@@ -1,3 +1,4 @@
+import random
 from decimal import Decimal
 
 import pytest
@@ -76,3 +77,15 @@ def test_the_largest_representable_annualized_return_is_still_reported() -> None
     assert result.annualized_return_pct is not None
     assert float(result.annualized_return_pct) == pytest.approx((1.2 ** 252 - 1) * 100, rel=1e-9)
     assert not any("Annualized" in warning for warning in result.warnings)
+
+
+def test_max_drawdown_equals_the_deepest_rounded_drawdown_on_random_curves() -> None:
+    # Phase 4B rounds only the deepest drawdown; rounding is monotonic, so it must equal min(rounded drawdowns).
+    rng = random.Random(7)
+    for _ in range(200):
+        curve = [CASH]
+        for _ in range(rng.randint(1, 40)):
+            curve.append((curve[-1] * D(str(1 + rng.uniform(-0.2, 0.2)))).quantize(D("0.01")))
+        result = compute_performance(CASH, curve, [])
+        assert result.max_drawdown_pct == min(result.drawdowns_pct)
+        assert len(result.drawdowns_pct) == len(curve)
