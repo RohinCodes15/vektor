@@ -1,3 +1,5 @@
+import threading
+import time
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -5,9 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.contracts import PaperOrder, PortfolioCreate, PortfolioUpdate
+from app.contracts import PaperOrder, PortfolioCreate, PortfolioUpdate, PriceBar
 from app.market_data.cache import HistoryCache
-from app.market_data.errors import InvalidMarketData, MarketDataUnavailable
+from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
+from app.market_data.provider import ProviderHistory
 from app.market_data.service import MarketDataService
 from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound, SnapshotRejected
 from app.portfolio.service import PortfolioService
@@ -337,3 +340,71 @@ def test_analytics_over_several_days(
 def test_analytics_for_unknown_portfolios_raise_not_found(service: PortfolioService, call: object) -> None:
     with pytest.raises(PortfolioNotFound):
         call(service, uuid4())  # type: ignore[operator]
+
+
+class TrackingProvider(FakeProvider):
+    """Records how many fetches overlap (each takes FETCH_SECONDS) and fails chosen symbols."""
+
+    FETCH_SECONDS = 0.1
+
+    def __init__(self, bars: list[PriceBar]) -> None:
+        super().__init__(bars)
+        self.errors: dict[str, Exception] = {}
+        self.active = self.peak = 0
+        self._lock = threading.Lock()
+
+    def fetch_daily_history(self, symbol: str, start: date, end: date) -> ProviderHistory:
+        with self._lock:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+        try:
+            time.sleep(self.FETCH_SECONDS)
+            if symbol in self.errors:
+                self.calls.append((symbol, start, end))
+                raise self.errors[symbol]
+            return super().fetch_daily_history(symbol, start, end)
+        finally:
+            with self._lock:
+                self.active -= 1
+
+
+@pytest.fixture
+def tracked(tmp_path: Path, clock: Clock) -> tuple[PortfolioService, TrackingProvider, object]:
+    """A portfolio holding AAA, BBB and CCC whose quotes are no longer cached (a new trading day)."""
+    provider = TrackingProvider([make_bar("2024-01-08", 99.0), make_bar("2024-01-09", 100.25)])
+    market = MarketDataService(provider, HistoryCache(tmp_path / "cache.sqlite3"), timedelta(hours=24), clock=clock)
+    service = PortfolioService(PortfolioStore(tmp_path / "portfolios.sqlite3"), market, clock=clock)
+    portfolio_id = service.create(PortfolioCreate(name="Main", starting_cash=Decimal("1000.00"))).id
+    for symbol in ("AAA", "BBB", "CCC"):
+        service.submit_order(portfolio_id, order(client_order_id=symbol, quantity="1", symbol=symbol))
+    clock.next_day()
+    provider.peak = 0
+    return service, provider, portfolio_id
+
+
+def test_holdings_fetch_uncached_quotes_concurrently(
+    tracked: tuple[PortfolioService, TrackingProvider, object],
+) -> None:
+    service, provider, portfolio_id = tracked
+    holdings = service.holdings(portfolio_id)  # type: ignore[arg-type]
+    assert provider.peak == 3  # all three quotes in flight at once, not one after another
+    assert [h.last_price for h in holdings.holdings] == [Decimal("100.25")] * 3
+
+
+def test_holdings_mark_a_missing_quote_unpriced_and_keep_the_others(
+    tracked: tuple[PortfolioService, TrackingProvider, object],
+) -> None:
+    service, provider, portfolio_id = tracked
+    provider.errors = {"BBB": MarketDataNotFound("none")}
+    holdings = service.holdings(portfolio_id)  # type: ignore[arg-type]
+    assert [h.last_price for h in holdings.holdings] == [Decimal("100.25"), None, Decimal("100.25")]
+    assert holdings.equity is None
+
+
+def test_holdings_fail_when_any_quote_provider_request_fails(
+    tracked: tuple[PortfolioService, TrackingProvider, object],
+) -> None:
+    service, provider, portfolio_id = tracked
+    provider.errors = {"BBB": MarketDataNotFound("none"), "CCC": InvalidMarketData("bad bar")}
+    with pytest.raises(InvalidMarketData, match="bad bar"):
+        service.holdings(portfolio_id)  # type: ignore[arg-type]
