@@ -35,13 +35,14 @@ from app.contracts import (
     BacktestSummary,
     BacktestTrade,
     MarketHistoryQuery,
+    MarketHistoryResponse,
     OptimizationCandidate,
     OptimizationSegment,
     OptimizationSelection,
     OptimizationSplit,
     StrategyComparisonResult,
 )
-from app.market_data.errors import MarketDataNotFound
+from app.market_data.errors import MarketDataError, MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
 from app.portfolio.accounting import to_cents
 
@@ -91,7 +92,7 @@ class BacktestService:
     def run(self, request: BacktestCreate) -> Backtest:
         """Simulate the request on adjusted daily bars and store the result. Raises BacktestRejected on unusable data."""
         self._check_range(request)
-        aligned = align({symbol: self._bars(symbol, request) for symbol in request.symbols})
+        aligned = align(self._bars_by_symbol(request.symbols, request))
         shortfall = _shortfall(request, request.strategy, aligned)
         if shortfall is not None:
             raise BacktestRejected(shortfall)
@@ -116,7 +117,7 @@ class BacktestService:
         data; a strategy with too little history for its warm-up is reported as unavailable instead.
         """
         self._check_range(request)
-        aligned = align({request.symbol: self._bars(request.symbol, request)})
+        aligned = align(self._bars_by_symbol([request.symbol], request))
         indicators = _indicators(aligned)
         results = [_compared(request, strategy, aligned, indicators) for strategy in request.strategies]
         baseline = results[0].metrics
@@ -151,7 +152,7 @@ class BacktestService:
         days. Nothing is stored. Raises BacktestRejected on unusable data or when no candidate fits both segments.
         """
         self._check_range(request)
-        aligned = align({request.symbol: self._bars(request.symbol, request)})
+        aligned = align(self._bars_by_symbol([request.symbol], request))
         split = split_calendar(aligned.calendar, request.train_pct)
         train, test = _slice(aligned, 0, len(split.train)), _slice(aligned, len(split.train), len(aligned.calendar))
         strategies: Sequence[BacktestStrategy] = request.grid.strategies()
@@ -230,14 +231,27 @@ class BacktestService:
                 f"(about {self._max_range_days // 365} years). Choose a shorter range."
             )
 
-    def _bars(self, symbol: str, request: BacktestSettings) -> list[Bar]:
-        query = MarketHistoryQuery(symbol=symbol, start=request.start, end=request.end)
-        try:
-            history = self._market_data.get_history(query)
-        except MarketDataNotFound:
+    def _bars_by_symbol(self, symbols: Sequence[str], request: BacktestSettings) -> dict[str, list[Bar]]:
+        """Bars for every symbol; uncached symbols are fetched concurrently. Failures are handled in request order,
+        exactly as fetching one symbol after another would.
+        """
+        queries = [MarketHistoryQuery(symbol=symbol, start=request.start, end=request.end) for symbol in symbols]
+        histories = self._market_data.get_histories(queries)
+        bars: dict[str, list[Bar]] = {}
+        for symbol in symbols:
+            # Drop each raw history once it is adjusted, so at most one is held beside the adjusted bars.
+            bars[symbol] = self._bars(symbol, request, histories.pop(0))
+        return bars
+
+    def _bars(
+        self, symbol: str, request: BacktestSettings, history: MarketHistoryResponse | MarketDataError
+    ) -> list[Bar]:
+        if isinstance(history, MarketDataNotFound):
             raise BacktestRejected(
                 f"No daily history for {symbol} between {request.start} and {request.end}. Check the symbol and dates."
-            ) from None
+            )
+        if isinstance(history, MarketDataError):
+            raise history
         if history.currency != BACKTEST_CURRENCY:
             raise BacktestRejected(
                 f"{symbol} is priced in {history.currency or 'an unreported currency'}; "
