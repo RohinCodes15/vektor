@@ -14,7 +14,7 @@ from decimal import Decimal
 from itertools import pairwise
 from typing import Literal
 
-from app.backtest.indicators import rsi, sma
+from app.backtest.indicators import Indicators
 from app.contracts import BacktestStrategy, BuyAndHoldStrategy, RsiStrategy, SmaCrossoverStrategy
 
 Signal = Literal["buy", "sell"]
@@ -32,23 +32,28 @@ def warmup_bars(strategy: BacktestStrategy) -> int:
 
 
 def signal_series(strategy: BacktestStrategy, closes: Sequence[Decimal]) -> tuple[Signal | None, ...]:
+    return signals(strategy, Indicators(closes))
+
+
+def signals(strategy: BacktestStrategy, indicators: Indicators) -> tuple[Signal | None, ...]:
+    """signal_series on precomputed indicators, shared by every strategy evaluated on the same closes."""
     match strategy:
         case BuyAndHoldStrategy():
-            return tuple("buy" if i == 0 else None for i in range(len(closes)))
+            return tuple("buy" if i == 0 else None for i in range(len(indicators.values)))
         case SmaCrossoverStrategy():
-            return _sma_crossover(strategy, closes)
+            return _sma_crossover(strategy, indicators)
         case RsiStrategy():
-            return _rsi_levels(strategy, closes)
+            return _rsi_levels(strategy, indicators)
 
 
-def _sma_crossover(strategy: SmaCrossoverStrategy, closes: Sequence[Decimal]) -> tuple[Signal | None, ...]:
-    fast = sma(closes, strategy.fast_window)
-    slow = sma(closes, strategy.slow_window)
+def _sma_crossover(strategy: SmaCrossoverStrategy, indicators: Indicators) -> tuple[Signal | None, ...]:
+    fast = indicators.sma(strategy.fast_window)
+    slow = indicators.sma(strategy.slow_window)
     spread = [f - s if f is not None and s is not None else None for f, s in zip(fast, slow, strict=True)]
-    signals: list[Signal | None] = [None] * min(len(closes), 1)
+    result: list[Signal | None] = [None] * min(len(indicators.values), 1)
     for previous, current in pairwise(spread):
-        signals.append(_crossing(previous, current))
-    return tuple(signals)
+        result.append(_crossing(previous, current))
+    return tuple(result)
 
 
 def _crossing(previous: Decimal | None, current: Decimal | None) -> Signal | None:
@@ -61,7 +66,7 @@ def _crossing(previous: Decimal | None, current: Decimal | None) -> Signal | Non
     return None
 
 
-def _rsi_levels(strategy: RsiStrategy, closes: Sequence[Decimal]) -> tuple[Signal | None, ...]:
+def _rsi_levels(strategy: RsiStrategy, indicators: Indicators) -> tuple[Signal | None, ...]:
     def level(value: Decimal | None) -> Signal | None:
         if value is None:
             return None
@@ -69,4 +74,4 @@ def _rsi_levels(strategy: RsiStrategy, closes: Sequence[Decimal]) -> tuple[Signa
             return "buy"
         return "sell" if value > strategy.overbought else None
 
-    return tuple(level(value) for value in rsi(closes, strategy.period))
+    return tuple(level(value) for value in indicators.rsi(strategy.period))

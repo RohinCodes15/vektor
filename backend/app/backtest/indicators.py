@@ -50,3 +50,24 @@ def _rsi(average_gain: Decimal, average_loss: Decimal) -> Decimal | None:
     if average_loss == 0:
         return HUNDRED if average_gain > 0 else None
     return HUNDRED - HUNDRED / (1 + average_gain / average_loss)
+
+
+class Indicators:
+    """Indicators of one series, each computed once per parameter. An optimization evaluates up to 100 candidates on
+    the same closes, and most share a window or period, so this avoids recomputing identical series.
+    """
+
+    def __init__(self, values: Sequence[Decimal]) -> None:
+        self.values = tuple(values)
+        self._sma: dict[int, tuple[Decimal | None, ...]] = {}
+        self._rsi: dict[int, tuple[Decimal | None, ...]] = {}
+
+    def sma(self, window: int) -> tuple[Decimal | None, ...]:
+        if window not in self._sma:
+            self._sma[window] = sma(self.values, window)
+        return self._sma[window]
+
+    def rsi(self, period: int) -> tuple[Decimal | None, ...]:
+        if period not in self._rsi:
+            self._rsi[period] = rsi(self.values, period)
+        return self._rsi[period]
