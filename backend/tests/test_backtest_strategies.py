@@ -2,7 +2,8 @@ from decimal import Decimal
 
 import pytest
 
-from app.backtest.strategies import signal_series, warmup_bars
+from app.backtest.indicators import Indicators
+from app.backtest.strategies import signal_series, signals, warmup_bars
 from app.contracts import BacktestStrategy, BuyAndHoldStrategy, RsiStrategy, SmaCrossoverStrategy
 
 BUY_AND_HOLD = BuyAndHoldStrategy(kind="buy_and_hold")
@@ -57,3 +58,15 @@ def test_signals_never_depend_on_later_bars(strategy: BacktestStrategy) -> None:
         assert signal_series(strategy, prefix) == full[: end + 1]
         shocked = [*prefix, Decimal(1000)]  # an extreme next close cannot change any signal before it
         assert signal_series(strategy, shocked)[: end + 1] == full[: end + 1]
+
+
+def test_strategies_sharing_precomputed_indicators_get_the_same_signals() -> None:
+    history = closes(*[10 + (i * 7) % 11 for i in range(60)])
+    shared = Indicators(history)
+    candidates: list[BacktestStrategy] = [
+        BUY_AND_HOLD, SMA, RSI,
+        SmaCrossoverStrategy(kind="sma_crossover", fast_window=2, slow_window=5),
+        RsiStrategy(kind="rsi", period=3, oversold=Decimal(40), overbought=Decimal(60)),
+    ]
+    for strategy in candidates:
+        assert signals(strategy, shared) == signal_series(strategy, history)

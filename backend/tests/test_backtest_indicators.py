@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.backtest.indicators import rsi, sma
+from app.backtest.indicators import Indicators, rsi, sma
 
 D = Decimal
 
@@ -54,3 +54,14 @@ def test_indicators_are_causal(indicator: object) -> None:
 def test_indicators_reject_a_non_positive_window(indicator: object) -> None:
     with pytest.raises(ValueError, match="at least 1"):
         indicator(series(1, 2), 0)  # type: ignore[operator]
+
+
+def test_indicators_match_the_plain_functions_and_compute_each_parameter_once() -> None:
+    values = [Decimal(v) for v in (10, 11, 13, 12, 9, 14, 15, 11, 10, 12)]
+    indicators = Indicators(values)
+    assert indicators.sma(3) == sma(values, 3)
+    assert indicators.rsi(4) == rsi(values, 4)
+    # Memoized: a second request returns the very same series instead of recomputing it.
+    assert indicators.sma(3) is indicators.sma(3)
+    assert indicators.rsi(4) is indicators.rsi(4)
+    assert indicators.sma(4) != indicators.sma(3)
