@@ -38,8 +38,13 @@ class Performance:
     win_rate_pct: Decimal | None
     closed_trades: int
     winning_trades: int
-    drawdowns_pct: tuple[Decimal, ...]  # one per equity point
+    drawdown_ratios: tuple[Decimal, ...]  # E_t / peak - 1, unrounded, one per equity point
     warnings: tuple[str, ...]  # why each undefined metric is null
+
+    @property
+    def drawdowns_pct(self) -> tuple[Decimal, ...]:
+        """Rounded only on request: an optimization ranks 100 candidates by their metrics and needs no curve."""
+        return tuple(pct(ratio) for ratio in self.drawdown_ratios)
 
 
 def compute_performance(
@@ -49,7 +54,7 @@ def compute_performance(
     returns = [today / previous - ONE for previous, today in pairwise(equity) if previous > 0]
     stdev = sample_stdev(returns)
     # The running peak is at least the starting cash, which is positive.
-    drawdowns = tuple(pct(e / peak - ONE) for e, peak in zip(equity, accumulate(equity, max), strict=True))
+    drawdowns = tuple(e / peak - ONE for e, peak in zip(equity, accumulate(equity, max), strict=True))
     winners = sum(1 for pnl in realized_pnl if pnl > 0)
     periods = len(equity) - 1
     annualized = _annualized(equity[-1] / starting_cash, periods)
@@ -71,12 +76,13 @@ def compute_performance(
         total_return_pct=pct(equity[-1] / starting_cash - ONE),
         annualized_return_pct=annualized,
         volatility_pct=pct(stdev * ANNUALIZER) if stdev is not None else None,
-        max_drawdown_pct=min(drawdowns),
+        # Rounding is monotonic, so rounding the deepest drawdown equals the deepest rounded drawdown.
+        max_drawdown_pct=pct(min(drawdowns)),
         sharpe_ratio=rounded(mean(returns) / stdev * ANNUALIZER) if stdev else None,
         win_rate_pct=pct(Decimal(winners) / len(realized_pnl)) if realized_pnl else None,
         closed_trades=len(realized_pnl),
         winning_trades=winners,
-        drawdowns_pct=drawdowns,
+        drawdown_ratios=drawdowns,
         warnings=tuple(warnings),
     )
 
