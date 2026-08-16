@@ -10,13 +10,14 @@ import logging
 import sqlite3
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, date, datetime, timedelta
 
 from app.contracts import MarketHistoryQuery, MarketHistoryResponse
 from app.market_data.cache import HistoryCache
-from app.market_data.errors import MarketDataNotFound, MarketDataUnavailable
+from app.market_data.errors import MarketDataError, MarketDataNotFound, MarketDataUnavailable
 from app.market_data.provider import HistoryProvider
 
 logger = logging.getLogger("vektor.market_data")
@@ -59,6 +60,31 @@ class MarketDataService:
         now = self._clock()
         history = self._load_cached(query, fresh_after=now - self._cache_ttl)
         return self._served(query, history if history is not None else self._fetch_once(query, now))
+
+    def get_histories(self, queries: Sequence[MarketHistoryQuery]) -> list[MarketHistoryResponse | MarketDataError]:
+        """get_history for each query, in order, with each failure returned in its query's place instead of raised.
+
+        Cached queries are read one after another (parsing is CPU-bound, so threads would only contend); uncached
+        ones are fetched concurrently, still within the bounded fetch slots, so N cold symbols cost about one
+        provider round trip per slot rather than N.
+        """
+        now = self._clock()
+        cached = [self._load_cached(query, fresh_after=now - self._cache_ttl) for query in queries]
+        misses = [i for i, history in enumerate(cached) if history is None]
+        fetched: dict[int, MarketHistoryResponse | MarketDataError] = {}
+        if len(misses) == 1:
+            fetched[misses[0]] = _outcome(lambda: self._fetch_once(queries[misses[0]], now))
+        elif misses:
+            with ThreadPoolExecutor(max_workers=len(misses), thread_name_prefix="vektor-fetch") as pool:
+                futures = {i: pool.submit(self._fetch_once, queries[i], now) for i in misses}
+                fetched = {i: _outcome(future.result) for i, future in futures.items()}
+        results: list[MarketHistoryResponse | MarketDataError] = []
+        for i, query in enumerate(queries):
+            history = cached[i] if cached[i] is not None else fetched[i]
+            results.append(history if isinstance(history, MarketDataError) else _outcome(
+                lambda q=query, h=history: self._served(q, h)
+            ))
+        return results
 
     def _served(self, query: MarketHistoryQuery, history: MarketHistoryResponse) -> MarketHistoryResponse:
         if not history.bars:
@@ -140,3 +166,9 @@ class MarketDataService:
         except (sqlite3.Error, OSError):
             logger.warning("market data cache write failed; response not cached", exc_info=True)
 
+
+def _outcome(call: Callable[[], MarketHistoryResponse]) -> MarketHistoryResponse | MarketDataError:
+    try:
+        return call()
+    except MarketDataError as error:
+        return error
