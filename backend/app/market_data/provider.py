@@ -1,6 +1,7 @@
 """Historical price providers. Yahoo Finance via yfinance: free, no API key, read-only."""
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from http import HTTPStatus
@@ -16,7 +17,13 @@ from app.market_data.normalize import normalize_daily_frame
 logger = logging.getLogger("vektor.market_data")
 
 REQUEST_TIMEOUT_SECONDS = 10
+# A transient failure (network error, timeout, HTTP 5xx) is retried once after a short pause, so the worst case is
+# about 2 * REQUEST_TIMEOUT_SECONDS per HTTP call yfinance makes. Not found, rate limits and other HTTP errors are not
+# retried: repeating them cannot succeed, and retrying a rate limit makes it worse.
+ATTEMPTS = 2
+RETRY_DELAY_SECONDS = 0.5
 RATE_LIMITED = "Yahoo Finance is rate limiting requests. Try again later."
+UNREACHABLE = "Yahoo Finance could not be reached. Try again later."
 
 
 @dataclass(frozen=True)
@@ -42,6 +49,17 @@ class YFinanceProvider:
         yf.config.debug.hide_exceptions = False
 
     def fetch_daily_history(self, symbol: str, start: date, end: date) -> ProviderHistory:
+        for attempt in range(1, ATTEMPTS + 1):
+            try:
+                return self._fetch(symbol, start, end)
+            except _TransientError:
+                if attempt == ATTEMPTS:
+                    raise MarketDataUnavailable(UNREACHABLE) from None
+                logger.info("retrying provider request", extra={"symbol": symbol, "attempt": attempt + 1})
+                time.sleep(RETRY_DELAY_SECONDS)
+        raise AssertionError("unreachable")  # the loop always returns or raises
+
+    def _fetch(self, symbol: str, start: date, end: date) -> ProviderHistory:
         ticker = yf.Ticker(symbol)
         try:
             frame = ticker.history(
@@ -67,8 +85,14 @@ class YFinanceProvider:
             logger.warning("provider request failed", extra={"symbol": symbol, "http_status": status}, exc_info=True)
             if status == HTTPStatus.TOO_MANY_REQUESTS:
                 raise MarketDataUnavailable(RATE_LIMITED) from None
-            raise MarketDataUnavailable("Yahoo Finance could not be reached. Try again later.") from None
+            if status is None or status >= HTTPStatus.INTERNAL_SERVER_ERROR:
+                raise _TransientError from None
+            raise MarketDataUnavailable(UNREACHABLE) from None
         return ProviderHistory(currency=_currency(ticker), bars=normalize_daily_frame(frame, start, end))
+
+
+class _TransientError(Exception):
+    """A failure that may succeed when repeated: no HTTP status (network error, timeout) or HTTP 5xx."""
 
 
 def _http_status(error: Exception) -> int | None:
