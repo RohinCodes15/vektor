@@ -27,9 +27,11 @@ class FakeTicker:
 
     def history(self, **kwargs: Any) -> Any:
         self.history_kwargs = kwargs
-        if isinstance(FakeTicker.result, BaseException):
-            raise FakeTicker.result
-        return FakeTicker.result
+        # A list is a sequence of outcomes, one per call (for retries).
+        outcome = FakeTicker.result.pop(0) if isinstance(FakeTicker.result, list) else FakeTicker.result
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
 
     def get_history_metadata(self) -> Any:
         if isinstance(FakeTicker.metadata, BaseException):
@@ -43,6 +45,7 @@ def fake_ticker(monkeypatch: pytest.MonkeyPatch) -> type[FakeTicker]:
     FakeTicker.result = daily_frame(["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"])
     FakeTicker.metadata = {"currency": "USD"}
     monkeypatch.setattr(provider_module.yf, "Ticker", FakeTicker)
+    monkeypatch.setattr(provider_module, "RETRY_DELAY_SECONDS", 0)
     return FakeTicker
 
 
@@ -159,3 +162,31 @@ def test_other_http_errors_are_unavailable_without_leaking_urls(fake_ticker: typ
     with pytest.raises(MarketDataUnavailable) as raised:
         YFinanceProvider().fetch_daily_history("AAPL", START, END)
     assert raised.value.message == "Yahoo Finance could not be reached. Try again later."
+
+
+def test_a_transient_failure_is_retried_once_and_can_succeed(fake_ticker: type[FakeTicker]) -> None:
+    fake_ticker.result = [TimeoutError("timed out"), daily_frame(["2024-01-02"])]
+    history = YFinanceProvider().fetch_daily_history("AAPL", START, END)
+    assert [bar.date for bar in history.bars] == [date(2024, 1, 2)]
+    assert len(fake_ticker.instances) == 2
+
+
+@pytest.mark.parametrize("error", [ConnectionError("reset"), FakeHTTPError(503)])
+def test_a_repeated_transient_failure_is_unavailable_after_two_attempts(
+    fake_ticker: type[FakeTicker], error: Exception
+) -> None:
+    fake_ticker.result = [error, error, daily_frame(["2024-01-02"])]
+    with pytest.raises(MarketDataUnavailable, match="could not be reached"):
+        YFinanceProvider().fetch_daily_history("AAPL", START, END)
+    assert len(fake_ticker.instances) == 2  # bounded: never a third attempt
+
+
+@pytest.mark.parametrize(
+    "error",
+    [YFRateLimitError(), FakeHTTPError(429), FakeHTTPError(404), FakeHTTPError(401), YFPricesMissingError("X", "")],
+)
+def test_permanent_failures_and_rate_limits_are_not_retried(fake_ticker: type[FakeTicker], error: Exception) -> None:
+    fake_ticker.result = [error, daily_frame(["2024-01-02"])]
+    with pytest.raises((MarketDataUnavailable, MarketDataNotFound)):
+        YFinanceProvider().fetch_daily_history("AAPL", START, END)
+    assert len(fake_ticker.instances) == 1
