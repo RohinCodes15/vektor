@@ -134,3 +134,18 @@ def test_health_is_unchanged(client: TestClient) -> None:
     res = client.get("/api/v1/health")
     assert res.status_code == 200 and res.json()["trading_mode"] == "paper"
     assert res.json().keys() == {"status", "app", "version", "environment", "trading_mode"}
+
+
+def test_large_responses_are_gzipped_for_clients_that_accept_it(client: TestClient, provider: FakeProvider) -> None:
+    provider.bars = [make_bar(f"2024-01-{day:02d}") for day in range(1, 32)]
+    plain = client.get(URL, params=PARAMS, headers={"accept-encoding": "identity"})
+    compressed = client.get(URL, params=PARAMS, headers={"accept-encoding": "gzip"})
+    assert "content-encoding" not in plain.headers
+    assert compressed.headers["content-encoding"] == "gzip"
+    assert compressed.num_bytes_downloaded < len(plain.content)
+    assert compressed.json() == {**plain.json(), "cached": True}  # same JSON contract; the repeat hit the cache
+
+
+def test_small_responses_are_not_compressed(client: TestClient) -> None:
+    response = client.get("/api/v1/health", headers={"accept-encoding": "gzip"})
+    assert response.status_code == 200 and "content-encoding" not in response.headers
