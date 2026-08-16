@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.analysis.provider import AnalysisProvider, AnthropicProvider
 from app.analysis.service import AnalysisService
@@ -28,6 +29,8 @@ except PackageNotFoundError:
     VERSION = "0.1.0"
 
 v1 = APIRouter(prefix="/api/v1")
+GZIP_MINIMUM_BYTES = 1024  # smaller bodies gain little and cost a little CPU
+GZIP_LEVEL = 1
 
 
 @v1.get("/health", response_model=HealthResponse, tags=["system"])
@@ -56,6 +59,10 @@ def build_analysis_provider(settings: Settings) -> AnalysisProvider | None:
 
 def add_middleware(app: FastAPI, settings: Settings) -> None:
     """Innermost first: each later middleware wraps the ones before it, so CORS headers reach every response."""
+    # History, backtest, comparison and optimization responses carry thousands of daily points; gzip shrinks them
+    # about 4x for clients that accept it. The JSON itself is unchanged. Level 1 compresses a 650 KB body in about
+    # 5 ms; level 9 saves only another 18% for ten times the CPU (benchmarks/README.md).
+    app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES, compresslevel=GZIP_LEVEL)
     app.add_middleware(RequestBodyLimit, max_bytes=settings.max_request_body_bytes)
     app.add_middleware(ExpensiveConcurrencyLimit, max_concurrent=settings.max_concurrent_expensive_requests)
     app.add_middleware(
