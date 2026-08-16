@@ -13,11 +13,12 @@ from uuid import UUID, uuid4
 from app.backtest.comparison import differences, leaders
 from app.backtest.engine import Costs, Holding, Simulation, simulate
 from app.backtest.errors import BacktestNotFound, BacktestRejected
+from app.backtest.indicators import Indicators
 from app.backtest.metrics import Performance, compute_performance
 from app.backtest.optimization import Scored, objective_value, overfitting_report, rank, split_calendar
 from app.backtest.prices import Aligned, Bar, adjust, align
 from app.backtest.store import BacktestStore
-from app.backtest.strategies import signal_series, warmup_bars
+from app.backtest.strategies import signal_series, signals, warmup_bars
 from app.contracts import (
     Backtest,
     BacktestComparison,
@@ -45,6 +46,8 @@ from app.market_data.service import MarketDataService, utc_now
 from app.portfolio.accounting import to_cents
 
 logger = logging.getLogger("vektor.backtest")
+
+SymbolIndicators = Mapping[str, Indicators]
 
 BACKTEST_CURRENCY = "USD"
 BASIS_POINTS = Decimal(10_000)
@@ -114,7 +117,8 @@ class BacktestService:
         """
         self._check_range(request)
         aligned = align({request.symbol: self._bars(request.symbol, request)})
-        results = [_compared(request, strategy, aligned) for strategy in request.strategies]
+        indicators = _indicators(aligned)
+        results = [_compared(request, strategy, aligned, indicators) for strategy in request.strategies]
         baseline = results[0].metrics
         if baseline is not None:
             results = [
@@ -155,9 +159,13 @@ class BacktestService:
         eligible = [(i, s) for i, s in enumerate(strategies) if warmup_bars(s) <= shortest]
         if not eligible:
             raise BacktestRejected(_optimization_shortfall(request, strategies, split.train, split.test))
-        scored = [Scored(i, strategy, _segment_metrics(request, strategy, train)) for i, strategy in eligible]
+        train_indicators = _indicators(train)
+        scored = [
+            Scored(i, strategy, _segment_metrics(request, strategy, train, train_indicators))
+            for i, strategy in eligible
+        ]
         ranked = rank(scored, request.objective)
-        selected = _selection(request, ranked[0], len(eligible), train, test) if ranked else None
+        selected = _selection(request, ranked[0], len(eligible), train, test, train_indicators) if ranked else None
         logger.info(
             "backtest optimization completed",
             extra={
@@ -253,7 +261,7 @@ def _shortfall(request: BacktestSettings, strategy: BacktestStrategy, aligned: A
 
 
 def _compared(
-    request: BacktestComparisonCreate, strategy: BacktestStrategy, aligned: Aligned
+    request: BacktestComparisonCreate, strategy: BacktestStrategy, aligned: Aligned, indicators: SymbolIndicators
 ) -> StrategyComparisonResult:
     shortfall = _shortfall(request, strategy, aligned)
     if shortfall is not None:
@@ -261,7 +269,7 @@ def _compared(
             strategy=strategy, status="unavailable", unavailable_reason=shortfall, metrics=None, warnings=[],
             equity=None, vs_baseline=None,
         )
-    simulation = _simulate(request, strategy, aligned)
+    simulation = _simulate(request, strategy, aligned, indicators)
     performance = _performance(request, simulation)
     return StrategyComparisonResult(
         strategy=strategy,
@@ -301,10 +309,15 @@ def _objective(scored: Scored, request: BacktestOptimizationCreate) -> Decimal:
 
 
 def _selection(
-    request: BacktestOptimizationCreate, best: Scored, candidates: int, train: Aligned, test: Aligned
+    request: BacktestOptimizationCreate,
+    best: Scored,
+    candidates: int,
+    train: Aligned,
+    test: Aligned,
+    train_indicators: SymbolIndicators,
 ) -> OptimizationSelection:
-    train_segment = _segment(request, best.strategy, train)
-    test_segment = _segment(request, best.strategy, test)
+    train_segment = _segment(request, best.strategy, train, train_indicators)
+    test_segment = _segment(request, best.strategy, test, _indicators(test))
     return OptimizationSelection(
         strategy=best.strategy,
         train=train_segment,
@@ -315,13 +328,17 @@ def _selection(
     )
 
 
-def _segment_metrics(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> BacktestMetrics:
-    simulation = _simulate(request, strategy, aligned)
+def _segment_metrics(
+    request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned, indicators: SymbolIndicators
+) -> BacktestMetrics:
+    simulation = _simulate(request, strategy, aligned, indicators)
     return _metrics(simulation, _performance(request, simulation))
 
 
-def _segment(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> OptimizationSegment:
-    simulation = _simulate(request, strategy, aligned)
+def _segment(
+    request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned, indicators: SymbolIndicators
+) -> OptimizationSegment:
+    simulation = _simulate(request, strategy, aligned, indicators)
     performance = _performance(request, simulation)
     return OptimizationSegment(
         first_date=aligned.calendar[0],
@@ -333,15 +350,25 @@ def _segment(request: BacktestSettings, strategy: BacktestStrategy, aligned: Ali
     )
 
 
-def _simulate(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> Simulation:
-    signals = {symbol: signal_series(strategy, [bar.close for bar in bars]) for symbol, bars in aligned.bars.items()}
+def _indicators(aligned: Aligned) -> SymbolIndicators:
+    """Closing-price indicators per symbol, computed once and shared by every strategy simulated on `aligned`."""
+    return {symbol: Indicators([bar.close for bar in bars]) for symbol, bars in aligned.bars.items()}
+
+
+def _simulate(
+    request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned, indicators: SymbolIndicators | None = None
+) -> Simulation:
+    if indicators is None:  # nothing to share: compute each symbol's indicators and let them go
+        series = {s: signal_series(strategy, [bar.close for bar in bars]) for s, bars in aligned.bars.items()}
+    else:
+        series = {symbol: signals(strategy, indicators[symbol]) for symbol in aligned.bars}
     costs = Costs(
         fee_per_trade=request.fee_per_trade,
         fee_rate=request.fee_bps / BASIS_POINTS,
         slippage=request.slippage_bps / BASIS_POINTS,
     )
     return simulate(
-        aligned.calendar, aligned.bars, signals, request.starting_cash, costs, request.position_size_pct / 100
+        aligned.calendar, aligned.bars, series, request.starting_cash, costs, request.position_size_pct / 100
     )
 
 
