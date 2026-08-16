@@ -97,6 +97,7 @@ def create_app(
         provider=market_data_provider or YFinanceProvider(),
         cache=HistoryCache(settings.market_data_cache_path),
         cache_ttl=timedelta(hours=settings.market_data_cache_ttl_hours),
+        max_concurrent_fetches=settings.market_data_max_concurrent_fetches,
     )
     app.state.market_data_service = market_data_service
     app.state.portfolio_service = PortfolioService(PortfolioStore(settings.portfolio_db_path), market_data_service)
