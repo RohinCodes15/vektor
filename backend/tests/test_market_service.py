@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from app.contracts import MarketHistoryQuery
+from app.contracts import MarketHistoryQuery, MarketHistoryResponse
 from app.market_data.cache import HistoryCache
 from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
 from app.market_data.provider import ProviderHistory
@@ -275,3 +275,43 @@ def test_a_request_that_waits_too_long_for_a_fetch_slot_is_unavailable(tmp_path:
     join_all(threads)
     assert [call[0] for call in provider.calls] == ["SLOW"]  # the timed-out request never reached the provider
 
+
+def test_get_histories_returns_each_result_or_error_in_query_order(
+    service: MarketDataService, provider: FakeProvider
+) -> None:
+    provider.bars_by_symbol = {"EMPTY": []}
+    service.get_history(query(symbol="AAPL"))  # cached
+    provider.calls.clear()
+    results = service.get_histories([query(symbol="AAPL"), query(symbol="EMPTY"), query(symbol="MSFT")])
+    assert isinstance(results[0], MarketHistoryResponse) and results[0].cached
+    assert isinstance(results[1], MarketDataNotFound)
+    assert isinstance(results[2], MarketHistoryResponse) and not results[2].cached
+    assert sorted(call[0] for call in provider.calls) == ["EMPTY", "MSFT"]  # the cached symbol is not fetched
+
+
+def test_get_histories_returns_provider_failures_instead_of_raising(
+    service: MarketDataService, provider: FakeProvider
+) -> None:
+    provider.error = MarketDataUnavailable("down")
+    results = service.get_histories([query(symbol="AAPL"), query(symbol="MSFT")])
+    assert [type(r) for r in results] == [MarketDataUnavailable, MarketDataUnavailable]
+
+
+def test_get_histories_fetches_uncached_symbols_concurrently(tmp_path: Path) -> None:
+    provider = BlockingProvider()
+    service = MarketDataService(provider, HistoryCache(tmp_path / "cache.sqlite3"), TTL, clock=Clock())
+    threads, results = in_threads([lambda: service.get_histories([query(symbol=s) for s in ("A", "B", "C")])])
+    wait_until(lambda: provider.active == 3)  # all three in flight at once, not one after another
+    provider.release.set()
+    join_all(threads)
+    assert [r.symbol for r in results[0]] == ["A", "B", "C"]
+
+
+def test_range_locks_are_released_after_every_request(tmp_path: Path) -> None:
+    provider = BlockingProvider()
+    provider.release.set()
+    service = MarketDataService(provider, HistoryCache(tmp_path / "cache.sqlite3"), TTL, clock=Clock())
+    threads, _ = in_threads([lambda s=s: service.get_history(query(symbol=s)) for s in ("A", "A", "B", "C")])
+    join_all(threads)
+    service.get_histories([query(symbol="D"), query(symbol="E")])
+    assert service._range_locks == {}  # nothing accumulates across requests
