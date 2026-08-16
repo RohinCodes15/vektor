@@ -107,6 +107,9 @@ def simulate(
 ) -> Simulation:
     """Run the timeline above. `bars[s][i]` and `signals[s][i]` belong to `calendar[i]` for every symbol."""
     symbols = sorted(bars)
+    # Most bars have no signal; only these can produce an order.
+    signal_bars = {i for s in symbols for i, signal in enumerate(signals[s]) if signal is not None}
+    last = len(calendar) - 1
     account = Account(cash=starting_cash)
     curve: list[EquityPoint] = []
     pending: tuple[Order, ...] = ()
@@ -114,9 +117,11 @@ def simulate(
         if pending:
             budget = curve[-1].equity * position_fraction / len(symbols)
             account = _execute(account, pending, {s: bars[s][i] for s in symbols}, costs, budget)
-        curve.append(_mark(day, account, {s: bars[s][i].close for s in symbols}))
-        is_last = i == len(calendar) - 1
-        pending = () if is_last else _orders(day, symbols, {s: signals[s][i] for s in symbols}, account)
+        curve.append(_mark(day, account, bars, i))
+        if i in signal_bars and i != last:
+            pending = _orders(day, symbols, {s: signals[s][i] for s in symbols}, account)
+        else:
+            pending = ()
     return Simulation(tuple(curve), account)
 
 
@@ -193,6 +198,11 @@ def _reject(account: Account, order: Order, fill_date: date, reason: str) -> Acc
     return replace(account, rejections=(*account.rejections, rejection))
 
 
-def _mark(day: date, account: Account, closes: Mapping[str, Decimal]) -> EquityPoint:
-    positions_value = sum((to_cents(h.quantity * closes[s]) for s, h in account.holdings.items()), ZERO_CASH)
+def _mark(day: date, account: Account, bars: Mapping[str, Sequence[Bar]], i: int) -> EquityPoint:
+    """Value the account at the closes of bar i."""
+    if not account.holdings:  # flat: same value as the empty sum below, without building a generator
+        return EquityPoint(day, account.cash, ZERO_CASH, account.cash + ZERO_CASH)
+    positions_value = sum(
+        (to_cents(h.quantity * bars[s][i].close) for s, h in account.holdings.items()), ZERO_CASH
+    )
     return EquityPoint(day, account.cash, positions_value, account.cash + positions_value)
