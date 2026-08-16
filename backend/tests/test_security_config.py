@@ -25,6 +25,7 @@ def test_development_keeps_local_frontends_and_docs_and_sets_limits() -> None:
     assert s.cors_origins == DEVELOPMENT_CORS_ORIGINS and s.docs_enabled
     assert (s.max_request_body_bytes, s.rate_limit_per_minute, s.expensive_rate_limit_per_minute) == (65536, 300, 30)
     assert (s.max_concurrent_expensive_requests, s.max_backtest_range_days) == (4, 7305)
+    assert s.market_data_max_concurrent_fetches == 4
 
 
 def test_production_defaults_to_no_cors_origins_and_no_docs() -> None:
@@ -76,6 +77,7 @@ def test_malformed_origins_are_rejected_in_every_environment(origin: str) -> Non
         {"rate_limit_per_minute": -1}, {"expensive_rate_limit_per_minute": -1},
         {"max_concurrent_expensive_requests": 0}, {"max_backtest_range_days": 10},
         {"max_backtest_range_days": 40_000},
+        {"market_data_max_concurrent_fetches": 0}, {"market_data_max_concurrent_fetches": 17},
     ],
 )
 def test_resource_limits_are_bounded(bad: dict[str, int]) -> None:

@@ -1,13 +1,18 @@
 import logging
 import sqlite3
+import threading
+import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from app.contracts import MarketHistoryQuery
 from app.market_data.cache import HistoryCache
 from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
+from app.market_data.provider import ProviderHistory
 from app.market_data.service import MarketDataService
 from tests.fakes import FakeProvider, make_bar
 
@@ -176,3 +181,97 @@ def test_logs_each_served_request(service: MarketDataService, caplog: pytest.Log
         service.get_history(query())
     (record,) = (r for r in caplog.records if r.getMessage() == "market history served")
     assert (record.symbol, record.cached, record.bars) == ("AAPL", False, 2)
+
+
+class BlockingProvider(FakeProvider):
+    """Holds every fetch until `release` is set, and records how many ran at once."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.release = threading.Event()
+        self.active = self.peak = 0
+        self._lock = threading.Lock()
+
+    def fetch_daily_history(self, symbol: str, start: date, end: date) -> ProviderHistory:
+        with self._lock:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+        try:
+            self.release.wait(timeout=5)
+            return super().fetch_daily_history(symbol, start, end)
+        finally:
+            with self._lock:
+                self.active -= 1
+
+
+def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not condition():
+        assert time.monotonic() < deadline, "condition not reached"
+        time.sleep(0.005)
+
+
+def join_all(threads: list[threading.Thread]) -> None:
+    """Every worker must finish inside the test, so none logs after the test (and its log capture) has ended."""
+    for thread in threads:
+        thread.join(timeout=5)
+        assert not thread.is_alive(), "worker thread did not finish"
+
+
+def in_threads(calls: list[Callable[[], Any]]) -> tuple[list[threading.Thread], list[Any]]:
+    results: list[Any] = [None] * len(calls)
+
+    def run(i: int) -> None:
+        try:
+            results[i] = calls[i]()
+        except Exception as error:  # collected for the assertion
+            results[i] = error
+
+    threads = [threading.Thread(target=run, args=(i,)) for i in range(len(calls))]
+    for thread in threads:
+        thread.start()
+    return threads, results
+
+
+def test_concurrent_identical_requests_share_one_provider_fetch(tmp_path: Path) -> None:
+    provider = BlockingProvider()
+    service = MarketDataService(provider, HistoryCache(tmp_path / "cache.sqlite3"), TTL, clock=Clock())
+    threads, results = in_threads([lambda: service.get_history(query()) for _ in range(5)])
+    wait_until(lambda: provider.active == 1)
+    time.sleep(0.05)  # let the other requests queue behind the first
+    provider.release.set()
+    join_all(threads)
+    assert len(provider.calls) == 1
+    assert all(r.bars == results[0].bars for r in results)
+    assert sorted(r.cached for r in results) == [False, True, True, True, True]
+
+
+def test_provider_fetches_are_bounded_across_requests(tmp_path: Path) -> None:
+    provider = BlockingProvider()
+    service = MarketDataService(
+        provider, HistoryCache(tmp_path / "cache.sqlite3"), TTL, clock=Clock(), max_concurrent_fetches=2
+    )
+    threads, results = in_threads([lambda s=s: service.get_history(query(symbol=s)) for s in "ABCDEF"])
+    wait_until(lambda: provider.active == 2)
+    time.sleep(0.05)
+    assert provider.peak == 2  # the other four wait for a slot
+    provider.release.set()
+    join_all(threads)
+    assert len(provider.calls) == 6 and provider.peak == 2
+    assert all(len(r.bars) == 2 for r in results)
+
+
+def test_a_request_that_waits_too_long_for_a_fetch_slot_is_unavailable(tmp_path: Path) -> None:
+    provider = BlockingProvider()
+    service = MarketDataService(
+        provider, HistoryCache(tmp_path / "cache.sqlite3"), TTL, clock=Clock(),
+        max_concurrent_fetches=1, fetch_wait_seconds=0.05,
+    )
+    threads, _ = in_threads([lambda: service.get_history(query(symbol="SLOW"))])
+    wait_until(lambda: provider.active == 1)
+    with pytest.raises(MarketDataUnavailable, match="busy"):
+        service.get_history(query(symbol="NEXT"))
+    provider.release.set()
+    join_all(threads)
+    assert [call[0] for call in provider.calls] == ["SLOW"]  # the timed-out request never reached the provider
+
