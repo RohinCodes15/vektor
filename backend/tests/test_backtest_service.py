@@ -11,7 +11,8 @@ from app.backtest.service import BacktestService
 from app.backtest.store import BacktestStore
 from app.contracts import BacktestCreate, PriceBar
 from app.market_data.cache import HistoryCache
-from app.market_data.errors import InvalidMarketData, MarketDataUnavailable
+from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
+from app.market_data.provider import ProviderHistory
 from app.market_data.service import MarketDataService
 from tests.fakes import FakeProvider
 
@@ -139,3 +140,50 @@ def test_market_data_failures_propagate_and_nothing_is_stored(
 def test_an_unknown_backtest_is_not_found(service: BacktestService) -> None:
     with pytest.raises(BacktestNotFound):
         service.get(uuid4())
+
+
+class PerSymbolProvider(FakeProvider):
+    """Bars for every symbol except those mapped to an error."""
+
+    def __init__(self, errors: dict[str, Exception]) -> None:
+        super().__init__(price_bars([10, 12, 14]))
+        self.errors = errors
+
+    def fetch_daily_history(self, symbol: str, start: date, end: date) -> ProviderHistory:
+        if symbol in self.errors:
+            self.calls.append((symbol, start, end))
+            raise self.errors[symbol]
+        return super().fetch_daily_history(symbol, start, end)
+
+
+def per_symbol_service(tmp_path: Path, errors: dict[str, Exception]) -> tuple[BacktestService, BacktestStore]:
+    store = BacktestStore(tmp_path / "backtests.sqlite3")
+    market_data = MarketDataService(
+        PerSymbolProvider(errors), HistoryCache(tmp_path / "cache.sqlite3"), timedelta(hours=24), lambda: NOW
+    )
+    return BacktestService(store, market_data, clock=lambda: NOW), store
+
+
+@pytest.mark.parametrize(
+    ("errors", "expected", "match"),
+    [
+        # The first failing symbol in request order decides, as if the symbols were fetched one after another.
+        ({"BBB": MarketDataNotFound("none"), "CCC": MarketDataUnavailable("down")}, BacktestRejected, "BBB"),
+        ({"BBB": MarketDataUnavailable("down"), "CCC": MarketDataNotFound("none")}, MarketDataUnavailable, "down"),
+        ({"CCC": InvalidMarketData("bad bar")}, InvalidMarketData, "bad bar"),
+    ],
+)
+def test_multi_symbol_failures_are_reported_for_the_first_failing_symbol(
+    tmp_path: Path, errors: dict[str, Exception], expected: type[Exception], match: str
+) -> None:
+    service, store = per_symbol_service(tmp_path, errors)
+    with pytest.raises(expected, match=match):
+        service.run(request(symbols=["AAA", "BBB", "CCC"]))
+    assert store.list_summaries() == []
+
+
+def test_multi_symbol_backtest_reuses_cached_history(tmp_path: Path) -> None:
+    service, _ = per_symbol_service(tmp_path, {})
+    first = service.run(request(symbols=["AAA", "BBB"]))
+    second = service.run(request(symbols=["AAA", "BBB"]))
+    assert first.metrics == second.metrics and first.equity_curve == second.equity_curve
