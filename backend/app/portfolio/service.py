@@ -5,7 +5,7 @@ are open, and Yahoo can report it with missing values. Completed-day ranges are 
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from functools import partial
@@ -17,6 +17,7 @@ from app.contracts import (
     AssetRisk,
     EquitySnapshot,
     MarketHistoryQuery,
+    MarketHistoryResponse,
     PaperOrder,
     Portfolio,
     PortfolioAllocation,
@@ -27,7 +28,7 @@ from app.contracts import (
     PortfolioUpdate,
     Transaction,
 )
-from app.market_data.errors import MarketDataNotFound
+from app.market_data.errors import MarketDataError, MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
 from app.portfolio.accounting import Quote, Valuation, fill_order, to_price, value_portfolio
 from app.portfolio.allocation import concentration, pct, rounded
@@ -259,8 +260,7 @@ class PortfolioService:
         if not valuation.equity:
             return report("Equity is zero; weights are undefined.")
         closes: dict[str, dict[date, Decimal]] = {}
-        for symbol in quotes:
-            history = self._closes(symbol, *window)
+        for symbol, history in self._closes(list(quotes), *window).items():
             if history is None:
                 return report(f"No daily history for {symbol} between {window[0]} and {window[1]}.")
             closes[symbol] = history
@@ -295,13 +295,22 @@ class PortfolioService:
             ],
         )
 
-    def _closes(self, symbol: str, start: date, end: date) -> dict[date, Decimal] | None:
-        """Adjusted closes by date (dividends and splits included), or None when the provider has no bars."""
-        try:
-            history = self._market_data.get_history(MarketHistoryQuery(symbol=symbol, start=start, end=end))
-        except MarketDataNotFound:
-            return None
-        return {bar.date: Decimal(str(bar.adjusted_close)) for bar in history.bars}
+    def _closes(self, symbols: Sequence[str], start: date, end: date) -> dict[str, dict[date, Decimal] | None]:
+        """Adjusted closes by date (dividends and splits included) per symbol, None when the provider has no bars.
+
+        Uncached symbols are fetched concurrently. Other failures are raised for the first failing symbol in order,
+        as fetching one symbol after another would.
+        """
+        queries = [MarketHistoryQuery(symbol=symbol, start=start, end=end) for symbol in symbols]
+        closes: dict[str, dict[date, Decimal] | None] = {}
+        for symbol, history in zip(symbols, self._market_data.get_histories(queries), strict=True):
+            if isinstance(history, MarketDataNotFound):
+                closes[symbol] = None
+            elif isinstance(history, MarketDataError):
+                raise history
+            else:
+                closes[symbol] = {bar.date: Decimal(str(bar.adjusted_close)) for bar in history.bars}
+        return closes
 
     def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
         """Value one consistent read of cash and positions at the latest completed closes."""
@@ -309,39 +318,52 @@ class PortfolioService:
         if state is None:
             raise PortfolioNotFound(portfolio_id)
         portfolio, positions = state
-        quotes = {position.symbol: self._quote_or_none(position.symbol) for position in positions}
+        symbols = [position.symbol for position in positions]
+        # Uncached quotes are fetched concurrently; failures are handled in position order, as before.
+        histories = self._market_data.get_histories([self._quote_query(symbol) for symbol in symbols])
+        quotes = {symbol: self._quote_or_none(symbol, h) for symbol, h in zip(symbols, histories, strict=True)}
         return portfolio, value_portfolio(portfolio.cash, positions, quotes), quotes
 
-    def _quote_or_none(self, symbol: str) -> Quote | None:
+    def _quote_or_none(self, symbol: str, history: MarketHistoryResponse | MarketDataError) -> Quote | None:
         try:
-            return self._latest_quote(symbol)
+            return _quote(symbol, history)
         except PriceUnavailable as error:
             logger.warning("holding has no market price", extra={"symbol": symbol, "reason": error.reason})
             return None
 
     def _latest_quote(self, symbol: str) -> Quote:
-        """The most recent close among the PRICE_LOOKBACK_DAYS days before today (UTC).
+        """The most recent close among the PRICE_LOOKBACK_DAYS days before today (UTC); see _quote."""
+        try:
+            return _quote(symbol, self._market_data.get_history(self._quote_query(symbol)))
+        except MarketDataNotFound as error:
+            return _quote(symbol, error)
 
-        Raises PriceUnavailable when there is none or it is not in USD. Provider outages and invalid data
-        (MarketDataUnavailable, InvalidMarketData) propagate unchanged, so nothing executes on bad data.
-        """
+    def _quote_query(self, symbol: str) -> MarketHistoryQuery:
         today = self._clock().date()
-        query = MarketHistoryQuery(
+        return MarketHistoryQuery(
             symbol=symbol, start=today - timedelta(days=PRICE_LOOKBACK_DAYS), end=today - timedelta(days=1)
         )
-        try:
-            history = self._market_data.get_history(query)
-        except MarketDataNotFound:
-            raise PriceUnavailable(
-                f"No daily close for {symbol} in the {PRICE_LOOKBACK_DAYS} days before today. Check the symbol."
-            ) from None
-        if history.currency != PORTFOLIO_CURRENCY:
-            raise PriceUnavailable(
-                f"{symbol} is priced in {history.currency or 'an unreported currency'}; "
-                f"portfolios hold {PORTFOLIO_CURRENCY} only."
-            )
-        bar = history.bars[-1]
-        return Quote(price=to_price(bar.close), price_date=bar.date)
+
+
+def _quote(symbol: str, history: MarketHistoryResponse | MarketDataError) -> Quote:
+    """The latest close of a quote history.
+
+    Raises PriceUnavailable when there is none or it is not in USD. Provider outages and invalid data
+    (MarketDataUnavailable, InvalidMarketData) propagate unchanged, so nothing executes on bad data.
+    """
+    if isinstance(history, MarketDataNotFound):
+        raise PriceUnavailable(
+            f"No daily close for {symbol} in the {PRICE_LOOKBACK_DAYS} days before today. Check the symbol."
+        )
+    if isinstance(history, MarketDataError):
+        raise history
+    if history.currency != PORTFOLIO_CURRENCY:
+        raise PriceUnavailable(
+            f"{symbol} is priced in {history.currency or 'an unreported currency'}; "
+            f"portfolios hold {PORTFOLIO_CURRENCY} only."
+        )
+    bar = history.bars[-1]
+    return Quote(price=to_price(bar.close), price_date=bar.date)
 
 
 def _is_stale(price_date: date, today: date) -> bool:
