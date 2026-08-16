@@ -26,7 +26,7 @@ uv run pytest
 
 ## Configuration
 
-All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). The optional AI analysis settings (`VEKTOR_AI_*`) are described under Phase 3A.1 below. Security, resource limits, and production settings are described under Phase 4A below. Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
+All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). The optional AI analysis settings (`VEKTOR_AI_*`) are described under Phase 3A.1 below. Security, resource limits, and production settings are described under Phase 4A below; market data concurrency under Phase 4B. Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
 
 ## Security and production (Phase 4A)
 
@@ -71,6 +71,35 @@ JSON lines on stderr. Each request is logged with its request id, method, path, 
 - Run **one** server process. Rate limits and the concurrency cap are kept in memory per process, and the SQLite databases expect a single writer.
 - Keep secrets in the environment or an untracked `backend/.env`, never in the repository.
 - Back up `VEKTOR_PORTFOLIO_DB_PATH` and `VEKTOR_BACKTEST_DB_PATH`. The market data cache is disposable.
+
+## Performance and reliability (Phase 4B)
+
+Measured, result-preserving optimizations. No API contract changed, and no dependency was added. Reproducible benchmarks, with before and after numbers, are in [`benchmarks/README.md`](benchmarks/README.md): `uv run python benchmarks/bench.py`.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `VEKTOR_MARKET_DATA_MAX_CONCURRENT_FETCHES` | `4` (1 to 16) | Yahoo Finance requests in flight at once, across all API requests. More wait their turn for up to 30 seconds, then get 503 |
+
+**Market data**
+- Concurrent requests for the same symbol and range make one Yahoo request: the others wait for it and read the result from the cache.
+- A multi-symbol backtest, portfolio valuation (holdings, snapshots, analytics, allocation), and portfolio risk read cached symbols one after another and fetch the uncached ones concurrently, within the fetch limit above. Errors are handled for the first failing symbol in order, exactly as before. Valuing 5 holdings on a cold cache with 250 ms provider latency went from 1.29 s to 0.52 s.
+- A transient failure (network error, timeout, HTTP 5xx) is retried once after 0.5 seconds. Not found, rate limits (429), and other HTTP errors are never retried. Each Yahoo HTTP call times out after 10 seconds, so one fetch takes at most about 20 seconds plus the pause.
+- Freshness rules are unchanged: an entry is reused only within `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` and only if it covers the whole range, ranges reaching today are never cached, and corrupt cache rows fall back to Yahoo.
+
+**Computation**
+- Optimizations and comparisons compute each moving average or RSI once per window or period and share it across candidates. They used to recompute it for every candidate.
+- The simulation skips order checks on bars without a signal and values a flat account without summing positions. Drawdowns are rounded only when an equity curve is returned, and the max drawdown is the rounded deepest drawdown. Rounding is monotonic, so that equals the deepest rounded drawdown.
+- `tests/test_performance_regression.py` pins SHA-256 digests of a multi-symbol backtest, a comparison, and SMA and RSI optimizations, all recorded with the pre-4B code. Every result is byte-identical.
+
+**Storage**
+- Each stored backtest keeps its summary beside the full result, so `GET /api/v1/backtests` no longer parses every stored equity curve. A database created before 4B is migrated, and its summaries filled from the stored results, the first time the server opens it. No data is lost or recomputed.
+
+**Responses**
+- Responses over 1 KiB are gzip-compressed (level 1) for clients that send `Accept-Encoding: gzip`, as browsers do. The JSON is unchanged. A 20-year history or backtest shrinks from about 650 KB to about 130 to 180 KB.
+
+**Remaining bottlenecks**
+- Simulation and metrics use exact `Decimal` arithmetic, so a 100-candidate optimization over 20 years still takes about 2 seconds. This is deliberate: money is never a float.
+- Each cached history load validates every bar (about 15 ms per 5,000 bars), so a corrupt cache can never reach a backtest.
 
 ## Historical market data (Phase 2A)
 
@@ -129,7 +158,7 @@ Ranges that end today (UTC) or later are never cached, because today's bar may s
 - Yahoo Finance is an unofficial, free source with no uptime guarantee and undocumented rate limits. Its data can contain errors; 502 responses surface the ones that fail validation.
 - yfinance reports a missing daily volume as `0`, so a zero volume cannot be told apart from an unreported one.
 - Yahoo restates split- and dividend-adjusted values after corporate actions. A cached entry can lag such a restatement by up to the cache TTL.
-- Only daily bars are supported. Requests are made synchronously, one symbol at a time.
+- Only daily bars are supported. Each request covers one symbol; a multi-symbol backtest fetches its uncached symbols concurrently, within the limits described under Phase 4B.
 - yfinance keeps its own small timezone cache in the user cache directory.
 - yfinance 1.7 emits `Pandas4Warning` deprecation warnings with pandas 3.1. They are harmless.
 
