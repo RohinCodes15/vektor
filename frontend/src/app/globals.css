@@ -495,4 +495,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 @media (max-width: 480px) {
   main { padding-inline: 16px; }
   .topbar, .sidebar, .sidebar-collapsed .sidebar { padding-inline: 16px; }
+  .topbar-actions { flex-wrap: wrap; min-width: 0; }
 }
