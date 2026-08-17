@@ -9,6 +9,8 @@ const sections = [
   { id: "overview", label: "Overview", icon: "◫" },
   { id: "activity", label: "Paper portfolio", icon: "↳" },
   { id: "backtest", label: "Backtest", icon: "⏱" },
+  { id: "comparison", label: "Strategy comparison", icon: "⇄" },
+  { id: "optimization", label: "Strategy optimization", icon: "⧉" },
   { id: "market", label: "Market workspace", icon: "⌁" },
 ] as const;
 
