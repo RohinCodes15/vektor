@@ -59,6 +59,7 @@ h4 { font-size: 13px; font-weight: 550; line-height: 1.5; }
 .backtest-form > [role="alert"] { padding: 12px 16px; border-left: 2px solid #dfc58e; background: #dfc58e08; border-radius: 4px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .trade-table-scroll, .holdings-scroll { max-width: 100%; overscroll-behavior-x: contain; }
 .trade-table-scroll:focus-visible, .holdings-scroll:focus-visible { outline-offset: -3px; }
+summary { min-height: 44px; padding-block: 10px; }
 .field input { min-height: 44px; min-width: 0; width: 100%; background: var(--color-canvas); border: 1px solid var(--color-control); border-radius: 5px; padding: 10px 12px; color: var(--color-ink); font-size: 12px; }
 .field input::placeholder { color: var(--color-muted); }
 .backtest-panel { padding: 28px; }
