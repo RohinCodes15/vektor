@@ -51,6 +51,7 @@ h4 { font-size: 13px; font-weight: 550; line-height: 1.5; }
 .field { display: grid; gap: 8px; min-width: 0; }
 .field label { font-size: 12px; }
 .field p { color: var(--color-muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.field input:disabled, .field select:disabled { cursor: not-allowed; color: var(--color-muted); opacity: 1; }
 .field input { min-height: 44px; min-width: 0; width: 100%; background: var(--color-canvas); border: 1px solid var(--color-control); border-radius: 5px; padding: 10px 12px; color: var(--color-ink); font-size: 12px; }
 .field input::placeholder { color: var(--color-muted); }
 .backtest-panel { padding: 28px; }
