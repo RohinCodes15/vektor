@@ -502,4 +502,6 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .comparison-legend label { min-width: 0; overflow-wrap: anywhere; }
   .comparison-legend input { flex-shrink: 0; }
   .comparison-values li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .optimization-segment > .panel-heading { align-items: flex-start; }
+  .section-heading { gap: 12px; }
 }
