@@ -19,6 +19,7 @@ export async function mount(file, imports, name, initialProps = {}) {
     },
     useRef(value) { const index = cursor++; return slots[index] ??= { current: value }; },
     useCallback(callback, deps) { return hooks.useMemo(() => callback, deps); },
+    useSyncExternalStore(_subscribe, getSnapshot, getServerSnapshot) { return (getServerSnapshot ?? getSnapshot)(); },
     useMemo(factory, deps) {
       const index = cursor++;
       if (!slots[index] || deps.some((value, i) => !Object.is(value, slots[index].deps[i]))) slots[index] = { deps, value: factory() };
