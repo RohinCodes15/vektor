@@ -46,6 +46,7 @@ h4 { font-size: 13px; font-weight: 550; line-height: 1.5; }
 .panel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-heading > div { min-width: 0; overflow-wrap: anywhere; }
 .panel-heading p { margin-top: 4px; }
+.panel-heading > .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .field { display: grid; gap: 8px; min-width: 0; }
 .field label { font-size: 12px; }
 .field input { min-height: 44px; min-width: 0; width: 100%; background: var(--color-canvas); border: 1px solid var(--color-control); border-radius: 5px; padding: 10px 12px; color: var(--color-ink); font-size: 12px; }
