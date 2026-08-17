@@ -499,4 +499,6 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .panel { padding-inline: 16px; }
   .backtest-fields, .metrics-grid { grid-template-columns: minmax(0, 1fr); }
   .strategy-picker label { white-space: normal; overflow-wrap: anywhere; }
+  .comparison-legend label { min-width: 0; overflow-wrap: anywhere; }
+  .comparison-legend input { flex-shrink: 0; }
 }
