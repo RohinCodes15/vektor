@@ -501,4 +501,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .strategy-picker label { white-space: normal; overflow-wrap: anywhere; }
   .comparison-legend label { min-width: 0; overflow-wrap: anywhere; }
   .comparison-legend input { flex-shrink: 0; }
+  .comparison-values li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 }
