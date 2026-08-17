@@ -492,3 +492,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .correlation-table td:focus-visible { outline: 2px solid var(--color-ink); outline-offset: -3px; }
 @media (max-width: 1000px) { .allocation-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 480px) { .allocation-toolbar { align-items: stretch; flex-direction: column; } }
+@media (max-width: 480px) {
+  main { padding-inline: 16px; }
+  .topbar, .sidebar, .sidebar-collapsed .sidebar { padding-inline: 16px; }
+}
