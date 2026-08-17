@@ -31,6 +31,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     mobileToggle.current?.focus();
   }
 
+  function focusSection(id: string): void {
+    setMobileOpen(false);
+    const section = document.getElementById(id);
+    if (section) {
+      section.tabIndex = -1;
+      section.focus({ preventScroll: true });
+    }
+  }
+
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: reduced ? 0 : 0.18, ease: "easeOut" }}>
     <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${mobileOpen ? "mobile-nav-open" : ""}`}>
@@ -49,7 +58,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="workspace-label"><span className="sidebar-copy">WORKSPACE / 01</span><span className="status-dot" /></div>
           <nav aria-label="Main">
             {sections.map(({ id, label, icon }) => (
-              <motion.a initial={false} whileHover={{ x: reduced ? 0 : 2 }} key={id} href={`#${id}`} className={`nav-link ${hash === `#${id}` ? "nav-active" : ""}`} aria-label={label} aria-current={hash === `#${id}` ? "location" : undefined} title={collapsed ? label : undefined} onClick={() => { if (mobileOpen) closeMobileNavigation(); }}>
+              <motion.a initial={false} whileHover={{ x: reduced ? 0 : 2 }} key={id} href={`#${id}`} className={`nav-link ${hash === `#${id}` ? "nav-active" : ""}`} aria-label={label} aria-current={hash === `#${id}` ? "location" : undefined} title={collapsed ? label : undefined} onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) focusSection(id); }}>
                 <span className="nav-icon" aria-hidden="true">{icon}</span><span className="sidebar-copy">{label}</span>
               </motion.a>
             ))}
