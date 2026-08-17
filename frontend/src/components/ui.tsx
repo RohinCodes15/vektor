@@ -14,8 +14,9 @@ export function Panel({ className = "", ...props }: HTMLMotionProps<"section">) 
   return <motion.section className={`panel ${className}`} initial={false} whileInView={{ y: [3, 0] }} viewport={{ once: true, amount: 0.15 }} {...props} />;
 }
 
-export function Field({ label, id, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; id: string; hint?: string }) {
-  return <div className="field"><label htmlFor={id}>{label}</label><input id={id} aria-describedby={hint ? `${id}-hint` : undefined} {...props} />{hint && <p id={`${id}-hint`} className="muted text-xs">{hint}</p>}</div>;
+export function Field({ label, id, hint, "aria-describedby": describedBy, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; id: string; hint?: string }) {
+  const descriptions = [describedBy, hint ? `${id}-hint` : undefined].filter(Boolean).join(" ") || undefined;
+  return <div className="field"><label htmlFor={id}>{label}</label><input id={id} aria-describedby={descriptions} {...props} />{hint && <p id={`${id}-hint`} className="muted text-xs">{hint}</p>}</div>;
 }
 
 export function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
