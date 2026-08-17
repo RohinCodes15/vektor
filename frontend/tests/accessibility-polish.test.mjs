@@ -20,3 +20,14 @@ test("shared fields associate hints and validation descriptions without dropping
   assert.equal(nodes(tree).find((node) => node.type === "input").props["aria-describedby"], undefined);
 });
 
+test("shared buttons preserve explicit form types, accessible names, and disabled behavior", async () => {
+  const component = await mount("../src/components/ui.tsx", { "motion/react-client": { section: "section" } }, "Button", {
+    type: "submit", disabled: true, "aria-label": "Run paper strategy comparison", children: "Compare", variant: "secondary",
+  });
+  const tree = component.render();
+  assert.equal(tree.type, "button");
+  assert.equal(tree.props.type, "submit");
+  assert.equal(tree.props.disabled, true);
+  assert.equal(tree.props["aria-label"], "Run paper strategy comparison");
+  assert.match(tree.props.className, /button-secondary/);
+});
