@@ -498,4 +498,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .topbar-actions { flex-wrap: wrap; min-width: 0; }
   .panel { padding-inline: 16px; }
   .backtest-fields, .metrics-grid { grid-template-columns: minmax(0, 1fr); }
+  .strategy-picker label { white-space: normal; overflow-wrap: anywhere; }
 }
