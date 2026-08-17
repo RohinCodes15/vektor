@@ -496,4 +496,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   main { padding-inline: 16px; }
   .topbar, .sidebar, .sidebar-collapsed .sidebar { padding-inline: 16px; }
   .topbar-actions { flex-wrap: wrap; min-width: 0; }
+  .panel { padding-inline: 16px; }
 }
