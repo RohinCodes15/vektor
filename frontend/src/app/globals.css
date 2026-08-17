@@ -23,10 +23,11 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--color-teal); outline-offset: 4px; }
 button:disabled { cursor: not-allowed; color: #98a5a3; border-color: var(--color-line); background: var(--color-surface); }
-h1, h2, h3, p { margin: 0; }
+h1, h2, h3, h4, p { margin: 0; }
 h1 { font-size: clamp(1.8rem, 2.6vw, 2.5rem); line-height: 1.2; letter-spacing: -.045em; font-weight: 500; }
 h2 { font-size: 18px; font-weight: 550; letter-spacing: -.025em; }
 h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
+h4 { font-size: 13px; font-weight: 550; line-height: 1.5; }
 .muted { color: var(--color-muted); }
 .mono { font-family: var(--font-mono); }
 .skip-link { position: fixed; top: -100px; left: 20px; z-index: 10; padding: 12px 20px; background: var(--color-teal); color: var(--color-canvas); }
