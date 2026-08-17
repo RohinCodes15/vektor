@@ -32,7 +32,7 @@ h4 { font-size: 13px; font-weight: 550; line-height: 1.5; }
 .mono { font-family: var(--font-mono); }
 .skip-link { position: fixed; top: -100px; left: 20px; z-index: 10; padding: 12px 20px; background: var(--color-teal); color: var(--color-canvas); }
 .skip-link:focus { top: 12px; }
-.button { display: inline-flex; justify-content: center; align-items: center; gap: 12px; min-height: 42px; padding: 10px 16px; border: 1px solid transparent; border-radius: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background-color .15s, border-color .15s; }
+.button { display: inline-flex; justify-content: center; align-items: center; gap: 12px; min-height: 44px; max-width: 100%; padding: 10px 16px; border: 1px solid transparent; border-radius: 5px; font-size: 12px; font-weight: 600; white-space: normal; text-align: center; overflow-wrap: anywhere; transition: background-color .15s, border-color .15s; }
 .button-primary { background: var(--color-teal); color: #12251f; }
 .button-primary:hover:enabled { background: #a2e3d2; }
 .button-secondary { background: var(--color-raised); border-color: var(--color-control); color: var(--color-ink); }
