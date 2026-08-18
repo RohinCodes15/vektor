@@ -1,5 +1,6 @@
 """Phase 4A hardening, exercised through the real app: limits, headers, CORS, docs, and safe errors."""
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -139,6 +140,24 @@ def test_unexpected_failures_never_expose_internal_details(tmp_path: Path) -> No
     client = make_client(tmp_path, FakeProvider(error=RuntimeError("db password=hunter2 at /srv/secret.py")))
     res = client.post("/api/v1/backtests", json=BACKTEST)
     assert res.status_code == 500 and res.json() == {"detail": "Internal server error"}
+    assert "hunter2" not in res.text
+
+
+def test_unexpected_failures_keep_cors_security_headers_and_the_request_id(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    client = make_client(tmp_path, FakeProvider(error=RuntimeError("db password=hunter2")))
+    logging.getLogger().addHandler(caplog.handler)  # create_app reconfigures logging and drops pytest's handler
+    res = client.post("/api/v1/backtests", json=BACKTEST, headers={"Origin": ORIGIN, "x-request-id": "trace-500"})
+    assert res.status_code == 500 and res.json() == {"detail": "Internal server error"}
+    # Without CORS headers a browser hides the response and the frontend sees a network error instead.
+    assert res.headers["access-control-allow-origin"] == ORIGIN
+    assert res.headers["x-request-id"] == "trace-500"
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["cache-control"] == "no-store"
+    assert res.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+    errors = [r for r in caplog.records if r.getMessage() == "unhandled error"]
+    assert len(errors) == 1 and errors[0].exc_info is not None
     assert "hunter2" not in res.text
 
 
