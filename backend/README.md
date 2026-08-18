@@ -153,7 +153,7 @@ One exception to "any missing value rejects the response": Yahoo returns the ses
 
 Responses are cached in SQLite at `backend/data/market_data.sqlite3` (git-ignored; set `VEKTOR_MARKET_DATA_CACHE_PATH` to move it). Each entry is one complete Yahoo response. A request is served from the cache only when a single entry fetched within `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (default 24) covers its whole range, so history is never stitched together from fetches made at different times. Repeated and narrower requests are served locally; wider ones are fetched again.
 
-Ranges that end today (UTC) or later are never cached, because today's bar may still change. Cache read or write failures are logged and fall back to Yahoo; they never fail a request. To clear the cache, stop the server and delete the file.
+Ranges that end today (UTC) or later are never cached, because today's bar may still change. Neither is a response from which an unfinished session was left out (see Data integrity). Cache read or write failures are logged and fall back to Yahoo; they never fail a request. To clear the cache, stop the server and delete the file.
 
 ### Limitations
 
