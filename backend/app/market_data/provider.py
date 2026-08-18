@@ -13,7 +13,7 @@ from yfinance.exceptions import YFPricesMissingError, YFRateLimitError, YFTzMiss
 
 from app.contracts import MarketDataSource, PriceBar
 from app.market_data.errors import MarketDataNotFound, MarketDataUnavailable
-from app.market_data.normalize import normalize_daily_frame
+from app.market_data.normalize import drop_unfinished_session, normalize_daily_frame
 
 logger = logging.getLogger("vektor.market_data")
 
@@ -25,6 +25,9 @@ ATTEMPTS = 2
 RETRY_DELAY_SECONDS = 0.5
 RATE_LIMITED = "Yahoo Finance is rate limiting requests. Try again later."
 UNREACHABLE = "Yahoo Finance could not be reached. Try again later."
+# A session dated on or after yesterday (UTC) may still be trading or awaiting Yahoo's finalization: the US session
+# is already yesterday in UTC from 19:00 or 20:00 New York time, and Yahoo can take hours to fill its Adj Close.
+UNFINISHED_SESSION_WINDOW = timedelta(days=1)
 
 
 @dataclass(frozen=True)
@@ -96,7 +99,12 @@ class YFinanceProvider:
             if status is None or status >= HTTPStatus.INTERNAL_SERVER_ERROR:
                 raise _TransientError from None
             raise MarketDataUnavailable(UNREACHABLE) from None
-        return ProviderHistory(currency=_currency(ticker), bars=normalize_daily_frame(frame, start, end))
+        frame, dropped = drop_unfinished_session(frame, live_from=self._clock().date() - UNFINISHED_SESSION_WINDOW)
+        if dropped:
+            logger.info("provider session not finalized; bar left out", extra={"symbol": symbol})
+        return ProviderHistory(
+            currency=_currency(ticker), bars=normalize_daily_frame(frame, start, end), complete=not dropped
+        )
 
 
 class _TransientError(Exception):
