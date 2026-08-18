@@ -2,8 +2,9 @@
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
 from typing import Protocol
 
@@ -45,8 +46,13 @@ class HistoryProvider(Protocol):
 class YFinanceProvider:
     source: MarketDataSource = "yahoo_finance"
 
-    def __init__(self, timeout_seconds: float = REQUEST_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float = REQUEST_TIMEOUT_SECONDS,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
         self._timeout_seconds = timeout_seconds
+        self._clock = clock
         # Surface Yahoo failures as exceptions instead of logged errors and empty frames.
         yf.config.debug.hide_exceptions = False
 
