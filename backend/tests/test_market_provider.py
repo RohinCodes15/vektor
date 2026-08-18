@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, ClassVar
 
 import pytest
@@ -111,6 +111,20 @@ def test_network_failures_are_unavailable_without_leaking_details(
     assert raised.value.message == "Yahoo Finance could not be reached. Try again later."
     assert str(error) not in raised.value.message
     assert any(record.exc_info for record in caplog.records)
+
+
+def _with_unfinished_last_session() -> object:
+    unfinished = row()
+    unfinished[4] = float("nan")  # Yahoo leaves Adj Close empty until the session is finalized
+    return daily_frame(["2024-01-04", "2024-01-05"], [row(), unfinished])
+
+
+def test_drops_yahoos_unfinished_session_and_reports_the_history_incomplete(fake_ticker: type[FakeTicker]) -> None:
+    fake_ticker.result = _with_unfinished_last_session()
+    evening_in_new_york = datetime(2024, 1, 6, 2, 30, tzinfo=UTC)  # 21:30 on Jan 5 in New York, already Jan 6 in UTC
+    history = YFinanceProvider(clock=lambda: evening_in_new_york).fetch_daily_history("AAPL", START, END)
+    assert [bar.date for bar in history.bars] == [date(2024, 1, 4)]
+    assert history.complete is False
 
 
 def test_invalid_provider_data_is_rejected(fake_ticker: type[FakeTicker]) -> None:
