@@ -57,7 +57,7 @@ Other limits:
 - An `X-Request-ID` header. A safe incoming value (1 to 64 letters, digits, `.`, `_`, `-`) is kept; otherwise one is generated. CORS exposes it and `Retry-After` to the frontend.
 
 Every error is `{"detail": "..."}`:
-- Unexpected failures answer `500 Internal server error` and are logged server-side only.
+- Unexpected failures answer `500 Internal server error` and are logged server-side only. That response still carries the CORS headers, the security headers and `X-Request-ID`, so the frontend can read it and the log line can be found.
 - Validation messages never echo submitted values.
 
 ### Logging
