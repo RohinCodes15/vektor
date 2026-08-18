@@ -147,6 +147,8 @@ Every error is `{"detail": "<message>"}`:
 
 Market data is never fabricated, filled, interpolated, or repaired. A response is either Yahoo's data, validated bar by bar, or an error. Rows that yfinance returns entirely empty (no prices and no volume) are dropped by yfinance itself, so those dates are simply absent.
 
+One exception to "any missing value rejects the response": Yahoo returns the session that is still trading, or not yet finalized, as its newest row and leaves values empty (typically the adjusted close) until it is final, which can be hours after the close. In the US evening that session is already yesterday in UTC, inside every "completed days" window. When the newest row is dated yesterday (UTC) or later and has a missing value, it is left out, never filled, and the response is not cached, so the bar appears once Yahoo finalizes it. Orders and valuations then use the previous finalized close. A missing value on any other row still rejects the whole response with 502.
+
 ### Cache
 
 Responses are cached in SQLite at `backend/data/market_data.sqlite3` (git-ignored; set `VEKTOR_MARKET_DATA_CACHE_PATH` to move it). Each entry is one complete Yahoo response. A request is served from the cache only when a single entry fetched within `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (default 24) covers its whole range, so history is never stitched together from fetches made at different times. Repeated and narrower requests are served locally; wider ones are fetched again.
