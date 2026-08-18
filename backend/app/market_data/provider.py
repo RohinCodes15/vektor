@@ -30,6 +30,8 @@ UNREACHABLE = "Yahoo Finance could not be reached. Try again later."
 class ProviderHistory:
     currency: str | None
     bars: tuple[PriceBar, ...]
+    # False when the provider left out an unfinished live session, so the result will change and must not be cached.
+    complete: bool = True
 
 
 class HistoryProvider(Protocol):
