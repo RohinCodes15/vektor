@@ -101,6 +101,18 @@ Measured, result-preserving optimizations. No API contract changed, and no depen
 - Simulation and metrics use exact `Decimal` arithmetic, so a 100-candidate optimization over 20 years still takes about 2 seconds. This is deliberate: money is never a float.
 - Each cached history load validates every bar (about 15 ms per 5,000 bars), so a corrupt cache can never reach a backtest.
 
+## Production readiness (Phase 4D)
+
+A final integration check of Phases 4A to 4C. No API contract changed, no dependency was added, and nothing was deployed.
+
+- Checks: `uv run pytest` (backend), and `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` (frontend).
+- Every workflow was exercised end to end against real Yahoo Finance data: market history, paper orders (idempotent resend, rejected oversell and overspend), holdings, snapshots, analytics, allocation, risk, backtests, AI analysis with the provider off, comparison and optimization.
+- Correctness, checked on real data: the same backtest, comparison or optimization request gives byte-identical results. A backtest cut off at an earlier end date is an exact prefix of the longer one, so no bar sees later data. An optimization's selected train and test metrics equal standalone backtests over exactly the train days and exactly the test days.
+- Benchmarks: `uv run python benchmarks/bench.py --repeat 7` reproduces every Phase 4B fingerprint, with every median at or below the Phase 4B result (see [`benchmarks/README.md`](benchmarks/README.md)).
+- Fixed: Yahoo's unfinished session made every order, valuation and recent backtest fail with 502 in the US evening (see Data integrity under Phase 2A). Unexpected 500s now carry CORS, security headers and the request id (see Phase 4A).
+
+The health check (`GET /api/v1/health`) is a liveness check: it reports the configuration but does not open the databases or call Yahoo.
+
 ## Historical market data (Phase 2A)
 
 Read-only daily OHLCV prices from Yahoo Finance via [yfinance](https://github.com/ranaroussi/yfinance): free, no account, no API key. Nothing here places orders or touches a broker.
