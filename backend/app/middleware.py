@@ -4,6 +4,8 @@
 - RateLimit: fixed one-minute windows per client IP, with a stricter bucket for expensive requests; 429 + Retry-After.
 - ExpensiveConcurrencyLimit: at most N expensive requests run at once across all clients; 503 + Retry-After.
 - SecurityHeaders: nosniff, no framing, no referrer, no caching, a deny-all CSP for API responses, HSTS in production.
+- UnexpectedErrors: an unhandled exception becomes the generic 500 inside this stack, so it still gets CORS, security
+  headers and the request id. Starlette would otherwise answer it from its outermost middleware, outside all of these.
 - RequestLogging: one JSON line per request (request id, method, path, status, duration). Never the query string,
   headers, or body, so no credentials or payloads reach the logs.
 
@@ -23,6 +25,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.contracts import ErrorResponse
 
 logger = logging.getLogger("vektor.http")
+error_logger = logging.getLogger("vektor")
+INTERNAL_ERROR = "Internal server error"
 
 WINDOW_SECONDS = 60
 # Stale rate-limit windows are swept once this many clients are tracked, which bounds memory.
@@ -165,6 +169,31 @@ class ExpensiveConcurrencyLimit:
             await self.app(scope, receive, send)
         finally:
             self.in_flight -= 1
+
+
+class UnexpectedErrors:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal started
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, receive, tracking_send)
+        except Exception:
+            # Logged server-side only; the client gets the generic message, never the exception's details.
+            error_logger.error("unhandled error", extra={"path": scope["path"]}, exc_info=True)
+            if started:  # too late for a clean error response: let the server abort the connection
+                raise
+            await send_error(send, 500, INTERNAL_ERROR)
 
 
 class SecurityHeaders:
