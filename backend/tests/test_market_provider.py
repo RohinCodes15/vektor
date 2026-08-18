@@ -127,6 +127,19 @@ def test_drops_yahoos_unfinished_session_and_reports_the_history_incomplete(fake
     assert history.complete is False
 
 
+def test_finalized_history_is_reported_complete(fake_ticker: type[FakeTicker]) -> None:
+    history = YFinanceProvider(clock=lambda: datetime(2024, 1, 6, 2, 30, tzinfo=UTC)).fetch_daily_history(
+        "AAPL", START, END
+    )
+    assert len(history.bars) == 4 and history.complete is True
+
+
+def test_an_incomplete_bar_older_than_the_live_session_is_still_rejected(fake_ticker: type[FakeTicker]) -> None:
+    fake_ticker.result = _with_unfinished_last_session()
+    with pytest.raises(InvalidMarketData, match="missing adjusted_close for 2024-01-05"):
+        YFinanceProvider(clock=lambda: datetime(2024, 1, 8, 15, tzinfo=UTC)).fetch_daily_history("AAPL", START, END)
+
+
 def test_invalid_provider_data_is_rejected(fake_ticker: type[FakeTicker]) -> None:
     fake_ticker.result = daily_frame(["2024-01-02"], [row(high=1.0)])
     with pytest.raises(InvalidMarketData, match="2024-01-02"):
