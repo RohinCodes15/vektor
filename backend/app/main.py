@@ -18,7 +18,14 @@ from app.logging_config import configure_logging
 from app.market_data.cache import HistoryCache
 from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
-from app.middleware import ExpensiveConcurrencyLimit, RateLimit, RequestBodyLimit, RequestLogging, SecurityHeaders
+from app.middleware import (
+    ExpensiveConcurrencyLimit,
+    RateLimit,
+    RequestBodyLimit,
+    RequestLogging,
+    SecurityHeaders,
+    UnexpectedErrors,
+)
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
 from app.routers import backtests, market, portfolios
@@ -62,6 +69,7 @@ def add_middleware(app: FastAPI, settings: Settings) -> None:
     # History, backtest, comparison and optimization responses carry thousands of daily points; gzip shrinks them
     # about 4x for clients that accept it. The JSON itself is unchanged. Level 1 compresses a 650 KB body in about
     # 5 ms; level 9 saves only another 18% for ten times the CPU (benchmarks/README.md).
+    app.add_middleware(UnexpectedErrors)  # innermost: the generic 500 then passes through every layer below
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES, compresslevel=GZIP_LEVEL)
     app.add_middleware(RequestBodyLimit, max_bytes=settings.max_request_body_bytes)
     app.add_middleware(ExpensiveConcurrencyLimit, max_concurrent=settings.max_concurrent_expensive_requests)
