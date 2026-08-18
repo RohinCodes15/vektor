@@ -10,6 +10,7 @@ from app.analysis.errors import AnalysisError
 from app.backtest.errors import BacktestError
 from app.contracts import ErrorResponse
 from app.market_data.errors import MarketDataError
+from app.middleware import INTERNAL_ERROR
 from app.portfolio.errors import PortfolioError
 from app.validation import summarize_errors
 
@@ -31,8 +32,9 @@ async def _domain_error(
 
 
 async def _unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    """Backstop for a failure outside the middleware stack; app.middleware.UnexpectedErrors handles the rest."""
     logger.error("unhandled error", extra={"path": request.url.path}, exc_info=exc)
-    return error_response(500, "Internal server error")
+    return error_response(500, INTERNAL_ERROR)
 
 
 def register_error_handlers(app: FastAPI) -> None:
