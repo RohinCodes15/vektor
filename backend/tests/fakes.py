@@ -19,11 +19,13 @@ class FakeProvider:
         currency: str | None = "USD",
         error: Exception | None = None,
         bars_by_symbol: dict[str, list[PriceBar]] | None = None,
+        complete: bool = True,
     ) -> None:
         self.bars = bars if bars is not None else [make_bar("2024-01-02"), make_bar("2024-01-03", 11.5)]
         self.bars_by_symbol = bars_by_symbol or {}  # per-symbol overrides of `bars`
         self.currency = currency
         self.error = error
+        self.complete = complete  # False: the provider dropped an unfinished live session
         self.calls: list[tuple[str, date, date]] = []
 
     def fetch_daily_history(self, symbol: str, start: date, end: date) -> ProviderHistory:
@@ -31,4 +33,4 @@ class FakeProvider:
         if self.error is not None:
             raise self.error
         bars = self.bars_by_symbol.get(symbol, self.bars)
-        return ProviderHistory(self.currency, tuple(bar for bar in bars if start <= bar.date <= end))
+        return ProviderHistory(self.currency, tuple(bar for bar in bars if start <= bar.date <= end), self.complete)
