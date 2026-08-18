@@ -62,6 +62,22 @@ Peak Python memory per request (`--memory`):
 | comparison_5_strategies_20y | 9.6 | 11.8 | Shared indicator series |
 | history and get workloads | 7.2 to 8.7 | 7.2 to 8.7 | Unchanged |
 
+### Phase 4D re-check
+
+Same machine and script, `--repeat 7`, after the Phase 4D fixes. Every fingerprint matches the table above, so every result is byte-identical. No workload is slower than its Phase 4B "after" median (differences within run-to-run noise):
+
+| Workload | Phase 4B median ms | Phase 4D median ms |
+|---|---:|---:|
+| history_uncached_20y | 56.5 | 54.3 |
+| history_cached_20y | 33.5 | 30.3 |
+| backtest_3sym_20y_sma | 327.0 | 308.4 |
+| comparison_5_strategies_20y | 266.9 | 254.4 |
+| optimization_sma_100_20y | 1912.0 | 1833.1 |
+| optimization_rsi_100_20y | 1732.0 | 1646.9 |
+| list_backtests_50 | 12.7 | 12.1 |
+| get_backtest_20y | 23.4 | 22.4 |
+| backtest_cold_5sym_10y_latency | 980.2 | 943.4 |
+
 ## SQLite: indexes and connections
 
 Checked with `EXPLAIN QUERY PLAN` on every hot query:
