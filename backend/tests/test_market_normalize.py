@@ -132,3 +132,19 @@ def test_drops_the_newest_row_when_it_is_an_unfinished_live_session() -> None:
     kept, dropped = drop_unfinished_session(frame, live_from=date(2024, 1, 3))
     assert dropped is True
     assert [bar.date for bar in normalize_daily_frame(kept, START, END)] == [date(2024, 1, 2)]
+
+
+def test_keeps_an_incomplete_historical_row_so_it_is_still_rejected() -> None:
+    frame = daily_frame(["2024-01-02", "2024-01-03"], [row(), unfinished_row()])
+    kept, dropped = drop_unfinished_session(frame, live_from=date(2024, 1, 4))
+    assert dropped is False
+    with pytest.raises(InvalidMarketData, match="missing adjusted_close for 2024-01-03"):
+        normalize_daily_frame(kept, START, END)
+
+
+def test_never_drops_an_incomplete_row_that_is_not_the_newest() -> None:
+    frame = daily_frame(["2024-01-02", "2024-01-03"], [unfinished_row(), row()])
+    kept, dropped = drop_unfinished_session(frame, live_from=date(2024, 1, 1))
+    assert dropped is False
+    with pytest.raises(InvalidMarketData, match="missing adjusted_close for 2024-01-02"):
+        normalize_daily_frame(kept, START, END)
