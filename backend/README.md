@@ -67,7 +67,7 @@ JSON lines on stderr. Each request is logged with its request id, method, path, 
 ### Deploying
 
 - Set `VEKTOR_ENVIRONMENT=production`, list your frontend's exact `https` origins in `VEKTOR_CORS_ORIGINS`, and serve the API over HTTPS behind a reverse proxy (HSTS assumes it).
-- The proxy must pass the client's address, and uvicorn must trust it, or every client shares one rate limit. For example: `uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header`.
+- The proxy must pass the client's address, and uvicorn must trust it, or every client shares one rate limit. For example: `uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header --no-access-log`. `--no-access-log` turns off uvicorn's own access log, which prints query strings; Vektor's JSON request log replaces it.
 - Run **one** server process. Rate limits and the concurrency cap are kept in memory per process, and the SQLite databases expect a single writer.
 - Keep secrets in the environment or an untracked `backend/.env`, never in the repository.
 - Back up `VEKTOR_PORTFOLIO_DB_PATH` and `VEKTOR_BACKTEST_DB_PATH`. The market data cache is disposable.
