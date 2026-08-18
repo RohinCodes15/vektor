@@ -103,9 +103,9 @@ class MarketDataService:
             cached = self._load_cached(query, fresh_after)
             if cached is not None:
                 return cached
-            history = self._fetch(query, now)
-            # Only completed days are cached; a range reaching today may still change.
-            if history.bars and query.end < now.date():
+            history, complete = self._fetch(query, now)
+            # Only completed days are cached: a range reaching today, or one missing an unfinished session, may change.
+            if history.bars and complete and query.end < now.date():
                 self._store(history, expire_before=fresh_after)
         return history
 
@@ -138,7 +138,8 @@ class MarketDataService:
                 else:
                     self._range_locks[key] = (lock, users - 1)
 
-    def _fetch(self, query: MarketHistoryQuery, now: datetime) -> MarketHistoryResponse:
+    def _fetch(self, query: MarketHistoryQuery, now: datetime) -> tuple[MarketHistoryResponse, bool]:
+        """The provider's history for the query, and whether it is complete (no unfinished session left out)."""
         provider_end = min(query.end, now.date() + PROVIDER_END_LEEWAY)
         fetched = self._provider.fetch_daily_history(query.symbol, query.start, provider_end)
         return MarketHistoryResponse(
@@ -151,7 +152,7 @@ class MarketDataService:
             cached=False,
             fetched_at=now,
             bars=list(fetched.bars),
-        )
+        ), fetched.complete
 
     def _load_cached(self, query: MarketHistoryQuery, fresh_after: datetime) -> MarketHistoryResponse | None:
         try:
