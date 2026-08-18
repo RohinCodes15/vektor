@@ -50,6 +50,22 @@ def normalize_daily_frame(frame: "DataFrame", start: date, end: date) -> tuple[P
     return tuple(sorted(bars, key=lambda bar: bar.date))
 
 
+def drop_unfinished_session(frame: "DataFrame", live_from: date) -> tuple["DataFrame", bool]:
+    """Remove Yahoo's row for a session that is still trading or not yet finalized; True when one was removed.
+
+    Yahoo returns the current session as the newest row and leaves values empty (typically Adj Close) until it is
+    finalized, which can be hours after the close: in the US evening that session is already "yesterday" in UTC.
+    Only the newest row is dropped, only when it is dated on or after `live_from` and has a missing value. The bar is
+    omitted, never filled; a missing value anywhere else still rejects the frame in normalize_daily_frame.
+    """
+    if frame.empty or any(column not in frame.columns for column in COLUMNS.values()):
+        return frame, False  # nothing to drop; normalize_daily_frame reports missing columns
+    newest = frame[list(COLUMNS.values())].iloc[-1]  # yfinance returns rows in ascending date order
+    if _trading_date(frame.index[-1]) < live_from or all(_number(value) is not None for value in newest):
+        return frame, False
+    return frame.iloc[:-1], True
+
+
 def _trading_date(timestamp: Any) -> date:
     """The bar's calendar date in the exchange's timezone (yfinance indexes daily bars at local midnight)."""
     try:
