@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from app.market_data.errors import InvalidMarketData
-from app.market_data.normalize import normalize_daily_frame
+from app.market_data.normalize import drop_unfinished_session, normalize_daily_frame
 from tests.market_frames import COLUMNS, daily_frame, row
 
 START, END = date(2024, 1, 1), date(2024, 1, 31)
@@ -118,3 +118,17 @@ def test_rejects_missing_timestamps() -> None:
     frame = pd.DataFrame([row()], index=pd.DatetimeIndex([pd.NaT]), columns=COLUMNS)
     with pytest.raises(InvalidMarketData, match="invalid timestamp"):
         normalize_daily_frame(frame, START, END)
+
+
+def unfinished_row() -> list[float]:
+    """Yahoo's row for a session that is still trading or not yet finalized: no adjusted close."""
+    values = row()
+    values[4] = np.nan
+    return values
+
+
+def test_drops_the_newest_row_when_it_is_an_unfinished_live_session() -> None:
+    frame = daily_frame(["2024-01-02", "2024-01-03"], [row(), unfinished_row()])
+    kept, dropped = drop_unfinished_session(frame, live_from=date(2024, 1, 3))
+    assert dropped is True
+    assert [bar.date for bar in normalize_daily_frame(kept, START, END)] == [date(2024, 1, 2)]
