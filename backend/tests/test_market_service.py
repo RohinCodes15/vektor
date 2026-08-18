@@ -106,6 +106,16 @@ def test_caches_ranges_ending_yesterday(service: MarketDataService, provider: Fa
     assert len(provider.calls) == 1
 
 
+def test_does_not_cache_history_missing_an_unfinished_session(
+    service: MarketDataService, provider: FakeProvider
+) -> None:
+    provider.bars, provider.complete = [make_bar("2024-02-28")], False
+    first = service.get_history(query("2024-02-01", "2024-02-29"))
+    second = service.get_history(query("2024-02-01", "2024-02-29"))
+    assert len(provider.calls) == 2
+    assert first.cached is False and second.cached is False
+
+
 def test_limits_the_provider_request_to_one_day_past_today(service: MarketDataService, provider: FakeProvider) -> None:
     provider.bars = [make_bar("2024-02-29")]
     res = service.get_history(query("2024-02-01", "2099-12-31"))
