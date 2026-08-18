@@ -9,7 +9,7 @@ uv run python benchmarks/bench.py --repeat 7   # more runs per workload
 uv run python benchmarks/bench.py --memory     # peak Python allocation per request (tracemalloc)
 ```
 
-The **fingerprint** is a SHA-256 of the response JSON with ids and timestamps removed. If an optimization changes any price, fill, metric, curve point, or ranking, the fingerprint changes. The fingerprints below are identical before and after Phase 4B.
+The **fingerprint** is a SHA-256 of the response JSON with ids and timestamps removed. If an optimization changes any price, fill, metric, curve point, or ranking, the fingerprint changes. The fingerprints below are identical before and after Phase 4B. Workloads that use a new symbol or add a stored backtest on every run (`history_uncached_20y`, `list_backtests_50`, `backtest_cold_5sym_10y_latency`) fingerprint their last run, so compare them at the same `--repeat`: the table uses 7.
 
 ## Workloads
 
