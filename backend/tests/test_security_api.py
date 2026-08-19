@@ -84,7 +84,7 @@ def test_cors_rejects_other_origins_and_unlisted_headers(tmp_path: Path) -> None
 
 
 def test_production_without_configured_origins_allows_no_browser_origin(tmp_path: Path) -> None:
-    client = make_client(tmp_path, environment="production", cors_origins=None)
+    client = make_client(tmp_path, environment="production", cors_origins=[])  # explicitly none (Phase 5A)
     res = client.get("/api/v1/health", headers={"origin": ORIGIN})
     assert res.status_code == 200 and "access-control-allow-origin" not in res.headers
 

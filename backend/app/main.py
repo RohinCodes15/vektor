@@ -29,6 +29,7 @@ from app.middleware import (
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
 from app.routers import backtests, market, portfolios
+from app.startup import check_startup
 
 try:
     VERSION = version("vektor-backend")
@@ -98,6 +99,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+    check_startup(settings)  # fail now, by setting name, rather than on the first request
     docs = settings.docs_enabled
     app = FastAPI(
         title=settings.app_name,
