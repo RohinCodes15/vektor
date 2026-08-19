@@ -48,3 +48,19 @@ def test_fly_holds_no_secrets_and_leaves_cors_to_the_operator() -> None:
     # Deliberately unset: startup must fail until the operator names the frontend origin.
     problems = configuration_problems(Settings(_env_file=None, **vektor_env(FLY["env"])))
     assert len(problems) == 1 and "VEKTOR_CORS_ORIGINS" in problems[0]
+
+
+def test_the_production_env_example_is_complete_and_loadable() -> None:
+    settings = Settings(_env_file=BACKEND / "deploy" / "production.env.example")
+    assert settings.environment == "production" and settings.trading_mode == "paper"
+    assert settings.docs_enabled is False and settings.ai_provider == "none"
+    assert configuration_problems(settings) == []
+
+
+def test_the_image_runs_one_unprivileged_worker_without_query_string_logs() -> None:
+    assert "--workers 1" in DOCKERFILE and "--no-access-log" in DOCKERFILE and "--proxy-headers" in DOCKERFILE
+    assert "uv sync --frozen --no-dev" in DOCKERFILE and "/api/v1/health" in DOCKERFILE
+    entrypoint = (BACKEND / "deploy" / "docker-entrypoint.sh").read_text()
+    assert "setpriv --reuid=vektor" in entrypoint
+    ignored = (BACKEND / ".dockerignore").read_text().split()
+    assert {".env", "data/", "tests/", "*.sqlite3"} <= set(ignored)
