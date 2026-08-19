@@ -64,3 +64,42 @@ def test_the_image_runs_one_unprivileged_worker_without_query_string_logs() -> N
     assert "setpriv --reuid=vektor" in entrypoint
     ignored = (BACKEND / ".dockerignore").read_text().split()
     assert {".env", "data/", "tests/", "*.sqlite3"} <= set(ignored)
+
+
+def _database(path: Path, rows: int) -> None:
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("CREATE TABLE t (n INTEGER)")
+        conn.executemany("INSERT INTO t VALUES (?)", [(n,) for n in range(rows)])
+        conn.commit()
+
+
+def _rows(path: Path) -> int:
+    with closing(sqlite3.connect(path)) as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM t").fetchone()[0])
+
+
+def test_backup_copies_the_databases_into_a_timestamped_folder(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        portfolio_db_path=tmp_path / "p.sqlite3",
+        backtest_db_path=tmp_path / "b.sqlite3",
+        market_data_cache_path=tmp_path / "m.sqlite3",
+    )
+    _database(settings.portfolio_db_path, 3)
+    _database(settings.backtest_db_path, 5)
+    _database(settings.market_data_cache_path, 7)
+    written = backup_databases(settings, tmp_path / "backups")
+    assert sorted(p.name for p in written) == ["b.sqlite3", "p.sqlite3"]
+    assert {p.name: _rows(p) for p in written} == {"p.sqlite3": 3, "b.sqlite3": 5}
+    assert len({p.parent for p in written}) == 1
+    with_cache = backup_databases(settings, tmp_path / "with-cache", include_cache=True)
+    assert sorted(p.name for p in with_cache) == ["b.sqlite3", "m.sqlite3", "p.sqlite3"]
+
+
+def test_backup_command_fails_when_there_is_nothing_to_back_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VEKTOR_PORTFOLIO_DB_PATH", str(tmp_path / "missing-p.sqlite3"))
+    monkeypatch.setenv("VEKTOR_BACKTEST_DB_PATH", str(tmp_path / "missing-b.sqlite3"))
+    monkeypatch.setattr("app.backup.get_settings", lambda: Settings(_env_file=None))
+    assert main([str(tmp_path / "out")]) == 1
