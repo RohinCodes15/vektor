@@ -88,3 +88,33 @@ docker run --rm -p 8000:8000 -v vektor_data:/data \
   -e VEKTOR_PORTFOLIO_DB_PATH=/data/portfolios.sqlite3 -e VEKTOR_BACKTEST_DB_PATH=/data/backtests.sqlite3 \
   -e VEKTOR_MARKET_DATA_CACHE_PATH=/data/market_data.sqlite3 vektor-backend
 ```
+
+## Backups and rollback
+
+**Before every deploy, back up the data.** A deploy can migrate the SQLite schema forward. Phase 4B added a summary
+column, for example. Older code is not guaranteed to read a migrated file.
+
+```bash
+fly ssh console --user vektor -C "python -m app.backup /data/backups"    # consistent copy while serving
+fly volumes snapshots create <volume-id>                                 # platform snapshot (fly volumes list)
+```
+
+`app.backup` uses SQLite's online backup API, so it never captures a half-written order. Add `--include-cache` to copy
+the market data cache too.
+
+**Roll back the code** (data untouched):
+
+```bash
+fly releases --image                       # find the last good image
+fly deploy --image <registry.fly.io/app:deployment-...>
+```
+
+**Roll back the data** too, when the new release migrated or damaged it:
+1. Stop traffic: `fly scale count 0`.
+2. Restore the files: `fly ssh console` into a machine with the volume and copy `/data/backups/<timestamp>/*.sqlite3`
+   over `/data/`. Or create a volume from a snapshot (`fly volumes create vektor_data --snapshot-id <id> --region iad`)
+   and attach it in place of the damaged one.
+3. Deploy the matching image (above), then `fly scale count 1`, and check `/api/v1/health` plus a portfolio read.
+
+Anything created after the backup is lost by a data rollback. Paper orders are simulated, so nothing real is ever at
+stake.
