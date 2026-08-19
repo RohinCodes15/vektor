@@ -101,6 +101,15 @@ Measured, result-preserving optimizations. No API contract changed, and no depen
 - Simulation and metrics use exact `Decimal` arithmetic, so a 100-candidate optimization over 20 years still takes about 2 seconds. This is deliberate: money is never a float.
 - Each cached history load validates every bar (about 15 ms per 5,000 bars), so a corrupt cache can never reach a backtest.
 
+## Deployment (Phase 5A)
+
+Deployment steps, costs, limitations and rollback are in [`DEPLOYMENT.md`](DEPLOYMENT.md). The short version:
+- Run the Docker image (`Dockerfile`) as one process on one machine with a persistent volume. `fly.toml` targets Fly.io.
+- In production, startup refuses to run, naming each missing setting, without explicit `VEKTOR_CORS_ORIGINS`,
+  `VEKTOR_PORTFOLIO_DB_PATH` and `VEKTOR_BACKTEST_DB_PATH`, without an AI key when AI is on, or without writable
+  database directories (`app/startup.py`). `deploy/production.env.example` lists every production setting.
+- Back up the databases while the server runs with `python -m app.backup <dir>`.
+
 ## Production readiness (Phase 4D)
 
 A final integration check of Phases 4A to 4C. No API contract changed, no dependency was added, and nothing was deployed.
