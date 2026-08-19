@@ -78,3 +78,22 @@ def test_unwritable_storage_is_reported(tmp_path: Path) -> None:
     finally:
         locked.chmod(0o700)
     assert len(problems) == 1 and "VEKTOR_PORTFOLIO_DB_PATH" in problems[0] and str(locked) in problems[0]
+
+
+def test_every_problem_is_reported_at_once_without_secrets(tmp_path: Path) -> None:
+    settings = production(tmp_path, cors_origins=None, portfolio_db_path=None, ai_provider="anthropic")
+    with pytest.raises(StartupConfigurationError) as raised:
+        check_startup(settings)
+    message = str(raised.value)
+    assert message.startswith("Production configuration is incomplete:")
+    assert all(name in message for name in ("VEKTOR_CORS_ORIGINS", "VEKTOR_PORTFOLIO_DB_PATH", "VEKTOR_AI_API_KEY"))
+
+
+def test_create_app_refuses_to_start_an_incomplete_production_configuration(tmp_path: Path) -> None:
+    with pytest.raises(StartupConfigurationError, match="VEKTOR_CORS_ORIGINS"):
+        create_app(production(tmp_path, cors_origins=None), market_data_provider=FakeProvider())
+
+
+def test_create_app_starts_a_complete_production_configuration(tmp_path: Path) -> None:
+    app = create_app(production(tmp_path), market_data_provider=FakeProvider())
+    assert app.state.portfolio_service is not None
