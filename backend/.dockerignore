@@ -1,0 +1,10 @@
+# Only pyproject.toml, uv.lock, .python-version, app/ and deploy/docker-entrypoint.sh are needed in the image.
+.venv/
+data/
+tests/
+benchmarks/
+**/__pycache__/
+.pytest_cache/
+.env
+.env.*
+*.sqlite3
