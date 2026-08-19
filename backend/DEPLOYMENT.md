@@ -36,3 +36,55 @@ in use.
 disk and sleeps after about 15 minutes idle. Paper portfolios and backtests are lost on every restart, deploy, and
 sleep. That is acceptable only for a throwaway demo. Startup still requires you to set the database paths explicitly
 (for example `/tmp/portfolios.sqlite3`), so the data loss is a choice you make on purpose.
+
+## Production configuration
+
+`deploy/production.env.example` lists every production setting. In production, startup **fails with a message naming
+each missing setting** (`app/startup.py`) when:
+- `VEKTOR_CORS_ORIGINS` is not set. Give your frontend's exact `https` origins as a JSON list, or `[]` for no browser
+  origin.
+- `VEKTOR_PORTFOLIO_DB_PATH` or `VEKTOR_BACKTEST_DB_PATH` is not set. Their defaults are inside the image and vanish on
+  deploy.
+- `VEKTOR_AI_PROVIDER=anthropic` and neither `VEKTOR_AI_API_KEY` nor `ANTHROPIC_API_KEY` is set.
+- A database directory cannot be created or written.
+
+It also logs a warning if a rate limit is off, the docs are on, or no CORS origin is set. Phase 4A rules still apply:
+production rejects `*` and plain-`http` origins (except localhost), turns the docs off, and keeps the limits.
+
+| Variable | Where | Notes |
+|---|---|---|
+| `VEKTOR_CORS_ORIGINS` | `fly.toml` `[env]` | Not a secret. Required. |
+| `VEKTOR_*_DB_PATH`, `VEKTOR_MARKET_DATA_CACHE_PATH` | `fly.toml` `[env]` (preset to `/data`) | Must be on the volume |
+| `VEKTOR_AI_API_KEY` | `fly secrets set` only | Never in a file, a commit, or a log |
+| `FORWARDED_ALLOW_IPS` | `fly.toml` `[env]` (preset to `*`) | Read by uvicorn. `*` is safe only when the platform proxy is the only way in. Otherwise all clients share one rate limit, or clients can spoof their IP. |
+
+## Deploying to Fly.io
+
+Prerequisites: the `flyctl` CLI, a Fly account, and the frontend's final https origin.
+
+```bash
+cd backend
+fly launch --no-deploy --copy-config --name <your-app-name>       # keeps fly.toml; update `app` if asked
+fly volumes create vektor_data --size 1 --region iad               # one volume, same region as primary_region
+# Edit fly.toml: uncomment VEKTOR_CORS_ORIGINS and set your frontend's origin(s).
+fly secrets set VEKTOR_AI_API_KEY=...                              # only if you set VEKTOR_AI_PROVIDER=anthropic
+fly deploy
+curl https://<your-app-name>.fly.dev/api/v1/health                 # {"status":"ok",...,"trading_mode":"paper"}
+```
+
+Then point the frontend at it with `NEXT_PUBLIC_API_ORIGIN=https://<your-app-name>.fly.dev`.
+
+Check the deployment:
+- `fly logs` shows one JSON line per request (no query strings), and `app configured` with `environment: production`.
+- `fly status` shows one machine passing the `/api/v1/health` check.
+- A market history request returns data. A steady `503` means Yahoo is refusing the host's IPs; see Limitations.
+
+Run it locally the same way:
+
+```bash
+docker build -t vektor-backend backend
+docker run --rm -p 8000:8000 -v vektor_data:/data \
+  -e VEKTOR_CORS_ORIGINS='["http://localhost:3000"]' \
+  -e VEKTOR_PORTFOLIO_DB_PATH=/data/portfolios.sqlite3 -e VEKTOR_BACKTEST_DB_PATH=/data/backtests.sqlite3 \
+  -e VEKTOR_MARKET_DATA_CACHE_PATH=/data/market_data.sqlite3 vektor-backend
+```
