@@ -62,3 +62,19 @@ def test_anthropic_analysis_requires_a_key(tmp_path: Path, monkeypatch: pytest.M
     assert configuration_problems(production(tmp_path, ai_provider="anthropic", ai_api_key="sk-ant-x")) == []
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-from-sdk-env")
     assert configuration_problems(production(tmp_path, ai_provider="anthropic")) == []
+
+
+def test_development_and_test_environments_need_nothing_extra(tmp_path: Path) -> None:
+    for environment in ("development", "test"):
+        assert configuration_problems(Settings(_env_file=None, environment=environment)) == []
+
+
+def test_unwritable_storage_is_reported(tmp_path: Path) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)
+    try:
+        problems = storage_problems(production(tmp_path, portfolio_db_path=locked / "portfolios.sqlite3"))
+    finally:
+        locked.chmod(0o700)
+    assert len(problems) == 1 and "VEKTOR_PORTFOLIO_DB_PATH" in problems[0] and str(locked) in problems[0]
