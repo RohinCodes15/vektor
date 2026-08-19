@@ -26,6 +26,13 @@ REQUIRED_IN_PRODUCTION = {
     "portfolio_db_path": "VEKTOR_PORTFOLIO_DB_PATH must be set to a file on persistent storage (paper portfolios).",
     "backtest_db_path": "VEKTOR_BACKTEST_DB_PATH must be set to a file on persistent storage (stored backtests).",
 }
+DATABASES = {
+    "VEKTOR_MARKET_DATA_CACHE_PATH": "market_data_cache_path",
+    "VEKTOR_PORTFOLIO_DB_PATH": "portfolio_db_path",
+    "VEKTOR_BACKTEST_DB_PATH": "backtest_db_path",
+}
+
+
 class StartupConfigurationError(RuntimeError):
     """The settings cannot run safely; the message lists every problem by setting name."""
 
@@ -37,4 +44,19 @@ def configuration_problems(settings: Settings) -> list[str]:
     if settings.ai_provider == "anthropic" and settings.ai_api_key is None and not os.environ.get("ANTHROPIC_API_KEY"):
         problems.append("VEKTOR_AI_PROVIDER=anthropic needs an API key: set VEKTOR_AI_API_KEY (or ANTHROPIC_API_KEY) "
                         "as a secret, or set VEKTOR_AI_PROVIDER=none.")
+    return problems
+
+
+def storage_problems(settings: Settings) -> list[str]:
+    """Each database's directory, created if missing, must be writable (as must an existing database file)."""
+    problems = []
+    for name, field in DATABASES.items():
+        path: Path = getattr(settings, field)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            problems.append(f"{name}: cannot create {path.parent} ({error.strerror}).")
+            continue
+        if not os.access(path.parent, os.W_OK | os.X_OK) or (path.exists() and not os.access(path, os.R_OK | os.W_OK)):
+            problems.append(f"{name}: {path.parent} is not writable by this process.")
     return problems
