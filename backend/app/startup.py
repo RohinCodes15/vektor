@@ -60,3 +60,22 @@ def storage_problems(settings: Settings) -> list[str]:
         if not os.access(path.parent, os.W_OK | os.X_OK) or (path.exists() and not os.access(path, os.R_OK | os.W_OK)):
             problems.append(f"{name}: {path.parent} is not writable by this process.")
     return problems
+
+
+def check_startup(settings: Settings) -> None:
+    problems = configuration_problems(settings) + storage_problems(settings)
+    if problems:
+        title = "Production configuration is incomplete:" if settings.environment == "production" else (
+            "Configuration is unusable:")
+        raise StartupConfigurationError("\n".join([title, *(f"- {p}" for p in problems)]))
+    if settings.environment == "production":
+        _warn_about_risky_choices(settings)
+
+
+def _warn_about_risky_choices(settings: Settings) -> None:
+    if settings.rate_limit_per_minute == 0 or settings.expensive_rate_limit_per_minute == 0:
+        logger.warning("a rate limit is turned off in production")
+    if settings.docs_enabled:
+        logger.warning("interactive API docs are enabled in production")
+    if not settings.cors_origins:
+        logger.warning("no CORS origins: browsers on other origins cannot call the API")
