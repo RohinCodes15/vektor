@@ -1,0 +1,51 @@
+# Fly.io manifest for the Vektor backend (Phase 5A). Paper-only: no broker settings exist.
+# Before the first deploy: replace `app`, create the volume, and set VEKTOR_CORS_ORIGINS (see backend/DEPLOYMENT.md).
+# Secrets (VEKTOR_AI_API_KEY) go in `fly secrets set`, never in this file.
+app = "vektor-api-change-me"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  strategy = "immediate"  # one machine with one volume: there is no second machine to roll onto
+
+[env]
+  VEKTOR_ENVIRONMENT = "production"
+  VEKTOR_TRADING_MODE = "paper"
+  VEKTOR_PORTFOLIO_DB_PATH = "/data/portfolios.sqlite3"
+  VEKTOR_BACKTEST_DB_PATH = "/data/backtests.sqlite3"
+  VEKTOR_MARKET_DATA_CACHE_PATH = "/data/market_data.sqlite3"
+  VEKTOR_AI_PROVIDER = "none"
+  VEKTOR_LOG_LEVEL = "INFO"
+  # Fly's proxy is the only way in, so trust its X-Forwarded-For; otherwise every client shares one rate limit.
+  FORWARDED_ALLOW_IPS = "*"
+  # Required. The exact https origin(s) of your frontend, as a JSON list. Startup fails until this is set.
+  # VEKTOR_CORS_ORIGINS = '["https://your-frontend.example"]'
+
+[[mounts]]
+  source = "vektor_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 40
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/api/v1/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
