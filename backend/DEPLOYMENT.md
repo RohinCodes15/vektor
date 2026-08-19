@@ -118,3 +118,16 @@ fly deploy --image <registry.fly.io/app:deployment-...>
 
 Anything created after the backup is lost by a data rollback. Paper orders are simulated, so nothing real is ever at
 stake.
+
+## Limitations and remaining risks
+
+- **No authentication.** Anyone who can reach the URL can create and change paper portfolios. CORS limits browsers
+  only. Do not share the URL with people you do not trust. An auth layer is future work.
+- **Yahoo Finance availability.** It is unofficial and free, with undocumented rate limits, and some cloud IP ranges
+  get blocked. Expect occasional `503`s. Vektor never fabricates data to cover gaps.
+- **Single machine.** A restart, deploy, or idle stop interrupts in-flight requests, and the in-memory rate limits reset.
+- **Cold starts.** With auto-stop, the first request after idling waits for the machine to boot.
+- **Image size.** About 950 MB, mostly pandas and numpy through yfinance. That is fine for Fly but slow on very
+  constrained builders.
+- **Health check.** `/api/v1/health` is liveness only: it does not open the databases or call Yahoo. Startup itself
+  verifies configuration and storage.
