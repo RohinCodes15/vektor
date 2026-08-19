@@ -63,10 +63,13 @@ class Settings(BaseSettings):
         """Production locks down what development leaves open, unless a value is set explicitly."""
         if self.environment != "production":
             return self
-        if "cors_origins" not in self.model_fields_set:
+        defaulted = {"cors_origins", "docs_enabled"} - self.model_fields_set
+        if "cors_origins" in defaulted:
             self.cors_origins = []
-        if "docs_enabled" not in self.model_fields_set:
+        if "docs_enabled" in defaulted:
             self.docs_enabled = False
+        # Assignment marks a field as set; keep model_fields_set meaning "set by the operator" (app.startup uses it).
+        self.model_fields_set.difference_update(defaulted)
         for origin in self.cors_origins:
             if origin == "*":
                 raise ValueError("a wildcard CORS origin is not allowed in production: list the exact origins")
