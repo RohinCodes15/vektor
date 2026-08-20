@@ -14,6 +14,10 @@ npm start         # serve the production build
 
 Use Node.js 22.13+ and npm. Dependencies are pinned in package-lock.json.
 
+Production builds require `NEXT_PUBLIC_API_ORIGIN` set to the deployed backend's HTTPS origin.
+See [Phase 5B deployment instructions](DEPLOYMENT.md) for Vercel + Fly.io configuration, CORS,
+build-time validation, checks, and deployment prerequisites. Local development retains its localhost default.
+
 ## Design system
 
 `src/app/globals.css` owns Tailwind theme tokens, charcoal surfaces, teal accent, typography, spacing, visible keyboard focus, responsive layouts, and reduced-motion styles. System fonts work offline. `src/components/ui.tsx` provides typed Button (three variants), Badge (three tones), Panel, and labeled Field primitives; they forward native attributes. Pass `aria-invalid` and an explanatory hint for invalid fields.
