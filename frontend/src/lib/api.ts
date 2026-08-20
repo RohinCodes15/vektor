@@ -1,4 +1,5 @@
 import { moneyInCents } from "./portfolio-values.ts";
+import { apiOrigin } from "./api-origin.ts";
 
 /** Mirrors backend/app/contracts.py HealthResponse; no contract changes. */
 export type HealthResponse = Readonly<{
@@ -35,8 +36,7 @@ async function requestJson(path: string, name: "health" | "market history" | "po
   const operation = name === "health" ? "health check" : `${name} request`;
   let url: URL;
   try {
-    url = new URL(process.env.NEXT_PUBLIC_API_ORIGIN || "http://localhost:8000");
-    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error();
+    url = new URL(apiOrigin(process.env.NEXT_PUBLIC_API_ORIGIN, process.env.NODE_ENV === "production"));
     url.pathname = path;
     if (params) url.search = params.toString();
   } catch {
