@@ -22,3 +22,11 @@ test("deployment requires an explicit HTTPS backend origin while development sta
     assert.throws(() => apiOrigin(value, true), (error) => /NEXT_PUBLIC_API_ORIGIN/.test(error.message) && !error.message.includes("private"));
   }
 });
+
+test("Next production config fails before building without a valid origin; development needs none", () => {
+  process.env.NEXT_PUBLIC_API_ORIGIN = "";
+  assert.deepEqual(nextConfig(PHASE_DEVELOPMENT_SERVER), {});
+  assert.throws(() => nextConfig(PHASE_PRODUCTION_BUILD), /NEXT_PUBLIC_API_ORIGIN/);
+  process.env.NEXT_PUBLIC_API_ORIGIN = "https://vektor-backend.fly.dev";
+  assert.deepEqual(nextConfig(PHASE_PRODUCTION_BUILD), {});
+});
