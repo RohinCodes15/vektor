@@ -30,3 +30,15 @@ test("Next production config fails before building without a valid origin; devel
   process.env.NEXT_PUBLIC_API_ORIGIN = "https://vektor-backend.fly.dev";
   assert.deepEqual(nextConfig(PHASE_PRODUCTION_BUILD), {});
 });
+
+test("production browser requests reach the configured versioned backend and handle downtime safely", async (t) => {
+  process.env.NODE_ENV = "production";
+  process.env.NEXT_PUBLIC_API_ORIGIN = "https://vektor-backend.fly.dev";
+  const request = t.mock.method(globalThis, "fetch", async (url) => {
+    assert.equal(url.href, "https://vektor-backend.fly.dev/api/v1/health");
+    return Response.json({ status: "ok", app: "Vektor", version: "0.1.0", environment: "production", trading_mode: "paper" });
+  });
+  assert.equal((await getHealth()).trading_mode, "paper");
+  request.mock.mockImplementation(async () => { throw new Error("private host failure"); });
+  await assert.rejects(getHealth(), /could not be reached/);
+});
