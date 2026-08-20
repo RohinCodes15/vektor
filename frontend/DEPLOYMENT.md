@@ -32,3 +32,26 @@ Development keeps its `http://localhost:8000` default. To override it, copy `.en
 
 No Vercel manifest, proxy, frontend database, or extra dependencies are needed. The existing browser
 client calls the Fly.io backend directly using versioned `/api/v1` endpoints, without credentials or caching.
+
+## Verify before publishing
+
+```sh
+npm ci
+export NEXT_PUBLIC_API_ORIGIN=https://your-vektor-backend.fly.dev
+npm run typecheck
+npm run lint
+npm run build
+npm test
+npm start
+```
+
+The build renders the shell without contacting the backend. Health, portfolios, and research requests
+run in the browser. Existing timeouts, retry actions, cancellation, safe API errors, and the AI
+`unavailable` state remain intact; no data is invented during downtime. Fly auto-start can make an initial
+health request time out; retry after the machine starts. Provider availability is separate from health.
+
+On the deployed frontend, verify the browser requests your configured backend (never the visitor's
+localhost), CORS permits it, and health reports `trading_mode: "paper"`. Check portfolio reads,
+backtesting, comparison, optimization, and AI-off behavior. Keep backend secrets on Fly.io.
+Do not publish until the backend URL, frontend origin, persistence, and backend access controls are reviewed.
+Roll back to a prior frontend deployment built against the correct backend; a frontend rollback does not alter SQLite data.
