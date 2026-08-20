@@ -18,3 +18,17 @@ to the frontend host or any `NEXT_PUBLIC_*` variable. AI remains optional and co
 
 Development keeps its `http://localhost:8000` default. To override it, copy `.env.example` to
 `.env.local` (uncommitted), set the origin, and restart `npm run dev`.
+
+## Vercel project settings
+
+- Import the existing repository; set **Root Directory** to `frontend` and framework to **Next.js**.
+- Select Node.js **22.x** (at least 22.13); use the committed npm lockfile and `npm ci`.
+- Build command: `npm run build`. Keep the default Next.js output setting; this app is not a static export.
+- Set `NEXT_PUBLIC_API_ORIGIN` for Production before building. Set Preview separately only if its
+  frontend origin is allowed by the intended backend. Avoid sending previews to a shared production backend by accident.
+- The backend owner must configure `VEKTOR_CORS_ORIGINS` with the exact frontend HTTPS origin(s),
+  as Phase 5A documents. CORS is not authentication. Do not use a wildcard or expose an untrusted demo's
+  paper portfolios or optional paid AI endpoint to arbitrary visitors.
+
+No Vercel manifest, proxy, frontend database, or extra dependencies are needed. The existing browser
+client calls the Fly.io backend directly using versioned `/api/v1` endpoints, without credentials or caching.
