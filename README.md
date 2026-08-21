@@ -128,3 +128,20 @@ curl -X POST http://localhost:8000/api/v1/portfolios \
 ```
 
 Then select **Refresh portfolios** in the dashboard. This creates virtual cash, not a deposit. Use the portfolio API for simulated orders and explicit equity snapshots; Vektor does not backfill or schedule snapshots.
+
+## Configuration
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_ORIGIN` | Frontend `.env.local` or hosting build environment | Backend origin only, without `/api/v1`, credentials, query, or fragment. Development defaults to `http://localhost:8000`; production requests require an explicit HTTPS non-loopback origin. Public and embedded into the browser bundle at build time. |
+| `VEKTOR_TRADING_MODE` | Backend environment or `.env` | Literal `paper` only; other values fail validation. |
+| `VEKTOR_ENVIRONMENT` | Backend | Development, test, or production behavior. |
+| `VEKTOR_CORS_ORIGINS` | Backend | JSON list of exact permitted frontend origins. Required explicitly in production. CORS is not authentication. |
+| `VEKTOR_PORTFOLIO_DB_PATH`, `VEKTOR_BACKTEST_DB_PATH` | Backend | Persistent SQLite databases; production requires explicit paths. |
+| `VEKTOR_MARKET_DATA_CACHE_PATH` | Backend | Disposable historical-data cache. |
+| `VEKTOR_AI_PROVIDER` | Backend | `none` by default; `anthropic` enables optional hosted analysis. |
+| `VEKTOR_AI_API_KEY` or `ANTHROPIC_API_KEY` | Backend environment only | Optional provider credential. Never add it to frontend variables or committed files. |
+
+See [backend defaults](backend/.env.example), [production settings](backend/deploy/production.env.example), and [frontend defaults](frontend/.env.example). Restart development or rebuild the frontend after changing its public backend origin. Never commit `.env` files or real credentials.
+
+**Optional AI costs:** enabling Anthropic makes paid outbound requests billed to the configured account, including repeated requests for analysis. It is outside the free local default. Leave `VEKTOR_AI_PROVIDER=none` to avoid provider costs; portfolio, backtest, comparison, and optimization features remain available. The AI interprets facts and can be wrong even when its cited fact IDs are valid.
