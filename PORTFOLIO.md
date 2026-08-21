@@ -17,3 +17,9 @@ TypeScript, React 19, Next.js 16 App Router, Tailwind CSS 4, Motion, custom SVG 
 - **Reliability and operations:** isolated provider tests, financial-output regression checks, workload limits, request IDs, structured logs, configurable CORS, and documented persistent-volume deployment and backups.
 
 These describe implemented project work, not individual authorship, measured business impact, or production adoption. [Repository ownership rules](AGENTS.md) distinguish backend and frontend responsibilities.
+
+## Resume description
+
+Developed a paper-trading research application with Next.js, TypeScript, FastAPI, and SQLite, supporting historical strategy backtests, configuration comparisons, and bounded parameter optimization with chronological holdout evaluation. Implemented exact decimal accounting and idempotent simulated orders alongside typed API validation, interactive charts, and regression coverage. Integrated optional AI explanations grounded in locally measured backtest facts, with explicit unavailable states and backend-only credentials.
+
+Use this description only to the extent it reflects your own contributions; narrow the scope for frontend-only or backend-only work.
