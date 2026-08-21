@@ -7,3 +7,13 @@ Vektor is a local-first, paper-only trading research application. A Next.js dash
 ## Technologies
 
 TypeScript, React 19, Next.js 16 App Router, Tailwind CSS 4, Motion, custom SVG charts, Python, FastAPI, Pydantic, `Decimal`, SQLite, `yfinance`, and the optional Anthropic SDK. Tooling includes npm, `uv`, pytest/HTTPX, Node's test runner, ESLint, and TypeScript checks.
+
+## Engineering contributions represented in the repository
+
+- **Financial integrity:** decimal accounting, explicit rounding, exact money formatting, atomic SQLite orders, and idempotency keys that prevent duplicate simulated fills.
+- **Research engine:** Buy & Hold, SMA, and RSI backtests; next-open fills from prior-close signals; configurable costs; shared-data comparison; bounded parameter search ranked exclusively on training data.
+- **Honest evaluation:** independent train/test segments, missing-metric handling, overfitting flags, and visible distinctions between simulated performance, measured facts, and AI interpretation.
+- **Frontend systems:** typed and runtime-validated API clients, responsive results tables, keyboard-accessible interactive charts, stale-request cancellation, and memoized chart work and result sections.
+- **Reliability and operations:** isolated provider tests, financial-output regression checks, workload limits, request IDs, structured logs, configurable CORS, and documented persistent-volume deployment and backups.
+
+These describe implemented project work, not individual authorship, measured business impact, or production adoption. [Repository ownership rules](AGENTS.md) distinguish backend and frontend responsibilities.
