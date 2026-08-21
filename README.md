@@ -32,3 +32,53 @@ The frontend includes keyboard chart exploration, responsive tables, focus state
 | Data and storage | Yahoo Finance via `yfinance`, SQLite for portfolios, backtest results, and history cache |
 | Optional AI | Anthropic SDK, configured exclusively on the backend |
 | Tooling | `uv` and `uv.lock`; npm and `package-lock.json`; pytest, HTTPX, Node's test runner, ESLint, TypeScript |
+
+## Architecture
+
+```mermaid
+flowchart TD
+    Browser[Browser: research dashboard]
+    Next[Next.js: frontend rendering and assets]
+    API[FastAPI: /api/v1 contracts and middleware]
+    Portfolio[Paper portfolio service]
+    Backtest[Backtest, comparison and optimization engine]
+    Market[Validated market-data service]
+    Analysis[Measured facts and AI interpretation validation]
+    DB[(SQLite: portfolios and stored backtests)]
+    Cache[(SQLite: historical-data cache)]
+    Yahoo[Yahoo Finance via yfinance]
+    AI[Optional Anthropic provider: paid]
+
+    Next --> Browser
+    Browser -->|Typed HTTP requests| API
+    API --> Portfolio
+    API --> Backtest
+    API --> Analysis
+    Portfolio --> DB
+    Backtest --> DB
+    Portfolio --> Market
+    Backtest --> Market
+    Market --> Cache
+    Market -->|Read-only HTTPS| Yahoo
+    Analysis -->|Stored backtest facts| Backtest
+    Analysis -.->|Optional interpretation| AI
+```
+
+The browser calls the backend directly; Next.js is not an order-routing proxy. Completed standalone backtests are stored; comparisons and optimizations are calculated on request and are not persisted. AI interpretations are also generated on request.
+
+```text
+backend/
+  app/contracts.py       Versioned request/response models
+  app/routers/           Market, portfolio, and backtest endpoints
+  app/portfolio/         Decimal accounting, analytics, risk, SQLite storage
+  app/backtest/          Signals, simulation, comparison, optimization, storage
+  app/market_data/       Provider validation, caching, bounded fetching
+  app/analysis/          Measured facts, provider integration, evidence checks
+  tests/                 Isolated backend regression tests
+frontend/
+  src/app/               Next.js page, layout, theme
+  src/components/        Dashboard, research forms, results, shared UI
+  src/hooks/             Request lifecycle and cancellation
+  src/lib/               Typed API client, chart geometry, exact money formatting
+  tests/                 API, component, chart, accessibility, performance tests
+```
