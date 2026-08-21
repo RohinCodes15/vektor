@@ -171,3 +171,25 @@ All application endpoints use `/api/v1`. The canonical models are in [contracts.
 - [Frontend deployment guide](frontend/DEPLOYMENT.md)
 - [Reproducible backend benchmarks](backend/benchmarks/README.md)
 - [Repository ownership and contribution constraints](AGENTS.md)
+
+## Testing
+
+From `backend/`:
+
+```sh
+uv run pytest
+```
+
+Backend tests mock providers and use temporary storage; they do not require market-data or AI network calls. Regression tests cover accounting, API validation, security/resource limits, deterministic financial results, comparisons, and optimization behavior.
+
+From `frontend/`:
+
+```sh
+npm run typecheck
+npm run lint
+# Use a real deployed backend origin before publishing. This reserved example is build verification only.
+NEXT_PUBLIC_API_ORIGIN=https://backend.example.com npm run build
+npm test
+```
+
+Build before `npm test`: rendered-page tests read the production HTML. Frontend tests use mocked requests and exercise exact decimal presentation, chart geometry, component states, keyboard controls, and request cancellation. Synthetic test fixtures are not market data displayed by the running application. These commands describe the verification workflow, not a claim that checks were run for this documentation update.
