@@ -21,3 +21,14 @@ Vektor combines simulated USD portfolios, historical backtests, strategy compari
 | Parameter optimization | Bounded SMA/RSI grid search with up to 100 valid combinations. Training-only ranking, a chronological holdout, ranked parameter results, separate train/test charts, and overfitting warning flags. |
 
 The frontend includes keyboard chart exploration, responsive tables, focus states, reduced-motion support, and clear loading/error/empty states. Core workflows require no AI account. Fetching market data requires internet access; the app shell and local storage do not require a hosted service.
+
+## Tech stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, Motion |
+| Visualization | Custom responsive SVG charts, shared geometry utilities, native keyboard range controls; no third-party chart library |
+| Backend | FastAPI, Pydantic/pydantic-settings, Uvicorn, Python `Decimal` |
+| Data and storage | Yahoo Finance via `yfinance`, SQLite for portfolios, backtest results, and history cache |
+| Optional AI | Anthropic SDK, configured exclusively on the backend |
+| Tooling | `uv` and `uv.lock`; npm and `package-lock.json`; pytest, HTTPX, Node's test runner, ESLint, TypeScript |
