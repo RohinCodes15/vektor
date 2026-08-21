@@ -145,3 +145,29 @@ Then select **Refresh portfolios** in the dashboard. This creates virtual cash, 
 See [backend defaults](backend/.env.example), [production settings](backend/deploy/production.env.example), and [frontend defaults](frontend/.env.example). Restart development or rebuild the frontend after changing its public backend origin. Never commit `.env` files or real credentials.
 
 **Optional AI costs:** enabling Anthropic makes paid outbound requests billed to the configured account, including repeated requests for analysis. It is outside the free local default. Leave `VEKTOR_AI_PROVIDER=none` to avoid provider costs; portfolio, backtest, comparison, and optimization features remain available. The AI interprets facts and can be wrong even when its cited fact IDs are valid.
+
+## API and documentation
+
+All application endpoints use `/api/v1`. The canonical models are in [contracts.py](backend/app/contracts.py); errors use `{"detail": "..."}`.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/health` | Paper-only service liveness/configuration |
+| `GET /api/v1/market/history` | Daily historical OHLCV |
+| `POST /api/v1/portfolios`, `GET /api/v1/portfolios` | Create/list simulated portfolios |
+| `/api/v1/portfolios/{id}` | Read, rename, or delete a portfolio |
+| `POST /api/v1/portfolios/{id}/orders` | Submit an idempotent simulated market order |
+| `GET /api/v1/portfolios/{id}/holdings`, `GET /api/v1/portfolios/{id}/transactions` | Valuation and executed paper trades |
+| `POST /api/v1/portfolios/{id}/snapshots` | Record equity at completed closes |
+| `GET /api/v1/portfolios/{id}/equity-history`, `/analytics`, `/allocation`, `/risk` | Recorded performance and current-position analysis; the latter three paths share the portfolio prefix |
+| `POST /api/v1/backtests`, `GET /api/v1/backtests`, `GET /api/v1/backtests/{id}` | Run/store, list, and retrieve standalone backtests |
+| `POST /api/v1/backtests/{id}/analysis` | Measured facts and optional AI interpretation |
+| `POST /api/v1/backtests/comparisons` | Shared-data strategy comparison |
+| `POST /api/v1/backtests/optimizations` | Bounded grid search and train/test evaluation |
+
+- [Backend setup, formulas, request examples, security, and limitations](backend/README.md)
+- [Frontend setup and design notes](frontend/README.md) — includes earlier phase notes; the feature table above reflects the current implementation.
+- [Backend deployment, backups, and rollback](backend/DEPLOYMENT.md)
+- [Frontend deployment guide](frontend/DEPLOYMENT.md)
+- [Reproducible backend benchmarks](backend/benchmarks/README.md)
+- [Repository ownership and contribution constraints](AGENTS.md)
