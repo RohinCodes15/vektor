@@ -207,3 +207,13 @@ The documented setup is **Vercel for Next.js** and **Fly.io for the FastAPI back
 Render's free backend option is documented for disposable demos only: without persistent storage, portfolio/backtest data can be lost on restart or redeployment. Fly idle stops introduce cold starts, and restarts interrupt in-flight requests. Yahoo may rate-limit or block hosting-provider IPs. Frontend errors report outages rather than inventing data.
 
 **Access limitation:** there is no authentication or per-user isolation. Anyone with API access can change simulated portfolios; CORS does not secure non-browser clients. Hosted AI can also incur costs. Review access controls before exposing the service publicly. API docs are disabled by default in production.
+
+## Engineering decisions
+
+- **Exact accounting over floating-point convenience.** Python `Decimal`, explicit rounding, decimal-text storage, and JSON strings protect cash and P&L. Frontend money formatting uses integer cents; numeric chart coordinates do not replace exact displayed values.
+- **Atomic orders over optimistic balance updates.** SQLite `BEGIN IMMEDIATE` and per-portfolio idempotency keys put duplicate detection, balance checks, position changes, and transaction writes under one write lock. Failed orders roll back.
+- **Explicit unknowns over plausible-looking values.** Missing metrics stay `null`. Unpriced holdings make aggregate valuation unavailable. Invalid historical rows are rejected; a newest unfinished session may be omitted until finalized, never filled.
+- **Controlled simulations over execution realism.** Backtest close signals fill at the next simulated open, with adjusted prices and configured costs. Portfolio market orders instead use the latest completed daily close. These are distinct models, not real execution.
+- **Holdout evaluation over ranking on future data.** Optimization ranks training results only and resets cash/positions for each segment. A single split is still vulnerable to selection bias; warning flags are not proof of robustness.
+- **Targeted caching over hidden data changes.** The backend caches validated history, bounds concurrent fetches, reuses indicators, and compresses large responses. Frontend comparison charts memoize geometry/paths, preserve observations, and skip repeated cursor-driven computations. Regression tests pin financial outputs and request lifecycle behavior; see the linked benchmark and test sources for evidence.
+- **Local simplicity over multi-tenant scale.** SQLite and in-memory request limits keep setup small but require a single backend process and persistent storage. Strict contracts, bounded workloads, CORS, security headers, sanitized errors, and JSON request logs add defenses without supplying authentication.
