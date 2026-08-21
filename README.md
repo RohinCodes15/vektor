@@ -193,3 +193,17 @@ npm test
 ```
 
 Build before `npm test`: rendered-page tests read the production HTML. Frontend tests use mocked requests and exercise exact decimal presentation, chart geometry, component states, keyboard controls, and request cancellation. Synthetic test fixtures are not market data displayed by the running application. These commands describe the verification workflow, not a claim that checks were run for this documentation update.
+
+## Deployment
+
+The documented setup is **Vercel for Next.js** and **Fly.io for the FastAPI backend**. Vercel Hobby is free only for eligible uses; Fly.io compute and persistent storage incur charges. Check current provider terms and pricing. There is no verified public deployment URL included here.
+
+1. Configure the frontend host with root directory `frontend`, the Next.js framework, `npm ci`, and `npm run build`.
+2. Set `NEXT_PUBLIC_API_ORIGIN` to the actual HTTPS backend origin **before building**. The checked-in client validates it for production requests; this checkout has no `next.config.ts` build-time validation hook, so do not assume a successful build proves the origin was configured.
+3. Run the backend as **one process on one machine**, with a persistent volume for both portfolio and backtest databases. The [Fly manifest](backend/fly.toml) is a template requiring an application name and explicit frontend CORS origins.
+4. Keep AI credentials on the backend, configure exact HTTPS CORS origins, and verify health plus real data workflows before sharing access.
+5. Follow the backend deployment guide for backups and rollback. A frontend rollback does not restore backend data.
+
+Render's free backend option is documented for disposable demos only: without persistent storage, portfolio/backtest data can be lost on restart or redeployment. Fly idle stops introduce cold starts, and restarts interrupt in-flight requests. Yahoo may rate-limit or block hosting-provider IPs. Frontend errors report outages rather than inventing data.
+
+**Access limitation:** there is no authentication or per-user isolation. Anyone with API access can change simulated portfolios; CORS does not secure non-browser clients. Hosted AI can also incur costs. Review access controls before exposing the service publicly. API docs are disabled by default in production.
