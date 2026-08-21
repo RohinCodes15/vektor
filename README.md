@@ -234,3 +234,7 @@ No committed screenshots were found in this checkout. These are capture placehol
 | Backtest results and AI Insights | Placeholder — show returned data and the provider's actual availability state |
 | Strategy comparison | Placeholder — capture shared-date curves and metric leaders |
 | Optimization | Placeholder — capture ranked parameters and labeled train/test results |
+
+## Project use and attribution
+
+See [PORTFOLIO.md](PORTFOLIO.md) for a concise technical summary. No license file is present in this checkout; a public repository alone does not grant an open-source license. Maintainers should choose an explicit license before representing reuse rights.
