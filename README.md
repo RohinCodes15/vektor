@@ -217,3 +217,9 @@ Render's free backend option is documented for disposable demos only: without pe
 - **Holdout evaluation over ranking on future data.** Optimization ranks training results only and resets cash/positions for each segment. A single split is still vulnerable to selection bias; warning flags are not proof of robustness.
 - **Targeted caching over hidden data changes.** The backend caches validated history, bounds concurrent fetches, reuses indicators, and compresses large responses. Frontend comparison charts memoize geometry/paths, preserve observations, and skip repeated cursor-driven computations. Regression tests pin financial outputs and request lifecycle behavior; see the linked benchmark and test sources for evidence.
 - **Local simplicity over multi-tenant scale.** SQLite and in-memory request limits keep setup small but require a single backend process and persistent storage. Strict contracts, bounded workloads, CORS, security headers, sanitized errors, and JSON request logs add defenses without supplying authentication.
+
+### Modeling limitations
+
+Daily data does not model intraday paths, liquidity, partial fills, or realistic market impact. Backtests are long-only, use whole shares and adjusted historical prices, and support USD instruments. Paper portfolio orders allow fractional shares, but do not charge fees or apply corporate-action quantity adjustments or dividend credits; holdings carried through splits can therefore be valued incorrectly.
+
+Snapshot analytics use only recorded observations, with no historical reconstruction. Current-holdings risk assumes today's quantities across its historical window rather than replaying past trades. Annualized statistics from short or irregular observation histories can be misleading. Yahoo can revise adjusted history, so a later provider response can change a later simulation even though computation on identical inputs is deterministic.
