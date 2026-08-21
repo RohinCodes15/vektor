@@ -223,3 +223,14 @@ Render's free backend option is documented for disposable demos only: without pe
 Daily data does not model intraday paths, liquidity, partial fills, or realistic market impact. Backtests are long-only, use whole shares and adjusted historical prices, and support USD instruments. Paper portfolio orders allow fractional shares, but do not charge fees or apply corporate-action quantity adjustments or dividend credits; holdings carried through splits can therefore be valued incorrectly.
 
 Snapshot analytics use only recorded observations, with no historical reconstruction. Current-holdings risk assumes today's quantities across its historical window rather than replaying past trades. Annualized statistics from short or irregular observation histories can be misleading. Yahoo can revise adjusted history, so a later provider response can change a later simulation even though computation on identical inputs is deterministic.
+
+## Screenshots
+
+No committed screenshots were found in this checkout. These are capture placeholders, not screenshots or fabricated demonstrations:
+
+| View | Screenshot status |
+|---|---|
+| Portfolio dashboard and analytics | Placeholder — capture an actual running dashboard |
+| Backtest results and AI Insights | Placeholder — show returned data and the provider's actual availability state |
+| Strategy comparison | Placeholder — capture shared-date curves and metric leaders |
+| Optimization | Placeholder — capture ranked parameters and labeled train/test results |
