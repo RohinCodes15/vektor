@@ -23,3 +23,9 @@ These describe implemented project work, not individual authorship, measured bus
 Developed a paper-trading research application with Next.js, TypeScript, FastAPI, and SQLite, supporting historical strategy backtests, configuration comparisons, and bounded parameter optimization with chronological holdout evaluation. Implemented exact decimal accounting and idempotent simulated orders alongside typed API validation, interactive charts, and regression coverage. Integrated optional AI explanations grounded in locally measured backtest facts, with explicit unavailable states and backend-only credentials.
 
 Use this description only to the extent it reflects your own contributions; narrow the scope for frontend-only or backend-only work.
+
+## Scope and tradeoffs
+
+This is educational software, not an execution platform or investment adviser. Market history depends on Yahoo Finance availability; optional Anthropic usage is paid. SQLite persistence and in-memory limits favor a single backend process, and the API has no authentication or multi-user isolation. Daily-bar simulations omit execution details; paper portfolios do not automatically adjust quantities for splits or credit dividends.
+
+See the [README](README.md) for verified features, setup, architecture, API references, deployment prerequisites, and fuller limitations. No deployed URL, user count, profitability claim, or unverified performance achievement is asserted here.
