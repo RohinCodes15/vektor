@@ -82,3 +82,49 @@ frontend/
   src/lib/               Typed API client, chart geometry, exact money formatting
   tests/                 API, component, chart, accessibility, performance tests
 ```
+
+## Quick start
+
+Requirements: [uv](https://docs.astral.sh/uv/), Node.js **22.13 or later**, and npm. The backend declares Python 3.12+ and pins **3.13** in `.python-version`; `uv` can install that interpreter. Start from this repository's root after cloning or downloading it.
+
+### 1. Run the backend
+
+In one terminal:
+
+```sh
+cd backend
+uv sync
+# Optional: copy defaults into an untracked local configuration file.
+cp .env.example .env
+uv run uvicorn app.main:app --reload
+```
+
+Check [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health). Interactive API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs) in development. Health checks configuration/liveness, not Yahoo or AI availability.
+
+### 2. Run the frontend
+
+In another terminal, starting from the repository root:
+
+```sh
+cd frontend
+npm ci
+# Optional for development: the default backend is http://localhost:8000.
+cp .env.example .env.local
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The default backend CORS configuration permits that origin.
+
+### 3. Explore real workflows
+
+Load historical prices, run a backtest, compare configurations, or optimize an SMA/RSI grid from the dashboard. All simulation end dates must precede today in UTC. Parameter warm-up requirements can make short periods unavailable.
+
+The portfolio dashboard starts empty. To create a paper portfolio, use the API documentation or this request in a third terminal:
+
+```sh
+curl -X POST http://localhost:8000/api/v1/portfolios \
+  -H 'content-type: application/json' \
+  -d '{"name":"Research portfolio","starting_cash":"10000.00"}'
+```
+
+Then select **Refresh portfolios** in the dashboard. This creates virtual cash, not a deposit. Use the portfolio API for simulated orders and explicit equity snapshots; Vektor does not backfill or schedule snapshots.
