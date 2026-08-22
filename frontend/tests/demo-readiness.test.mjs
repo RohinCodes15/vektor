@@ -66,3 +66,20 @@ test("restart refocuses even on step one; Skip and Escape restore entry focus", 
   component.render().props.onKeyDown({ key: "Escape", stopPropagation() {} });
   assert.equal(entryFocus, 2); assert.equal(button(component, "Explore Demo")["aria-expanded"], false);
 });
+
+test("missing feature links stay recoverable and top-bar return moves focus to the guide", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "document"); let focused = false;
+  const target = { tabIndex: 0, focus: () => { focused = true; } };
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { getElementById: (id) => id === "guided-demo" ? target : null } });
+  t.after(() => { if (original) Object.defineProperty(globalThis, "document", original); else delete globalThis.document; });
+  const component = await demo(); button(component, "Explore Demo").onClick();
+  let prevented = false;
+  nodes(component.render()).find((node) => node.props?.href === "#market").props.onClick({ preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.match(nodes(component.render()).find((node) => node.props?.role === "status").props.children, /section is unavailable/);
+  button(component, "Next").onClick(); assert.equal(nodes(component.render()).some((node) => node.props?.role === "status"), false);
+  const shell = await mount("../src/components/dashboard-shell.tsx", { "motion/react": { MotionConfig: "MotionConfig", motion: { a: "a", div: "div" }, useReducedMotion: () => true }, "./health-status": { HealthStatus: function Mock() {} }, "./ui": ui }, "DashboardShell", { children: "content" });
+  const link = nodes(shell.render()).find((node) => node.props?.href === "#guided-demo");
+  link.props.onClick({ ctrlKey: true }); assert.equal(focused, false);
+  link.props.onClick({}); assert.equal(focused, true); assert.equal(target.tabIndex, -1);
+});
