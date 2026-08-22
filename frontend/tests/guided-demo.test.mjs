@@ -43,3 +43,28 @@ test("demo is opt-in, walks all existing features, and makes no backend or AI re
   assert.equal(button(component, "Explore Demo")["aria-expanded"], false);
   assert.equal(fetch.mock.callCount(), 0);
 });
+
+test("demo focuses step headings, returns focus on exit, and supports Escape and restart", async () => {
+  const component = await demo();
+  let returned = 0, headingFocus = 0;
+  button(component, "Explore Demo").ref.current = { focus: () => returned++ };
+  component.flush();
+  button(component, "Explore Demo").onClick();
+  let tree = component.render();
+  const heading = nodes(tree).find((node) => node.props?.id === "demo-step-title");
+  assert.equal(heading.props.tabIndex, -1);
+  heading.props.ref.current = { focus: () => headingFocus++ };
+  component.flush();
+  assert.equal(headingFocus, 1);
+  button(component, "Next").onClick(); component.render(); component.flush();
+  assert.equal(headingFocus, 2);
+  button(component, "Restart demo").onClick();
+  assert.match(text(component.render()), /Step 1 of 6/);
+  let stopped = false;
+  component.render().props.onKeyDown({ key: "Escape", stopPropagation: () => { stopped = true; } });
+  assert.equal(stopped, true);
+  assert.equal(returned, 1);
+  button(component, "Explore Demo").onClick();
+  button(component, "Skip demo").onClick();
+  assert.equal(returned, 2);
+});
