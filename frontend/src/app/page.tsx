@@ -14,8 +14,8 @@ export default function Home() {
       <Reveal>
         <section id="overview" aria-labelledby="overview-title">
           <div className="dashboard-intro">
-            <div><div className="eyebrow"><span className="status-dot" /> YOUR RESEARCH DESK</div><h1 id="overview-title">A clearer view.<br className="mobile-break" /> A measured approach.</h1><p className="lead">Test ideas. Study the outcome. Keep your capital out of it.</p></div>
-            <a className="button button-primary" href="#backtest">New simulation</a>
+            <div><div className="eyebrow"><span className="status-dot" /> YOUR RESEARCH DESK</div><h1 id="overview-title">Research strategies.<br />Keep capital simulated.</h1><p className="lead">Explore real historical prices. Compare paper strategies. Evaluate parameters out of sample.</p></div>
+            <a className="button button-secondary" href="#backtest">New simulation</a>
           </div>
           <GuidedDemo />
           <div className="data-notice"><span className="notice-symbol" aria-hidden="true">i</span><p><strong>Paper portfolio workspace</strong><span>Virtual balances valued at completed daily closes. No live quotes or real-money execution.</span></p><Badge>NO LIVE DATA</Badge></div>
