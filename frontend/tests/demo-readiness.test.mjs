@@ -52,3 +52,17 @@ test("guide has working Next/Back/Finish links with no requests, fabricated resu
   assert.equal(button(component, "Explore Demo")["aria-expanded"], false);
   assert.equal(fetch.mock.callCount(), 0);
 });
+
+test("restart refocuses even on step one; Skip and Escape restore entry focus", async () => {
+  const component = await demo(); let entryFocus = 0, headingFocus = 0;
+  button(component, "Explore Demo").ref.current = { focus: () => entryFocus++ }; component.flush();
+  button(component, "Explore Demo").onClick();
+  nodes(component.render()).find((node) => node.props?.id === "demo-step-title").props.ref.current = { focus: () => headingFocus++ };
+  component.flush(); assert.equal(headingFocus, 1);
+  button(component, "Restart demo").onClick(); assert.equal(headingFocus, 2);
+  button(component, "Next").onClick(); component.render(); component.flush(); assert.equal(headingFocus, 3);
+  button(component, "Skip demo").onClick(); assert.equal(entryFocus, 1);
+  button(component, "Explore Demo").onClick();
+  component.render().props.onKeyDown({ key: "Escape", stopPropagation() {} });
+  assert.equal(entryFocus, 2); assert.equal(button(component, "Explore Demo")["aria-expanded"], false);
+});
