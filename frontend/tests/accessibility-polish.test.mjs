@@ -41,6 +41,7 @@ test("navigation reaches all research views and moves keyboard focus to the sele
   const component = await mount("../src/components/dashboard-shell.tsx", {
     "motion/react": { MotionConfig: "MotionConfig", motion: { a: "a", div: "div" }, useReducedMotion: () => true },
     "./health-status": { HealthStatus: function MockHealth() {} }, "./ui": { Badge: function MockBadge() {} },
+    "./guided-demo": { GuidedDemo: function MockDemo() {} },
   }, "DashboardShell", { children: "Dashboard content" });
   let tree = component.render();
   const links = nodes(tree).filter((node) => node.type === "a" && node.props?.className?.startsWith("nav-link"));
