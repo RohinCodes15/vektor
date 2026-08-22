@@ -1,8 +1,8 @@
 import * as motion from "motion/react-client";
 import type { HTMLMotionProps } from "motion/react";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from "react";
 
-export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" }) {
+export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost"; ref?: Ref<HTMLButtonElement> }) {
   return <button className={`button button-${variant} ${className}`} {...props} />;
 }
 
