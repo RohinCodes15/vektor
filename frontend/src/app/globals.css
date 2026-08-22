@@ -66,6 +66,12 @@ summary { min-height: 44px; padding-block: 10px; }
 .backtest-form { display: grid; gap: 24px; }
 .comparison-section { margin-block: 32px; }
 .optimization-section { margin-block: 32px; }
+.guided-demo { margin-bottom: 28px; min-width: 0; }
+.demo-entry, .demo-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; justify-content: space-between; }
+.demo-entry > div { flex: 1; min-width: min(100%, 220px); }
+.demo-entry { padding: 20px 24px; border: 1px solid #35594e; border-radius: 7px; background: linear-gradient(115deg, #86d5c108, var(--color-surface)); }
+.demo-entry p { margin-top: 6px; line-height: 1.7; }
+.demo-entry .demo-entry-title { font-size: 17px; font-weight: 550; color: var(--color-ink); letter-spacing: -.02em; }
 .optimization-ranges { min-width: 0; margin: 0; padding: 0; border: 0; }
 .optimization-ranges legend { margin-bottom: 10px; font-size: 12px; }
 .optimization-ranges .strategy-fields { margin-top: 16px; }
