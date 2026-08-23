@@ -624,6 +624,57 @@ function normalizeComparisonCreate(config: BacktestComparisonCreate): BacktestCo
   return { ...settings, symbol: normalized[0].symbols[0], strategies };
 }
 
+function isComparisonConfig(value: unknown): value is BacktestComparisonConfig {
+  if (!hasFields(value, ["symbol", "strategies", "start", "end", "starting_cash", "position_size_pct", "fee_per_trade", "fee_bps", "slippage_bps"])
+    || !Array.isArray(value.strategies) || value.strategies.length < 2 || value.strategies.length > 5) return false;
+  const { symbol, strategies, ...settings } = value;
+  return strategies.every((strategy) => isBacktestConfig({ ...settings, symbols: [symbol], strategy }))
+    && new Set(strategies.map(strategyKey)).size === strategies.length;
+}
+
+function isBacktestComparison(value: unknown, query: BacktestComparisonCreate): value is BacktestComparison {
+  if (!hasFields(value, ["mode", "currency", "source", "config", "bars", "first_date", "last_date", "dates", "results", "leaders", "disclaimer"])
+    || value.mode !== "paper" || value.currency !== "USD" || value.source !== "yahoo_finance" || !isComparisonConfig(value.config)
+    || typeof value.disclaimer !== "string" || !value.disclaimer.trim() || !Number.isSafeInteger(value.bars) || (value.bars as number) < 1
+    || !Array.isArray(value.dates) || value.dates.length !== value.bars || !value.dates.every(isCalendarDate)
+    || value.first_date !== value.dates[0] || value.last_date !== value.dates.at(-1)
+    || value.dates.some((date, index, dates) => date < query.start || date > query.end || (index > 0 && date <= dates[index - 1]))
+    || !Array.isArray(value.results) || value.results.length !== query.strategies.length || !Array.isArray(value.leaders)) return false;
+  const config = value.config;
+  if (config.symbol !== query.symbol || config.start !== query.start || config.end !== query.end
+    || Number(config.starting_cash) !== Number(query.starting_cash)
+    || Number(config.position_size_pct) !== Number(query.position_size_pct ?? "100")
+    || (["fee_per_trade", "fee_bps", "slippage_bps"] as const).some((key) => Number(config[key]) !== Number(query[key] ?? "0"))
+    || config.strategies.length !== query.strategies.length || config.strategies.some((strategy, index) => strategyKey(strategy) !== strategyKey(query.strategies[index]))) return false;
+  const baseline = value.results[0];
+  if (!value.results.every((result, index) => {
+    if (!hasFields(result, ["strategy", "status", "unavailable_reason", "metrics", "warnings", "equity", "vs_baseline"])
+      || !isBacktestConfig({ symbols: [config.symbol], start: config.start, end: config.end, starting_cash: config.starting_cash,
+        position_size_pct: config.position_size_pct, fee_per_trade: config.fee_per_trade, fee_bps: config.fee_bps, slippage_bps: config.slippage_bps, strategy: result.strategy })
+      || strategyKey(result.strategy as BacktestStrategy) !== strategyKey(config.strategies[index])
+      || !Array.isArray(result.warnings) || !result.warnings.every((warning) => typeof warning === "string")) return false;
+    if (result.status === "unavailable") return typeof result.unavailable_reason === "string" && !!result.unavailable_reason.trim()
+      && result.metrics === null && result.equity === null && result.vs_baseline === null;
+    if (result.status !== "available" || result.unavailable_reason !== null || !isBacktestMetrics(result.metrics)
+      || !Array.isArray(result.equity) || result.equity.length !== value.bars || !result.equity.every((equity) => isMoney(equity, true))) return false;
+    const metrics = result.metrics;
+    if (baseline?.status === "unavailable") return result.vs_baseline === null;
+    if (!hasFields(result.vs_baseline, comparisonMetrics)) return false;
+    const differences = result.vs_baseline;
+    return comparisonMetrics.every((metric) => metrics[metric] === null || baseline?.metrics?.[metric] === null
+      ? differences[metric] === null : isSignedDecimal(differences[metric]));
+  })) return false;
+  const results = value.results as StrategyComparisonResult[];
+  return new Set(value.leaders.map((leader) => leader?.metric)).size === value.leaders.length
+    && value.leaders.every((leader) => hasFields(leader, ["metric", "better", "leaders", "reason"])
+      && comparisonMetrics.includes(leader.metric as ComparisonMetric)
+      && leader.better === (leader.metric === "volatility_pct" ? "lower" : "higher") && Array.isArray(leader.leaders)
+      && new Set(leader.leaders).size === leader.leaders.length
+      && (leader.leaders.length === 0 ? typeof leader.reason === "string" && !!leader.reason.trim() : leader.reason === null)
+      && leader.leaders.every((index) => Number.isSafeInteger(index) && index >= 0 && index < results.length
+        && results[index].status === "available" && results[index].metrics?.[leader.metric as ComparisonMetric] !== null));
+}
+
 export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
 export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
 export type AnalysisInterpretation = Readonly<{
