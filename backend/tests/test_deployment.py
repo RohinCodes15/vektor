@@ -59,6 +59,7 @@ def test_the_production_env_example_is_complete_and_loadable() -> None:
     assert settings.environment == "production" and settings.trading_mode == "paper"
     assert settings.docs_enabled is False and settings.ai_provider == "none"
     assert configuration_problems(settings) == []
+    assert settings.trusted_proxy_hops == 1
 
 
 def test_the_image_runs_one_unprivileged_worker_without_query_string_logs() -> None:
