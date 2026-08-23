@@ -78,6 +78,7 @@ def add_middleware(app: FastAPI, settings: Settings) -> None:
         RateLimit,
         per_minute=settings.rate_limit_per_minute,
         expensive_per_minute=settings.expensive_rate_limit_per_minute,
+        trusted_proxy_hops=settings.trusted_proxy_hops,
     )
     app.add_middleware(SecurityHeaders, hsts=settings.environment == "production")
     app.add_middleware(RequestLogging)
