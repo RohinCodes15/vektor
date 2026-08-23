@@ -15,6 +15,7 @@ from app.middleware import (
     RequestBodyLimit,
     RequestLogging,
     SecurityHeaders,
+    client_ip,
     is_expensive,
 )
 
@@ -147,6 +148,15 @@ def test_over_the_limit_the_api_answers_429_with_retry_after() -> None:
     assert res.status_code == 429 and int(res.headers["retry-after"]) >= 1
     assert res.json()["detail"].startswith("Too many requests. Try again in")
     assert [client.get("/api/v1/health").status_code for _ in range(3)] == [200, 200, 429]
+
+
+def forwarded_scope(*values: str) -> Scope:
+    return {"client": ("10.0.0.9", 443), "headers": [(b"x-forwarded-for", v.encode()) for v in values]}
+
+
+def test_without_trusted_proxies_the_client_is_the_tcp_peer_whatever_the_headers_say() -> None:
+    assert client_ip(forwarded_scope("203.0.113.7")) == "10.0.0.9"
+    assert client_ip({"headers": []}) == "unknown"
 
 
 # --- expensive concurrency limit ---------------------------------------------------------------------------------
