@@ -56,6 +56,7 @@ production rejects `*` and plain-`http` origins (except localhost), turns the do
 | `VEKTOR_CORS_ORIGINS` | `fly.toml` `[env]` | Not a secret. Required. |
 | `VEKTOR_*_DB_PATH`, `VEKTOR_MARKET_DATA_CACHE_PATH` | `fly.toml` `[env]` (preset to `/data`) | Must be on the volume |
 | `VEKTOR_AI_API_KEY` | `fly secrets set` only | Never in a file, a commit, or a log |
+| `VEKTOR_TRUSTED_PROXY_HOPS` | `fly.toml` `[env]` (preset to `1`) | How many proxies append to `X-Forwarded-For`. Rate limits key on the address the outermost one appended. With `0` behind a proxy, every client shares one limit. |
 | `FORWARDED_ALLOW_IPS` | `fly.toml` `[env]` (preset to `*`) | Read by uvicorn. `*` is safe only when the platform proxy is the only way in. Otherwise all clients share one rate limit, or clients can spoof their IP. |
 
 ## Deploying to Fly.io
