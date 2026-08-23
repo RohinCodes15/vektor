@@ -118,9 +118,11 @@ class RateLimit:
         per_minute: int,
         expensive_per_minute: int,
         clock: Callable[[], float] = time.monotonic,
+        trusted_proxy_hops: int = 0,
     ) -> None:
         self.app = app
         self.limits = {"general": per_minute, "expensive": expensive_per_minute}
+        self.trusted_proxy_hops = trusted_proxy_hops
         self.clock = clock
         # (client ip, bucket) -> (window start, requests in the window). The event loop is single-threaded.
         self.windows: dict[tuple[str, str], tuple[float, int]] = {}
@@ -130,7 +132,7 @@ class RateLimit:
             await self.app(scope, receive, send)
             return
         bucket = "expensive" if is_expensive(scope) else "general"
-        retry_after = self._hit(client_ip(scope), bucket)
+        retry_after = self._hit(client_ip(scope, self.trusted_proxy_hops), bucket)
         if retry_after is not None:
             logger.warning("rate limit exceeded", extra={"bucket": bucket, "path": scope["path"]})
             await send_error(
