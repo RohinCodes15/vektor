@@ -111,6 +111,13 @@ Deployment steps, costs, limitations and rollback are in [`DEPLOYMENT.md`](DEPLO
   database directories (`app/startup.py`). `deploy/production.env.example` lists every production setting.
 - Back up the databases while the server runs with `python -m app.backup <dir>`.
 
+## Launch readiness (Phase 5E)
+
+The final pre-deploy verification, with PASS/FAIL results, test counts, what was not verified, and the deploy steps,
+is in [`LAUNCH_READINESS.md`](LAUNCH_READINESS.md). It found and fixed one issue: behind Fly.io's proxy, a client could
+pick a new rate-limit address for every request by writing its own `X-Forwarded-For`. Rate limits now key on the
+address the trusted proxy appended (`VEKTOR_TRUSTED_PROXY_HOPS`, set to `1` in `fly.toml`).
+
 ## Production readiness (Phase 4D)
 
 A final integration check of Phases 4A to 4C. No API contract changed, no dependency was added, and nothing was deployed.
