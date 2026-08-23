@@ -12,6 +12,7 @@
 Behind a reverse proxy, run uvicorn with --proxy-headers so the client IP is the real one, not the proxy's.
 """
 
+import ipaddress
 import logging
 import math
 import re
@@ -44,7 +45,20 @@ def is_expensive(scope: Scope) -> bool:
     return scope["method"] == "POST" and (path == "/api/v1/backtests" or path.startswith("/api/v1/backtests/"))
 
 
-def client_ip(scope: Scope) -> str:
+def client_ip(scope: Scope, trusted_proxy_hops: int = 0) -> str:
+    """The TCP peer, or with N trusted proxies the Nth X-Forwarded-For entry from the right when it is a valid IP."""
+    if trusted_proxy_hops:
+        forwarded = [
+            entry.strip()
+            for name, value in scope["headers"]
+            if name == b"x-forwarded-for"
+            for entry in value.decode("latin-1").split(",")
+        ]
+        if len(forwarded) >= trusted_proxy_hops:
+            try:
+                return str(ipaddress.ip_address(forwarded[-trusted_proxy_hops]))
+            except ValueError:
+                pass
     client = scope.get("client")
     return str(client[0]) if client else "unknown"
 
