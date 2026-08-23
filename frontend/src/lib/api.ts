@@ -588,6 +588,26 @@ export async function runBacktest(config: BacktestCreate, signal?: AbortSignal):
   return data;
 }
 
+export type BacktestComparisonCreate = Omit<BacktestCreate, "symbols" | "strategy"> & Readonly<{
+  symbol: string; strategies: readonly BacktestStrategy[];
+}>;
+export type BacktestComparisonConfig = Omit<BacktestConfig, "symbols" | "strategy"> & Readonly<{
+  symbol: string; strategies: readonly BacktestConfig["strategy"][];
+}>;
+const comparisonMetrics = ["total_return_pct", "annualized_return_pct", "volatility_pct", "sharpe_ratio", "max_drawdown_pct", "win_rate_pct"] as const;
+export type ComparisonMetric = typeof comparisonMetrics[number];
+export type MetricDifferences = Readonly<Record<ComparisonMetric, string | null>>;
+export type StrategyComparisonResult = Readonly<{ strategy: BacktestConfig["strategy"]; warnings: readonly string[] }> & Readonly<
+  | { status: "available"; unavailable_reason: null; metrics: BacktestMetrics; equity: readonly string[]; vs_baseline: MetricDifferences | null }
+  | { status: "unavailable"; unavailable_reason: string; metrics: null; equity: null; vs_baseline: null }
+>;
+export type MetricLeader = Readonly<{ metric: ComparisonMetric; better: "higher" | "lower"; leaders: readonly number[]; reason: string | null }>;
+export type BacktestComparison = Readonly<{
+  mode: "paper"; currency: "USD"; source: "yahoo_finance"; config: BacktestComparisonConfig;
+  bars: number; first_date: string; last_date: string; dates: readonly string[];
+  results: readonly StrategyComparisonResult[]; leaders: readonly MetricLeader[]; disclaimer: string;
+}>;
+
 export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
 export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
 export type AnalysisInterpretation = Readonly<{
