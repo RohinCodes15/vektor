@@ -78,6 +78,7 @@ def test_malformed_origins_are_rejected_in_every_environment(origin: str) -> Non
         {"max_concurrent_expensive_requests": 0}, {"max_backtest_range_days": 10},
         {"max_backtest_range_days": 40_000},
         {"market_data_max_concurrent_fetches": 0}, {"market_data_max_concurrent_fetches": 17},
+        {"trusted_proxy_hops": -1}, {"trusted_proxy_hops": 6},
     ],
 )
 def test_resource_limits_are_bounded(bad: dict[str, int]) -> None:
