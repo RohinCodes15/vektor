@@ -43,6 +43,10 @@ def test_fly_runs_paper_only_production_with_a_health_check() -> None:
     assert [check["path"] for check in service["checks"]] == ["/api/v1/health"]
 
 
+def test_fly_keys_rate_limits_on_the_address_its_proxy_appended() -> None:
+    assert Settings(_env_file=None, **vektor_env(FLY["env"])).trusted_proxy_hops == 1
+
+
 def test_fly_holds_no_secrets_and_leaves_cors_to_the_operator() -> None:
     assert not any("KEY" in name or "SECRET" in name or "TOKEN" in name for name in FLY["env"])
     # Deliberately unset: startup must fail until the operator names the frontend origin.
