@@ -87,3 +87,19 @@ No API contract changed and no dependency was added.
 - Running `next dev` makes Next.js 16 generate an untracked `frontend/AGENTS.md`. Either commit it or add it to
   `.gitignore` (a coordinated root file) so it doesn't keep showing up as a stray file.
 
+## Before the first deploy
+
+These are operator steps; the details are in [`DEPLOYMENT.md`](DEPLOYMENT.md) and
+[`../frontend/DEPLOYMENT.md`](../frontend/DEPLOYMENT.md).
+
+1. Create a Fly.io account with a payment method (compute plus a 1 GB volume, a few dollars a month) and install
+   `flyctl`. Choose the frontend host (the docs use Vercel) so you know its final https origin.
+2. `cd backend && fly launch --no-deploy --copy-config --name <app>`, then
+   `fly volumes create vektor_data --size 1 --region iad`.
+3. In `fly.toml`, uncomment `VEKTOR_CORS_ORIGINS` and set the frontend origin. Keep `VEKTOR_TRUSTED_PROXY_HOPS = "1"`.
+4. `fly deploy`, then `curl https://<app>.fly.dev/api/v1/health` and one history request to confirm Yahoo is reachable.
+5. Build the frontend with `NEXT_PUBLIC_API_ORIGIN=https://<app>.fly.dev` and deploy it.
+6. Schedule `fly ssh console --user vektor -C "python -m app.backup /data/backups"`, or keep volume snapshots.
+
+There are no user accounts. Anyone who can reach the API can create and read paper portfolios and backtests. The
+rate limits, body limit and concurrency cap bound the load; no real money or brokerage is involved.
