@@ -40,3 +40,14 @@ volume), not code defects. See "Before the first deploy".
   form returns 2,516 trading days and 45 fills. With the backend stopped, the status panel and the backtest form both
   say the backend could not be reached. At 390 px wide there is no horizontal scrolling.
 
+## Production configuration
+
+- Startup in production with no settings refuses to run and names `VEKTOR_CORS_ORIGINS`, `VEKTOR_PORTFOLIO_DB_PATH`
+  and `VEKTOR_BACKTEST_DB_PATH`. The Docker image with only the `fly.toml` defaults names `VEKTOR_CORS_ORIGINS`.
+- Health answers 200 with `trading_mode: paper`, HSTS, the deny-all CSP and a request id. `/docs` and `/openapi.json`
+  answer 404. A preflight from the configured origin is allowed; one from another origin gets no allow-origin header.
+- A portfolio, its fill and a stored backtest survive a server restart, and in Docker they survive replacing the
+  container on the same volume. `python -m app.backup` copies the databases while the server runs.
+- The container runs as the unprivileged `vektor` user (files on the volume are owned by uid 10001), its health check
+  reports healthy, and it reaches Yahoo Finance from inside the container.
+
