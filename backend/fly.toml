@@ -18,7 +18,10 @@ primary_region = "iad"
   VEKTOR_MARKET_DATA_CACHE_PATH = "/data/market_data.sqlite3"
   VEKTOR_AI_PROVIDER = "none"
   VEKTOR_LOG_LEVEL = "INFO"
-  # Fly's proxy is the only way in, so trust its X-Forwarded-For; otherwise every client shares one rate limit.
+  # Fly's proxy appends the client's address to X-Forwarded-For. Rate limits key on that entry, never on the
+  # client-written ones to its left; otherwise every client shares one limit or picks a new address per request.
+  VEKTOR_TRUSTED_PROXY_HOPS = "1"
+  # Lets uvicorn take the scheme (https) from Fly's proxy. It does not decide the rate-limit address.
   FORWARDED_ALLOW_IPS = "*"
   # Required. The exact https origin(s) of your frontend, as a JSON list. Startup fails until this is set.
   # VEKTOR_CORS_ORIGINS = '["https://your-frontend.example"]'
