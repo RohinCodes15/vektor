@@ -51,3 +51,23 @@ volume), not code defects. See "Before the first deploy".
 - The container runs as the unprivileged `vektor` user (files on the volume are owned by uid 10001), its health check
   reports healthy, and it reaches Yahoo Finance from inside the container.
 
+## Fixed in Phase 5E
+
+**Rate limits could be dodged behind Fly.io (security).** `fly.toml` sets `FORWARDED_ALLOW_IPS="*"`. With `*`,
+uvicorn 0.54 takes the leftmost `X-Forwarded-For` entry as the client, and the client writes that entry itself. Fly's
+proxy appends the real address to the right. Sending a different `X-Forwarded-For` with each request therefore gave
+every request a fresh rate-limit window. Reproduced on a real server: six requests over a limit of three, all 200.
+
+The fix is a new setting, `VEKTOR_TRUSTED_PROXY_HOPS` (default `0`, set to `1` in `fly.toml` and the production env
+example). With N trusted proxies, the rate limiter keys on the Nth `X-Forwarded-For` entry from the right, the one
+the outermost trusted proxy appended, and ignores everything to its left. When the entry is missing or not an IP, it
+falls back to the TCP peer. After the fix the same six requests answer 200, 200, 200, 429, 429, 429, and the Docker
+image behaves the same way. Regression tests: `tests/test_middleware.py`, `tests/test_deployment.py` and
+`tests/test_security_config.py`.
+
+**Lint results depended on the ruff version.** There was no ruff configuration, and ruff 0.17 changed its defaults,
+so a plain `ruff check` reported 24 style findings. `pyproject.toml` now pins the rules (the classic defaults, bugbear,
+import order) and a 120-column line length.
+
+No API contract changed and no dependency was added.
+
