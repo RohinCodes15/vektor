@@ -40,6 +40,7 @@ Local development needs no changes: the defaults below are generous for one pers
 | `VEKTOR_MAX_REQUEST_BODY_BYTES` | `65536` (1 KiB to 10 MiB) | Larger bodies get 413, whether declared by `Content-Length` or streamed |
 | `VEKTOR_RATE_LIMIT_PER_MINUTE` | `300` (0 = off) | Requests per client IP per minute; over the limit gets 429 with `Retry-After` |
 | `VEKTOR_EXPENSIVE_RATE_LIMIT_PER_MINUTE` | `30` (0 = off) | The same, for expensive requests: every `POST` under `/api/v1/backtests` (backtests, comparisons, optimizations, AI analysis) |
+| `VEKTOR_TRUSTED_PROXY_HOPS` | `0` (0 to 5) | Proxies in front of the API that append to `X-Forwarded-For`. With N, rate limits key on the Nth entry from the right (the one the outermost trusted proxy appended); entries to its left are written by the client and ignored. `0` uses the TCP peer |
 | `VEKTOR_MAX_CONCURRENT_EXPENSIVE_REQUESTS` | `4` (1 to 64) | Expensive requests running at once, across all clients; more get 503 with `Retry-After: 5` |
 | `VEKTOR_MAX_BACKTEST_RANGE_DAYS` | `7305`, about 20 years (30 to 36525) | Longest start-to-end span for a backtest, comparison, or optimization; longer gets 422 before any data is fetched |
 
