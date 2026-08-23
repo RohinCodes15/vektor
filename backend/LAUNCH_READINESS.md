@@ -21,3 +21,22 @@ volume), not code defects. See "Before the first deploy".
 | Docker image | Built and run with a volume (colima) | PASS |
 | Browser | Frontend dev server plus backend, in Chromium | PASS, with the notes below |
 
+## Workflows (real Yahoo Finance data, temporary databases)
+
+- **Market data:** AAPL 2023 returns 250 sessions, ordered, weekdays only, OHLC bounds hold. The second request comes
+  from the cache with identical bars. An unknown symbol and a weekend-only range answer 404; nothing is filled in.
+- **Paper trading:** buys fill at a real close, a resent `client_order_id` returns the original fill, an oversell and
+  an overspend are rejected (422) and leave cash unchanged.
+- **Analytics:** snapshots, equity history, analytics, allocation and risk all answer 200.
+- **Backtests:** the same request gives identical results apart from id and time. A run cut off at 2019 is an exact
+  prefix of the 2015–2024 run, equity curve and trades both, so no bar uses later data.
+- **AI insights:** with the provider off (the default) the analysis returns measured facts only.
+- **Comparison:** deterministic, and its SMA result equals a standalone backtest of the same strategy.
+- **Optimization:** the training days strictly precede the test days and add up to all bars. The selected strategy's
+  train and test metrics equal standalone backtests over exactly those days. Repeat runs are identical.
+- **Guided demo (browser):** Explore Demo opens six steps; Next, Back, Finish, Skip and Escape work; focus returns to
+  the entry button; the top-bar Demo guide link moves focus to the guide; the demo sends no requests to the backend.
+- **Frontend and backend together (browser):** the status panel reports Connected. A 10-year SPY SMA backtest from the
+  form returns 2,516 trading days and 45 fills. With the backend stopped, the status panel and the backtest form both
+  say the backend could not be reached. At 390 px wide there is no horizontal scrolling.
+
