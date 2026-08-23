@@ -608,6 +608,22 @@ export type BacktestComparison = Readonly<{
   results: readonly StrategyComparisonResult[]; leaders: readonly MetricLeader[]; disclaimer: string;
 }>;
 
+function strategyKey(strategy: BacktestStrategy): string {
+  return JSON.stringify(strategy.kind === "sma_crossover" ? [strategy.kind, strategy.fast_window ?? 20, strategy.slow_window ?? 50]
+    : strategy.kind === "rsi" ? [strategy.kind, strategy.period ?? 14, Number(strategy.oversold ?? "30"), Number(strategy.overbought ?? "70")]
+    : [strategy.kind]);
+}
+
+function normalizeComparisonCreate(config: BacktestComparisonCreate): BacktestComparisonCreate {
+  if (!Array.isArray(config.strategies) || config.strategies.length < 2 || config.strategies.length > 5)
+    throw new Error("Choose 2 to 5 distinct strategies.");
+  const { symbol, strategies, ...settings } = config;
+  const normalized = strategies.map((strategy) => normalizeBacktestCreate({ ...settings, symbols: [symbol], strategy }));
+  if (new Set(normalized.map((item) => strategyKey(item.strategy))).size !== strategies.length)
+    throw new Error("Choose distinct strategies with different kinds or parameters.");
+  return { ...settings, symbol: normalized[0].symbols[0], strategies };
+}
+
 export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
 export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
 export type AnalysisInterpretation = Readonly<{
