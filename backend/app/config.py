@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=300, ge=0, le=100_000)
     # Backtests, comparisons, optimizations, and AI analysis: every POST under /api/v1/backtests.
     expensive_rate_limit_per_minute: int = Field(default=30, ge=0, le=10_000)
+    # Reverse proxies in front of the API that append the client's address to X-Forwarded-For (1 on Fly.io).
+    # 0 (the default) keys rate limits on the TCP peer. Entries left of the trusted ones are client-written and ignored.
+    trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
     max_concurrent_expensive_requests: int = Field(default=4, ge=1, le=64)
     # Longest start-to-end span a backtest, comparison, or optimization may request (about 20 years).
     max_backtest_range_days: int = Field(default=7305, ge=30, le=36_525)
