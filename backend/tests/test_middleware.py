@@ -159,6 +159,25 @@ def test_without_trusted_proxies_the_client_is_the_tcp_peer_whatever_the_headers
     assert client_ip({"headers": []}) == "unknown"
 
 
+@pytest.mark.parametrize(
+    ("values", "hops", "expected"),
+    [
+        (("203.0.113.7",), 1, "203.0.113.7"),
+        (("1.1.1.1, 203.0.113.7",), 1, "203.0.113.7"),  # the left entry was written by the client
+        (("1.1.1.1", "203.0.113.7"), 1, "203.0.113.7"),  # repeated headers are one list, in order
+        (("1.1.1.1, 203.0.113.7, 10.1.1.1",), 2, "203.0.113.7"),
+        ((" 2001:db8::1 ",), 1, "2001:db8::1"),
+        ((), 1, "10.0.0.9"),  # did not come through the proxy: fall back to the peer
+        (("203.0.113.7",), 2, "10.0.0.9"),  # fewer entries than trusted proxies
+        (("1.1.1.1, not-an-ip",), 1, "10.0.0.9"),
+    ],
+)
+def test_with_trusted_proxies_the_client_is_the_entry_the_outermost_proxy_appended(
+    values: tuple[str, ...], hops: int, expected: str
+) -> None:
+    assert client_ip(forwarded_scope(*values), hops) == expected
+
+
 # --- expensive concurrency limit ---------------------------------------------------------------------------------
 
 
