@@ -675,6 +675,13 @@ function isBacktestComparison(value: unknown, query: BacktestComparisonCreate): 
         && results[index].status === "available" && results[index].metrics?.[leader.metric as ComparisonMetric] !== null));
 }
 
+export async function runBacktestComparison(config: BacktestComparisonCreate, signal?: AbortSignal): Promise<BacktestComparison> {
+  const query = normalizeComparisonCreate(config);
+  const data = await requestJson("/api/v1/backtests/comparisons", "strategy comparison", signal, undefined, query);
+  if (!isBacktestComparison(data, query)) throw new Error("Backend returned an incompatible strategy comparison. No comparison data was accepted.");
+  return data;
+}
+
 export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
 export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
 export type AnalysisInterpretation = Readonly<{
