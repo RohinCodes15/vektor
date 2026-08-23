@@ -31,7 +31,7 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(path: string, name: "health" | "market history" | "portfolio" | "backtest" | "backtest analysis", signal?: AbortSignal, params?: URLSearchParams, body?: unknown): Promise<unknown> {
+async function requestJson(path: string, name: "health" | "market history" | "portfolio" | "backtest" | "backtest analysis" | "strategy comparison", signal?: AbortSignal, params?: URLSearchParams, body?: unknown): Promise<unknown> {
   const operation = name === "health" ? "health check" : `${name} request`;
   let url: URL;
   try {
@@ -43,7 +43,7 @@ async function requestJson(path: string, name: "health" | "market history" | "po
     throw new Error("Backend address is invalid. Check NEXT_PUBLIC_API_ORIGIN.");
   }
 
-  const timeout = AbortSignal.timeout(name === "backtest analysis" ? 300000 : name === "backtest" ? 30000 : 5000);
+  const timeout = AbortSignal.timeout(name === "backtest analysis" ? 300000 : name === "backtest" || name === "strategy comparison" ? 30000 : 5000);
   let response: Response;
   try {
     response = await fetch(url, {
