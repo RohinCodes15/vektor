@@ -9,7 +9,10 @@
 - RequestLogging: one JSON line per request (request id, method, path, status, duration). Never the query string,
   headers, or body, so no credentials or payloads reach the logs.
 
-Behind a reverse proxy, run uvicorn with --proxy-headers so the client IP is the real one, not the proxy's.
+Behind reverse proxies, set trusted_proxy_hops (VEKTOR_TRUSTED_PROXY_HOPS) to how many of them append to
+X-Forwarded-For. The rate limit then keys on the entry the outermost trusted proxy added, never on entries to its left,
+which the client wrote itself. uvicorn's --forwarded-allow-ips "*" uses the leftmost entry, so a client could pick a new
+IP for every request.
 """
 
 import ipaddress
