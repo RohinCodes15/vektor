@@ -71,3 +71,11 @@ import order) and a 120-column line length.
 
 No API contract changed and no dependency was added.
 
+## Not verified here
+
+- The real Anthropic provider: it is paid and off by default, so it was not called. Its request and error handling
+  are covered by tests with a fake client.
+- Yahoo Finance from Fly.io's network: it works locally and from a container, but cloud IPs can be throttled. Check
+  after the first deploy with one history request.
+- Screen readers and real phones: only keyboard behavior and a 390 px Chromium viewport were checked.
+
