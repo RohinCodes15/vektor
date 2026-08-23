@@ -79,3 +79,11 @@ No API contract changed and no dependency was added.
   after the first deploy with one history request.
 - Screen readers and real phones: only keyboard behavior and a 390 px Chromium viewport were checked.
 
+## Frontend notes for Codex (not blockers)
+
+- `GET /favicon.ico` answers 404, the only console error on a clean load. Adding an icon in `frontend/src/app/` fixes it.
+- `frontend/README.md` still opens with "No … backend connection required" from Phase 1, but the dashboard now
+  depends on the backend for every workflow.
+- Running `next dev` makes Next.js 16 generate an untracked `frontend/AGENTS.md`. Either commit it or add it to
+  `.gitignore` (a coordinated root file) so it doesn't keep showing up as a stray file.
+
