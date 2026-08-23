@@ -178,6 +178,19 @@ def test_with_trusted_proxies_the_client_is_the_entry_the_outermost_proxy_append
     assert client_ip(forwarded_scope(*values), hops) == expected
 
 
+def test_a_client_cannot_dodge_the_rate_limit_by_inventing_forwarded_addresses() -> None:
+    app = echo_app()
+    app.add_middleware(RateLimit, per_minute=2, expensive_per_minute=1, trusted_proxy_hops=1)
+    client = TestClient(app)
+    codes = [
+        client.get("/api/v1/health", headers={"x-forwarded-for": f"198.51.100.{n}, 203.0.113.7"}).status_code
+        for n in range(3)
+    ]
+    assert codes == [200, 200, 429]
+    other = client.get("/api/v1/health", headers={"x-forwarded-for": "203.0.113.8"})
+    assert other.status_code == 200  # a different real client keeps its own window
+
+
 # --- expensive concurrency limit ---------------------------------------------------------------------------------
 
 
