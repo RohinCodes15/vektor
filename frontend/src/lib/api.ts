@@ -60,6 +60,15 @@ async function requestJson(path: string, name: "health" | "market history" | "po
     throw new Error("Backend could not be reached. Check that it is running and allows this frontend origin.");
   }
   if (!response.ok) {
+    if (name === "strategy comparison") {
+      const messages: Record<number, string> = {
+        404: "No historical data found for this comparison's symbol and date range.",
+        422: "Strategy comparison was rejected. Check the strategies, symbol, dates, and costs.",
+        502: "The market data provider returned invalid data. No comparison was accepted.",
+        503: "The market data provider is unavailable. Try again later.",
+      };
+      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
+    }
     if (name === "backtest analysis") {
       const messages: Record<number, string> = {
         404: "This backtest no longer exists.",
