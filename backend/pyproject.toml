@@ -26,3 +26,10 @@ pythonpath = ["."]
 addopts = "-q"
 # shortcut: starlette's TestClient warns about httpx; revisit when FastAPI's TestClient migrates.
 filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Pinned so `ruff check` means the same thing on every ruff version: the classic defaults, bugbear, import order.
+select = ["E4", "E7", "E9", "F", "B", "I"]
