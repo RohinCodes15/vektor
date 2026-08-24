@@ -57,6 +57,19 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .comparison-strategy legend { padding-inline: 8px; font-size: 12px; }
 .comparison-strategy .strategy-fields, .comparison-strategy > .button { margin-top: 16px; }
 .comparison-status { overflow-wrap: anywhere; line-height: 1.7; }
+.comparison-results { margin-top: 32px; min-width: 0; }
+.comparison-results > .panel { margin-top: 20px; }
+.comparison-legend, .comparison-values { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-block: 12px; padding: 0; list-style: none; font-size: 12px; }
+.comparison-legend label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.comparison-legend input { accent-color: currentColor; }
+.comparison-table th { padding: 14px; white-space: normal; min-width: 150px; }
+.comparison-table th:first-child { min-width: 140px; }
+.comparison-table td .badge { display: block; width: fit-content; margin-top: 6px; }
+.comparison-leader { background: #86d5c10a; }
+.comparison-metrics > p, .comparison-notes { margin-block: 16px; }
+.comparison-notes { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.comparison-notes summary { cursor: pointer; }
+.comparison-notes > div { margin-block: 16px; }
 .backtest-fields, .strategy-fields, .cost-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .strategy-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .strategy-picker, .cost-fields { margin: 0; padding: 0; border: 0; }
