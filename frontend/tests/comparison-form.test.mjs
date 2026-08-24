@@ -4,8 +4,9 @@ import { mount, nodes } from "./component-runtime.mjs";
 import { runBacktestComparison } from "../src/lib/api.ts";
 
 const ui = Object.fromEntries(["Badge", "Button", "Field", "Panel"].map((name) => [name, function Mock() {}]));
+function MockResults() {}
 async function form(client = runBacktestComparison) {
-  return mount("../src/components/comparison-form.tsx", { "../lib/api": { runBacktestComparison: client }, "./ui": ui }, "ComparisonForm");
+  return mount("../src/components/comparison-form.tsx", { "../lib/api": { runBacktestComparison: client }, "./ui": ui, "./comparison-results": { ComparisonResults: MockResults } }, "ComparisonForm");
 }
 function find(component, predicate) {
   const node = nodes(component.render()).find(predicate);
@@ -71,6 +72,7 @@ test("comparison submits exact shared settings and parameters, locks pending wor
   resolve({ results: [available, available] });
   await pending;
   assert.ok(nodes(component.render()).some((node) => node.props?.children === "Comparison complete."));
+  assert.equal(find(component, (node) => node.type === MockResults).data.results.length, 2);
   assert.equal(button(component, "Compare").disabled, false);
   field(component, "comparison-capital", "6000.00");
   assert.equal(nodes(component.render()).some((node) => node.props?.className === "comparison-status"), false);
