@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { runBacktestComparison, type BacktestComparison, type BacktestStrategy } from "../lib/api";
 import { Badge, Button, Field, Panel } from "./ui";
+import { ComparisonResults } from "./comparison-results";
 
 type StrategyRow = Readonly<{
   id: number; kind: BacktestStrategy["kind"]; fast: string; slow: string; period: string; oversold: string; overbought: string;
@@ -96,6 +97,7 @@ export function ComparisonForm() {
           </div>}
         </form>
       </Panel>
+      {state.status === "success" && <ComparisonResults data={state.data} />}
     </section>
   );
 }
