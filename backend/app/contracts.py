@@ -773,6 +773,122 @@ ParameterGrid = Annotated[SmaCrossoverGrid | RsiGrid, Field(discriminator="kind"
 
 
 
+# Strategy optimization (Phase 3C.1). A bounded grid search with a chronological train/test split, computed on
+# request from real history and never stored; nothing reaches a broker. Describes the past only.
+MAX_OPTIMIZATION_CANDIDATES = 100
+MAX_GRID_VALUES = 20
+OptimizationObjective = Literal["total_return_pct", "sharpe_ratio", "max_drawdown_pct"]
+GridValues = Annotated[list[int], Field(min_length=1, max_length=MAX_GRID_VALUES)]
+RsiLevel = Annotated[Decimal, Field(gt=0, lt=100, max_digits=4, decimal_places=2)]
+
+
+def _distinct_ascending[T: (int, Decimal)](values: list[T]) -> list[T]:
+    if len(set(values)) != len(values):
+        raise ValueError("grid values must not repeat")
+    return sorted(values)
+
+
+class SmaCrossoverGrid(Contract):
+    """Every (fast_window, slow_window) pair with fast_window < slow_window. Pairs that break that rule are skipped."""
+
+    kind: Literal["sma_crossover"]
+    fast_windows: GridValues
+    slow_windows: GridValues
+
+    @field_validator("fast_windows", "slow_windows")
+    @classmethod
+    def distinct(cls, value: list[int]) -> list[int]:
+        return _distinct_ascending(value)
+
+    @field_validator("fast_windows")
+    @classmethod
+    def fast_bounds(cls, value: list[int]) -> list[int]:
+        if not all(2 <= window <= 250 for window in value):
+            raise ValueError("fast_windows must be between 2 and 250")
+        return value
+
+    @field_validator("slow_windows")
+    @classmethod
+    def slow_bounds(cls, value: list[int]) -> list[int]:
+        if not all(3 <= window <= 500 for window in value):
+            raise ValueError("slow_windows must be between 3 and 500")
+        return value
+
+    def strategies(self) -> list[SmaCrossoverStrategy]:
+        """Valid combinations in a fixed order: fast_window ascending, then slow_window ascending."""
+        return [
+            SmaCrossoverStrategy(kind="sma_crossover", fast_window=fast, slow_window=slow)
+            for fast in self.fast_windows
+            for slow in self.slow_windows
+            if fast < slow
+        ]
+
+
+class RsiGrid(Contract):
+    """Every (period, oversold, overbought) triple with oversold < overbought. Triples that break it are skipped."""
+
+    kind: Literal["rsi"]
+    periods: GridValues
+    oversold: Annotated[list[RsiLevel], Field(min_length=1, max_length=MAX_GRID_VALUES)]
+    overbought: Annotated[list[RsiLevel], Field(min_length=1, max_length=MAX_GRID_VALUES)]
+
+    @field_validator("periods")
+    @classmethod
+    def period_bounds(cls, value: list[int]) -> list[int]:
+        if not all(2 <= period <= 100 for period in value):
+            raise ValueError("periods must be between 2 and 100")
+        return _distinct_ascending(value)
+
+    @field_validator("oversold", "overbought")
+    @classmethod
+    def distinct_levels(cls, value: list[Decimal]) -> list[Decimal]:
+        return _distinct_ascending([_canonical(level) for level in value])
+
+    def strategies(self) -> list[RsiStrategy]:
+        """Valid combinations in a fixed order: period, then oversold, then overbought, each ascending."""
+        return [
+            RsiStrategy(kind="rsi", period=period, oversold=low, overbought=high)
+            for period in self.periods
+            for low in self.oversold
+            for high in self.overbought
+            if low < high
+        ]
+
+
+ParameterGrid = Annotated[SmaCrossoverGrid | RsiGrid, Field(discriminator="kind")]
+
+
+class BacktestOptimizationCreate(BacktestSettings):
+    """Grid search over one strategy's parameters on one symbol.
+
+    The trading days in the range are split chronologically: the first `train_pct` percent train (rank candidates),
+    the rest test (evaluate only the selected candidate). At most MAX_OPTIMIZATION_CANDIDATES valid combinations.
+    """
+
+    symbol: str
+    grid: ParameterGrid
+    objective: OptimizationObjective
+    train_pct: int = Field(default=70, ge=50, le=90)
+    top_n: int = Field(default=10, ge=1, le=MAX_OPTIMIZATION_CANDIDATES)
+
+    @field_validator("symbol", mode="before")
+    @classmethod
+    def normalize_symbol(cls, value: object) -> object:
+        return _tradable(value) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def check_workload(self) -> Self:
+        candidates = len(self.grid.strategies())
+        if candidates == 0:
+            raise ValueError("the grid has no valid combination (fast < slow, oversold < overbought)")
+        if candidates > MAX_OPTIMIZATION_CANDIDATES:
+            raise ValueError(
+                f"the grid has {candidates} valid combinations; at most {MAX_OPTIMIZATION_CANDIDATES} are allowed"
+            )
+        return self
+
+
+
 # AI strategy analysis (Phase 3A.1). Educational and paper-only: explains a stored backtest and never gives advice.
 AnalysisProviderName = Literal["anthropic"]
 
