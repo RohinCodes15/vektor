@@ -2,6 +2,7 @@
 
 Simulation models are contracts only; no endpoints serve them yet. Backtest models back /api/v1/backtests;
 comparison models back POST /api/v1/backtests/comparisons (Phase 3B.1).
+Optimization models back POST /api/v1/backtests/optimizations (Phase 3C.1).
 Analysis models back POST /api/v1/backtests/{id}/analysis (Phase 3A.1, educational AI explanations of a backtest).
 Market history models back the read-only GET /api/v1/market/history endpoint.
 Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots, analytics, allocation
@@ -772,92 +773,6 @@ class RsiGrid(Contract):
 ParameterGrid = Annotated[SmaCrossoverGrid | RsiGrid, Field(discriminator="kind")]
 
 
-
-# Strategy optimization (Phase 3C.1). A bounded grid search with a chronological train/test split, computed on
-# request from real history and never stored; nothing reaches a broker. Describes the past only.
-MAX_OPTIMIZATION_CANDIDATES = 100
-MAX_GRID_VALUES = 20
-OptimizationObjective = Literal["total_return_pct", "sharpe_ratio", "max_drawdown_pct"]
-GridValues = Annotated[list[int], Field(min_length=1, max_length=MAX_GRID_VALUES)]
-RsiLevel = Annotated[Decimal, Field(gt=0, lt=100, max_digits=4, decimal_places=2)]
-
-
-def _distinct_ascending[T: (int, Decimal)](values: list[T]) -> list[T]:
-    if len(set(values)) != len(values):
-        raise ValueError("grid values must not repeat")
-    return sorted(values)
-
-
-class SmaCrossoverGrid(Contract):
-    """Every (fast_window, slow_window) pair with fast_window < slow_window. Pairs that break that rule are skipped."""
-
-    kind: Literal["sma_crossover"]
-    fast_windows: GridValues
-    slow_windows: GridValues
-
-    @field_validator("fast_windows", "slow_windows")
-    @classmethod
-    def distinct(cls, value: list[int]) -> list[int]:
-        return _distinct_ascending(value)
-
-    @field_validator("fast_windows")
-    @classmethod
-    def fast_bounds(cls, value: list[int]) -> list[int]:
-        if not all(2 <= window <= 250 for window in value):
-            raise ValueError("fast_windows must be between 2 and 250")
-        return value
-
-    @field_validator("slow_windows")
-    @classmethod
-    def slow_bounds(cls, value: list[int]) -> list[int]:
-        if not all(3 <= window <= 500 for window in value):
-            raise ValueError("slow_windows must be between 3 and 500")
-        return value
-
-    def strategies(self) -> list[SmaCrossoverStrategy]:
-        """Valid combinations in a fixed order: fast_window ascending, then slow_window ascending."""
-        return [
-            SmaCrossoverStrategy(kind="sma_crossover", fast_window=fast, slow_window=slow)
-            for fast in self.fast_windows
-            for slow in self.slow_windows
-            if fast < slow
-        ]
-
-
-class RsiGrid(Contract):
-    """Every (period, oversold, overbought) triple with oversold < overbought. Triples that break it are skipped."""
-
-    kind: Literal["rsi"]
-    periods: GridValues
-    oversold: Annotated[list[RsiLevel], Field(min_length=1, max_length=MAX_GRID_VALUES)]
-    overbought: Annotated[list[RsiLevel], Field(min_length=1, max_length=MAX_GRID_VALUES)]
-
-    @field_validator("periods")
-    @classmethod
-    def period_bounds(cls, value: list[int]) -> list[int]:
-        if not all(2 <= period <= 100 for period in value):
-            raise ValueError("periods must be between 2 and 100")
-        return _distinct_ascending(value)
-
-    @field_validator("oversold", "overbought")
-    @classmethod
-    def distinct_levels(cls, value: list[Decimal]) -> list[Decimal]:
-        return _distinct_ascending([_canonical(level) for level in value])
-
-    def strategies(self) -> list[RsiStrategy]:
-        """Valid combinations in a fixed order: period, then oversold, then overbought, each ascending."""
-        return [
-            RsiStrategy(kind="rsi", period=period, oversold=low, overbought=high)
-            for period in self.periods
-            for low in self.oversold
-            for high in self.overbought
-            if low < high
-        ]
-
-
-ParameterGrid = Annotated[SmaCrossoverGrid | RsiGrid, Field(discriminator="kind")]
-
-
 class BacktestOptimizationCreate(BacktestSettings):
     """Grid search over one strategy's parameters on one symbol.
 
@@ -887,6 +802,90 @@ class BacktestOptimizationCreate(BacktestSettings):
             )
         return self
 
+
+class OptimizationSplit(Contract):
+    """Chronological split of the shared trading days. Train days all precede test days; none is in both."""
+
+    train_pct: int
+    train_bars: int
+    train_first_date: date
+    train_last_date: date
+    test_bars: int
+    test_first_date: date
+    test_last_date: date
+
+
+class OptimizationCandidate(Contract):
+    """A parameter combination ranked by its training-segment value of the objective (rank 1 is best)."""
+
+    rank: int
+    strategy: BacktestStrategy
+    objective_value: Decimal
+    train_metrics: BacktestMetrics
+
+
+class OptimizationSegment(Contract):
+    """The selected parameters backtested on one segment alone, starting from `starting_cash` with no position."""
+
+    first_date: date
+    last_date: date
+    bars: int
+    metrics: BacktestMetrics
+    warnings: list[str]
+    equity_curve: list[BacktestEquityPoint]
+
+
+OverfittingCode = Literal["return_reversal", "sharpe_decay", "few_trades", "edge_of_grid", "many_candidates"]
+
+
+class OverfittingFlag(Contract):
+    code: OverfittingCode
+    message: str
+
+
+class OverfittingReport(Contract):
+    """Test minus train, per metric (percentage points or Sharpe units); null when either side is undefined.
+
+    Flags are warning signs, not proof: their absence does not mean the parameters will keep working.
+    """
+
+    annualized_return_gap_pct: Decimal | None
+    sharpe_gap: Decimal | None
+    max_drawdown_gap_pct: Decimal | None
+    flags: list[OverfittingFlag]
+
+
+class OptimizationSelection(Contract):
+    strategy: BacktestStrategy
+    train: OptimizationSegment
+    test: OptimizationSegment
+    overfitting: OverfittingReport
+
+
+class BacktestOptimization(Contract):
+    """Deterministic: the same request on the same data gives the same result. Describes the past only.
+
+    `selected` is null, with a `selection_reason`, when no candidate has a defined objective on the training data.
+    """
+
+    mode: TradingMode = "paper"
+    currency: PortfolioCurrency
+    source: MarketDataSource
+    config: BacktestOptimizationCreate
+    bars: int
+    split: OptimizationSplit
+    better: Literal["higher"]
+    # Valid combinations in the grid; skipped ones need more warm-up days than a segment has.
+    candidates_total: int
+    candidates_evaluated: int
+    candidates_skipped: int
+    # Evaluated candidates whose objective is undefined on the training data (for example, Sharpe with no trades).
+    candidates_unranked: int
+    ranked: list[OptimizationCandidate]  # best first, at most config.top_n
+    selected: OptimizationSelection | None
+    selection_reason: str | None
+    limitations: list[str]
+    disclaimer: str
 
 
 # AI strategy analysis (Phase 3A.1). Educational and paper-only: explains a stored backtest and never gives advice.
