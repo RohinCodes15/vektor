@@ -11,6 +11,8 @@ from app.contracts import (
     BacktestComparison,
     BacktestComparisonCreate,
     BacktestCreate,
+    BacktestOptimization,
+    BacktestOptimizationCreate,
     BacktestSummary,
     ErrorResponse,
 )
@@ -34,6 +36,14 @@ COMPARE_RESPONSES: dict[int | str, dict[str, Any]] = {
         "model": ErrorResponse,
         "description": "Invalid request, unknown symbol, or non-USD prices. A strategy with too little history is "
         "reported as unavailable instead.",
+    },
+}
+OPTIMIZE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **RUN_RESPONSES,
+    422: {
+        "model": ErrorResponse,
+        "description": "Invalid request or grid (no valid or too many combinations), unknown symbol, non-USD prices, "
+        "or too little history for any candidate in both the training and the test segment.",
     },
 }
 ANALYSIS_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -67,6 +77,12 @@ def run_backtest(body: BacktestCreate, service: Service) -> Backtest:
 def compare_strategies(body: BacktestComparisonCreate, service: Service) -> BacktestComparison:
     """Backtest 2 to 5 strategies on the same symbol, range, cash and costs and compare them. Nothing is stored."""
     return service.compare(body)
+
+
+@router.post("/optimizations", response_model=BacktestOptimization, responses=OPTIMIZE_RESPONSES)
+def optimize_strategy(body: BacktestOptimizationCreate, service: Service) -> BacktestOptimization:
+    """Grid-search a strategy's parameters with a chronological train/test split. Nothing is stored."""
+    return service.optimize(body)
 
 
 @router.get("", response_model=list[BacktestSummary])
