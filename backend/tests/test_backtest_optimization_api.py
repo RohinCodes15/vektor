@@ -1,0 +1,96 @@
+from datetime import date, timedelta
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.config import Settings
+from app.contracts import PriceBar
+from app.main import create_app
+from tests.fakes import FakeProvider
+
+URL = "/api/v1/backtests/optimizations"
+FIRST_DAY = date(2024, 1, 2)
+# 40 daily closes with swings, so short SMA and RSI settings trade in both segments.
+CLOSES = [10, 11, 12, 11, 10, 9, 10, 12, 13, 12, 11, 10, 11, 12, 14, 13, 12, 11, 12, 13,
+          15, 14, 13, 12, 11, 12, 14, 15, 16, 15, 14, 13, 12, 13, 14, 16, 17, 16, 15, 14]
+TRAIN_BARS = 28  # 40 * 70 // 100
+GRID: dict[str, Any] = {"kind": "sma_crossover", "fast_windows": [2, 3], "slow_windows": [4, 5, 6]}
+BODY: dict[str, Any] = {
+    "symbol": "aapl", "start": "2024-01-01", "end": "2024-06-28", "starting_cash": "1000",
+    "grid": GRID, "objective": "total_return_pct", "fee_per_trade": "1", "slippage_bps": "10",
+}
+
+
+def bars(closes: list[float]) -> list[PriceBar]:
+    return [
+        PriceBar(date=FIRST_DAY + timedelta(days=i), open=c, high=c + 1, low=c - 1, close=c, adjusted_close=c,
+                 volume=1000)
+        for i, c in enumerate(closes)
+    ]
+
+
+def make_client(provider: FakeProvider, tmp_path: Path) -> TestClient:
+    settings = Settings(
+        environment="test",
+        market_data_cache_path=tmp_path / "cache.sqlite3",
+        portfolio_db_path=tmp_path / "portfolios.sqlite3",
+        backtest_db_path=tmp_path / "backtests.sqlite3",
+    )
+    return TestClient(create_app(settings, market_data_provider=provider))
+
+
+@pytest.fixture
+def client(tmp_path: Path) -> TestClient:
+    return make_client(FakeProvider(bars(CLOSES)), tmp_path)
+
+
+def test_optimization_splits_chronologically_and_ranks_on_training_data(client: TestClient) -> None:
+    res = client.post(URL, json=BODY)
+    assert res.status_code == 200
+    body = res.json()
+    split = body["split"]
+    assert (body["mode"], body["bars"], split["train_bars"], split["test_bars"]) == ("paper", 40, TRAIN_BARS, 12)
+    assert split["train_last_date"] < split["test_first_date"]
+    assert (body["candidates_total"], body["candidates_evaluated"], body["candidates_skipped"]) == (6, 6, 0)
+    ranked = body["ranked"]
+    assert [c["rank"] for c in ranked] == [1, 2, 3, 4, 5, 6]
+    values = [float(c["objective_value"]) for c in ranked]
+    assert values == sorted(values, reverse=True)
+    assert all(c["objective_value"] == c["train_metrics"]["total_return_pct"] for c in ranked)
+    selected = body["selected"]
+    assert selected["strategy"] == ranked[0]["strategy"]
+    assert selected["train"]["metrics"] == ranked[0]["train_metrics"]
+    assert (selected["train"]["bars"], selected["test"]["bars"]) == (TRAIN_BARS, 12)
+    assert selected["test"]["equity_curve"][0]["equity"] == "1000.00"
+    assert selected["test"]["first_date"] == split["test_first_date"]
+    assert body["limitations"] and "not guaranteed" in body["disclaimer"]
+
+
+def test_segments_equal_standalone_backtests_on_the_same_dates(client: TestClient) -> None:
+    body = client.post(URL, json=BODY).json()
+    selected = body["selected"]
+    for segment in ("train", "test"):
+        part = selected[segment]
+        standalone = client.post("/api/v1/backtests", json={
+            **{k: v for k, v in BODY.items() if k not in ("symbol", "grid", "objective")},
+            "symbols": ["AAPL"], "strategy": selected["strategy"],
+            "start": part["first_date"], "end": part["last_date"],
+        }).json()
+        assert part["metrics"] == standalone["metrics"]
+        assert part["equity_curve"] == standalone["equity_curve"]
+        assert part["warnings"] == standalone["warnings"]
+
+
+def test_test_segment_prices_cannot_change_the_ranking(tmp_path: Path) -> None:
+    changed = CLOSES[:TRAIN_BARS] + [c * 3 if i % 2 else c / 2 for i, c in enumerate(CLOSES[TRAIN_BARS:])]
+    original = make_client(FakeProvider(bars(CLOSES)), tmp_path / "a").post(URL, json=BODY).json()
+    shifted = make_client(FakeProvider(bars(changed)), tmp_path / "b").post(URL, json=BODY).json()
+    assert original["ranked"] == shifted["ranked"]
+    assert original["selected"]["train"] == shifted["selected"]["train"]
+    assert original["selected"]["test"] != shifted["selected"]["test"]
+
+
+def test_same_request_gives_the_same_body(client: TestClient) -> None:
+    assert client.post(URL, json=BODY).json() == client.post(URL, json=BODY).json()
