@@ -4,9 +4,9 @@ backtest never runs on missing or invalid prices.
 """
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -14,6 +14,7 @@ from app.backtest.comparison import differences, leaders
 from app.backtest.engine import Costs, Holding, Simulation, simulate
 from app.backtest.errors import BacktestNotFound, BacktestRejected
 from app.backtest.metrics import Performance, compute_performance
+from app.backtest.optimization import Scored, objective_value, overfitting_report, rank, split_calendar
 from app.backtest.prices import Aligned, Bar, adjust, align
 from app.backtest.store import BacktestStore
 from app.backtest.strategies import signal_series, warmup_bars
@@ -24,6 +25,8 @@ from app.contracts import (
     BacktestCreate,
     BacktestEquityPoint,
     BacktestMetrics,
+    BacktestOptimization,
+    BacktestOptimizationCreate,
     BacktestPosition,
     BacktestRejectedOrder,
     BacktestSettings,
@@ -31,6 +34,10 @@ from app.contracts import (
     BacktestSummary,
     BacktestTrade,
     MarketHistoryQuery,
+    OptimizationCandidate,
+    OptimizationSegment,
+    OptimizationSelection,
+    OptimizationSplit,
     StrategyComparisonResult,
 )
 from app.market_data.errors import MarketDataNotFound
@@ -44,6 +51,24 @@ BASIS_POINTS = Decimal(10_000)
 COMPARISON_DISCLAIMER = (
     "Paper simulation on past daily prices. A strategy that led in this comparison is not guaranteed, or even likely, "
     "to lead or return anything in the future. Not investment advice."
+)
+OPTIMIZATION_DISCLAIMER = (
+    "Paper simulation on past daily prices. The best parameters on past data are not guaranteed, or even likely, "
+    "to work in the future, and a good test result is one more historical sample, not a prediction. "
+    "Not investment advice."
+)
+OPTIMIZATION_LIMITATIONS = (
+    "Ranking uses only the training segment; the test segment is evaluated once, for the selected parameters.",
+    (
+        "Each segment is simulated on its own from the starting cash, so indicators warm up inside it and the test "
+        "segment never sees training positions or signals."
+    ),
+    (
+        "One train/test split of one symbol's history is a single sample: a different range or split can select "
+        "different parameters."
+    ),
+    "Searching many combinations raises the chance that the winner fits noise (selection bias).",
+    "Every backtest limitation applies: daily bars, fills at the next open, long only, whole shares.",
 )
 
 
@@ -110,6 +135,67 @@ class BacktestService:
             disclaimer=COMPARISON_DISCLAIMER,
         )
 
+    def optimize(self, request: BacktestOptimizationCreate) -> BacktestOptimization:
+        """Grid-search one strategy's parameters: rank on the training days, evaluate the winner on the later test
+        days. Nothing is stored. Raises BacktestRejected on unusable data or when no candidate fits both segments.
+        """
+        aligned = align({request.symbol: self._bars(request.symbol, request)})
+        split = split_calendar(aligned.calendar, request.train_pct)
+        train, test = _slice(aligned, 0, len(split.train)), _slice(aligned, len(split.train), len(aligned.calendar))
+        strategies: Sequence[BacktestStrategy] = request.grid.strategies()
+        shortest = min(len(split.train), len(split.test))
+        eligible = [(i, s) for i, s in enumerate(strategies) if warmup_bars(s) <= shortest]
+        if not eligible:
+            raise BacktestRejected(_optimization_shortfall(request, strategies, split.train, split.test))
+        scored = [Scored(i, strategy, _segment_metrics(request, strategy, train)) for i, strategy in eligible]
+        ranked = rank(scored, request.objective)
+        selected = _selection(request, ranked[0], len(eligible), train, test) if ranked else None
+        logger.info(
+            "backtest optimization completed",
+            extra={
+                "symbol": request.symbol,
+                "strategy": request.grid.kind,
+                "objective": request.objective,
+                "candidates": len(eligible),
+                "bars": len(aligned.calendar),
+            },
+        )
+        return BacktestOptimization(
+            currency=BACKTEST_CURRENCY,
+            source="yahoo_finance",
+            config=request,
+            bars=len(aligned.calendar),
+            split=OptimizationSplit(
+                train_pct=request.train_pct,
+                train_bars=len(split.train),
+                train_first_date=split.train[0],
+                train_last_date=split.train[-1],
+                test_bars=len(split.test),
+                test_first_date=split.test[0],
+                test_last_date=split.test[-1],
+            ),
+            better="higher",
+            candidates_total=len(strategies),
+            candidates_evaluated=len(eligible),
+            candidates_skipped=len(strategies) - len(eligible),
+            candidates_unranked=len(eligible) - len(ranked),
+            ranked=[
+                OptimizationCandidate(
+                    rank=position,
+                    strategy=s.strategy,
+                    objective_value=_objective(s, request),
+                    train_metrics=s.metrics,
+                )
+                for position, s in enumerate(ranked[: request.top_n], start=1)
+            ],
+            selected=selected,
+            selection_reason=None if ranked else (
+                f"No candidate has a defined {request.objective} on the training data, so none was selected."
+            ),
+            limitations=list(OPTIMIZATION_LIMITATIONS),
+            disclaimer=OPTIMIZATION_DISCLAIMER,
+        )
+
     def get(self, backtest_id: UUID) -> Backtest:
         backtest = self._store.get(backtest_id)
         if backtest is None:
@@ -168,6 +254,65 @@ def _compared(
         warnings=list(performance.warnings),
         equity=[point.equity for point in simulation.equity_curve],
         vs_baseline=None,
+    )
+
+
+def _slice(aligned: Aligned, start: int, stop: int) -> Aligned:
+    return Aligned(aligned.calendar[start:stop], {symbol: bars[start:stop] for symbol, bars in aligned.bars.items()})
+
+
+def _optimization_shortfall(
+    request: BacktestOptimizationCreate,
+    strategies: Sequence[BacktestStrategy],
+    train: Sequence[date],
+    test: Sequence[date],
+) -> str:
+    required = min(warmup_bars(strategy) for strategy in strategies)
+    return (
+        f"Not enough history to optimize: the candidate with the shortest warm-up needs {required} trading days in "
+        f"both the training and the test segment, but the {request.train_pct}/{100 - request.train_pct} split of "
+        f"{request.start} to {request.end} has {len(train)} training and {len(test)} test days. "
+        "Widen the date range or search shorter windows."
+    )
+
+
+def _objective(scored: Scored, request: BacktestOptimizationCreate) -> Decimal:
+    value = objective_value(scored.metrics, request.objective)
+    if value is None:  # rank() returns only candidates with a defined objective
+        raise ValueError("ranked candidate has no objective value")
+    return value
+
+
+def _selection(
+    request: BacktestOptimizationCreate, best: Scored, candidates: int, train: Aligned, test: Aligned
+) -> OptimizationSelection:
+    train_segment = _segment(request, best.strategy, train)
+    test_segment = _segment(request, best.strategy, test)
+    return OptimizationSelection(
+        strategy=best.strategy,
+        train=train_segment,
+        test=test_segment,
+        overfitting=overfitting_report(
+            best.strategy, request.grid, candidates, train_segment.metrics, test_segment.metrics
+        ),
+    )
+
+
+def _segment_metrics(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> BacktestMetrics:
+    simulation = _simulate(request, strategy, aligned)
+    return _metrics(simulation, _performance(request, simulation))
+
+
+def _segment(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> OptimizationSegment:
+    simulation = _simulate(request, strategy, aligned)
+    performance = _performance(request, simulation)
+    return OptimizationSegment(
+        first_date=aligned.calendar[0],
+        last_date=aligned.calendar[-1],
+        bars=len(aligned.calendar),
+        metrics=_metrics(simulation, performance),
+        warnings=list(performance.warnings),
+        equity_curve=_equity_points(simulation, performance),
     )
 
 
