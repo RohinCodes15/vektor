@@ -217,7 +217,6 @@ def _backtest(
     performance: Performance,
 ) -> Backtest:
     account = simulation.account
-    curve = simulation.equity_curve
     return Backtest(
         id=backtest_id,
         currency=BACKTEST_CURRENCY,
@@ -229,16 +228,20 @@ def _backtest(
         last_date=aligned.calendar[-1],
         metrics=_metrics(simulation, performance),
         warnings=list(performance.warnings),
-        equity_curve=[
-            BacktestEquityPoint(
-                date=p.date, cash=p.cash, positions_value=p.positions_value, equity=p.equity, drawdown_pct=drawdown
-            )
-            for p, drawdown in zip(curve, performance.drawdowns_pct, strict=True)
-        ],
+        equity_curve=_equity_points(simulation, performance),
         trades=[BacktestTrade(**asdict(fill)) for fill in account.fills],
         rejected_orders=[BacktestRejectedOrder(**asdict(rejection)) for rejection in account.rejections],
         open_positions=_open_positions(account.holdings, {s: bars[-1].close for s, bars in aligned.bars.items()}),
     )
+
+
+def _equity_points(simulation: Simulation, performance: Performance) -> list[BacktestEquityPoint]:
+    return [
+        BacktestEquityPoint(
+            date=p.date, cash=p.cash, positions_value=p.positions_value, equity=p.equity, drawdown_pct=drawdown
+        )
+        for p, drawdown in zip(simulation.equity_curve, performance.drawdowns_pct, strict=True)
+    ]
 
 
 def _open_positions(holdings: Mapping[str, Holding], closes: Mapping[str, Decimal]) -> list[BacktestPosition]:
