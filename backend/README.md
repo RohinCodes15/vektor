@@ -378,6 +378,56 @@ curl -X POST localhost:8000/api/v1/backtests/comparisons -H 'content-type: appli
 
 **Limitations:** all the backtest limitations apply. The comparison ranks one historical path; a lead can come from chance, the chosen range, or the parameters, and says nothing about future returns. Trade counts and win rates on few trades are weak evidence.
 
+## Strategy optimization (Phase 3C.1)
+
+Grid-searches the parameters of one SMA crossover or RSI strategy on one symbol, ranks the combinations on a training period, and evaluates only the winner on a later, untouched test period. Every candidate runs through the same engine and metrics as `POST /backtests`. Paper-only, educational, computed on request, and never stored.
+
+| Method and path (under `/api/v1`) | Does | Success |
+|-----------------------------------|------|---------|
+| `POST /backtests/optimizations` | Run the grid search and the out-of-sample check | 200 `BacktestOptimization` |
+
+```bash
+curl -X POST localhost:8000/api/v1/backtests/optimizations -H 'content-type: application/json' -d '{
+  "symbol": "AAPL", "start": "2019-01-01", "end": "2024-12-31", "starting_cash": "10000",
+  "grid": {"kind": "sma_crossover", "fast_windows": [10, 20, 30], "slow_windows": [50, 100, 150, 200]},
+  "objective": "sharpe_ratio", "train_pct": 70, "top_n": 5, "fee_per_trade": "1.00", "slippage_bps": "5"
+}'
+```
+
+### Request (`BacktestOptimizationCreate`)
+
+| Field | Meaning |
+|-------|---------|
+| `symbol` | One tradable ticker |
+| `grid` | `{"kind": "sma_crossover", "fast_windows": [...], "slow_windows": [...]}` or `{"kind": "rsi", "periods": [...], "oversold": [...], "overbought": [...]}`. Each list holds 1 to 20 distinct values within the strategy's bounds (see Strategies). Every combination is tried except those with `fast_window ≥ slow_window` or `oversold ≥ overbought`, in a fixed ascending order |
+| `objective` | `total_return_pct`, `sharpe_ratio`, or `max_drawdown_pct` |
+| `train_pct` | Share of the trading days used for training, 50 to 90. Default 70 |
+| `top_n` | How many ranked candidates to return, 1 to 100. Default 10 |
+| other fields | As in a backtest request (`BacktestSettings`): range, starting cash, position size, fees, slippage |
+
+**Workload:** at most 100 valid combinations, one symbol fetched once (then cached), and one simulation per candidate plus two for the winner. A grid with no valid combination or more than 100 is rejected with 422 before any data is fetched.
+
+### Method
+
+1. **Split:** the shared trading days are split chronologically. The first `floor(bars × train_pct / 100)` days train, the rest test. Every training day precedes every test day.
+2. **No leakage:** each segment is simulated on its own, starting from `starting_cash` with no position, so indicators warm up inside the segment and the test segment never sees training positions, signals, or prices. Ranking reads training results only; changing test-period prices cannot change the ranking.
+3. **Eligibility:** a candidate is evaluated only if its warm-up (`slow_window + 2` or `period + 2` days) fits in **both** segments, so the winner can always be tested. The others are counted in `candidates_skipped`. If none fits, the request fails with 422 and says how many days the shortest warm-up needs.
+4. **Ranking:** by the training value of the objective, higher first for all three (max drawdown is zero or negative, so the shallowest leads). Ties go to the higher training total return, then to the earlier grid position. A candidate whose objective is undefined (a null Sharpe ratio, for example with no trades or flat prices) is not ranked and is counted in `candidates_unranked`; if nothing can be ranked, `selected` is null with a `selection_reason`.
+5. **Out of sample:** only the rank-1 parameters run on the test segment.
+
+### Response (`BacktestOptimization`)
+
+`split` gives the size and dates of each segment. `ranked` lists up to `top_n` candidates, best first, with `objective_value` and full `train_metrics` (`BacktestMetrics`). `selected` holds the winner's `train` and `test` segments (`OptimizationSegment`: metrics, warnings for null metrics, and the equity curve with per-day `drawdown_pct`, each segment's numbers equal to a standalone backtest on its dates) and an `overfitting` report:
+
+- Gaps (test − train): `annualized_return_gap_pct`, `sharpe_gap`, `max_drawdown_gap_pct`; null when either side is null. Annualized figures are compared because the segments differ in length.
+- `flags`, each a `code` with a `message`: `return_reversal` (gained in training, not in testing), `sharpe_decay` (test Sharpe undefined or below half the positive training Sharpe), `few_trades` (fewer than 5 closed training trades), `edge_of_grid` (a selected value is the smallest or largest searched, in a dimension with 2+ values), `many_candidates` (more than 50 combinations tried).
+
+`limitations` and `disclaimer` restate what the result cannot show. Deterministic: the same request on the same data returns the same body.
+
+**Errors:** 422 for an invalid request or grid, unknown symbol, non-USD prices, or too little history; 502/503 for provider failures, as for backtests.
+
+**Limitations:** all the backtest limitations apply. A single split of one symbol's history is one sample; a different range or split can pick different parameters. The more combinations are searched, the likelier the winner fits noise; flags are warning signs, and their absence does not mean the parameters will keep working. Optimizing for max drawdown favors candidates that rarely trade. Nothing here predicts future returns.
+
 ## AI strategy analysis (Phase 3A.1)
 
 Educational explanations of a stored backtest. Vektor measures the facts itself; an optional AI provider only interprets them. **Off by default:** with no provider configured the endpoint returns the measured facts and `"status": "unavailable"`, never a made-up analysis. Paper-only and educational: it describes a simulation and never gives investment advice, recommendations, forecasts, or promises of returns.
