@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ApiError, runBacktestOptimization } from "../src/lib/api.ts";
+import { mount } from "./component-runtime.mjs";
 
 const grid = { kind: "sma_crossover", fast_windows: [2], slow_windows: [3] };
 const config = { symbol: "AAPL", start: "2024-01-01", end: "2024-02-01", starting_cash: "10000.00", grid, objective: "total_return_pct", train_pct: 70, top_n: 10, position_size_pct: "100", fee_per_trade: "0.00", fee_bps: "0", slippage_bps: "0" };
@@ -130,4 +131,32 @@ test("optimization handles server, validation, network, malformed JSON, timeout,
   await assert.rejects(runBacktestOptimization(config), /strategy optimization request timed out/);
   const controller = new AbortController(); controller.abort();
   await assert.rejects(runBacktestOptimization(config, controller.signal), (error) => error === controller.signal.reason);
+});
+
+test("optimization hook exposes loading, success, insufficient data and errors, ignoring superseded/unmounted work", async () => {
+  const pending = [];
+  const component = await mount("../src/hooks/use-backtest-optimization.ts", { "../lib/api": { ApiError, runBacktestOptimization: (_config, signal) => new Promise((resolve, reject) => pending.push({ signal, resolve, reject })) } }, "useBacktestOptimization");
+  assert.equal(component.render().state.status, "idle"); component.flush();
+  const first = component.render().load(config);
+  assert.equal(component.render().state.status, "loading");
+  await Promise.resolve(); pending[0].resolve(result); await first;
+  assert.equal(component.render().state.status, "success");
+  const second = component.render().load(config);
+  assert.equal(component.render().state.data, undefined);
+  await Promise.resolve(); pending[1].resolve(insufficient); await second;
+  assert.equal(component.render().state.status, "insufficient-data");
+  assert.equal(component.render().state.data.selection_reason, insufficient.selection_reason);
+  const third = component.render().load(config);
+  await Promise.resolve(); pending[2].reject(new ApiError("Rejected", 422)); await third;
+  assert.equal(component.render().state.statusCode, 422);
+  const stale = component.render().load(config); await Promise.resolve();
+  const latest = component.render().load(config); await Promise.resolve();
+  assert.equal(pending[3].signal.aborted, true);
+  pending[4].resolve(result); await latest;
+  pending[3].reject(new Error("Stale")); await stale;
+  assert.equal(component.render().state.status, "success");
+  const last = component.render().load(config); await Promise.resolve(); component.unmount();
+  assert.equal(pending[5].signal.aborted, true);
+  pending[5].resolve(result); await last;
+  assert.equal(component.render().state.status, "loading");
 });
