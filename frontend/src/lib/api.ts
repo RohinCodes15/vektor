@@ -69,15 +69,6 @@ async function requestJson(path: string, name: "health" | "market history" | "po
       };
       if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
     }
-    if (name === "strategy optimization") {
-      const messages: Record<number, string> = {
-        404: "No historical data found for this optimization's symbol and date range.",
-        422: "Optimization was rejected. Check the parameter grid, objective, train/test split, dates, and costs.",
-        502: "The market data provider returned invalid data. No optimization was accepted.",
-        503: "The market data provider is unavailable. Try again later.",
-      };
-      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
-    }
     if (name === "strategy comparison") {
       const messages: Record<number, string> = {
         404: "No historical data found for this comparison's symbol and date range.",
@@ -738,6 +729,121 @@ export type BacktestOptimization = Readonly<{
   | { selected: OptimizationSelection; selection_reason: null }
   | { selected: null; selection_reason: string }
 >;
+
+function gridValues(value: unknown, minimum: number, maximum: number, decimal = false): boolean {
+  return Array.isArray(value) && value.length >= 1 && value.length <= 20
+    && value.every((item) => decimal ? isBoundedDecimal(item, minimum, maximum)
+      : Number.isInteger(item) && item >= minimum && item <= maximum)
+    && new Set(value.map(Number)).size === value.length;
+}
+
+function normalizeOptimizationGrid(value: unknown): ParameterGrid {
+  if (hasFields(value, ["kind", "fast_windows", "slow_windows"]) && value.kind === "sma_crossover"
+    && gridValues(value.fast_windows, 2, 250) && gridValues(value.slow_windows, 3, 500))
+    return { kind: "sma_crossover", fast_windows: [...value.fast_windows as number[]].sort((a, b) => a - b), slow_windows: [...value.slow_windows as number[]].sort((a, b) => a - b) };
+  if (hasFields(value, ["kind", "periods", "oversold", "overbought"]) && value.kind === "rsi"
+    && gridValues(value.periods, 2, 100) && gridValues(value.oversold, Number.MIN_VALUE, 99.99, true) && gridValues(value.overbought, Number.MIN_VALUE, 99.99, true))
+    return { kind: "rsi", periods: [...value.periods as number[]].sort((a, b) => a - b),
+      oversold: [...value.oversold as string[]].sort((a, b) => Number(a) - Number(b)), overbought: [...value.overbought as string[]].sort((a, b) => Number(a) - Number(b)) };
+  throw new Error("Choose a valid SMA or RSI grid with 1–20 distinct values per parameter.");
+}
+
+function optimizationStrategies(grid: ParameterGrid): BacktestConfig["strategy"][] {
+  return grid.kind === "sma_crossover" ? grid.fast_windows.flatMap((fast_window) => grid.slow_windows
+    .filter((slow_window) => fast_window < slow_window).map((slow_window) => ({ kind: "sma_crossover" as const, fast_window, slow_window })))
+    : grid.periods.flatMap((period) => grid.oversold.flatMap((oversold) => grid.overbought
+      .filter((overbought) => Number(oversold) < Number(overbought)).map((overbought) => ({ kind: "rsi" as const, period, oversold, overbought }))));
+}
+
+function normalizeOptimizationCreate(config: BacktestOptimizationCreate): BacktestOptimizationConfig {
+  const { symbol, grid: rawGrid, objective, train_pct = 70, top_n = 10, ...settings } = config;
+  const shared = normalizeBacktestCreate({ ...settings, symbols: [symbol], strategy: { kind: "buy_and_hold" } });
+  const grid = normalizeOptimizationGrid(rawGrid);
+  const count = optimizationStrategies(grid).length;
+  if (count < 1 || count > 100) throw new Error("Choose a grid with 1–100 valid combinations (fast < slow or oversold < overbought).");
+  if (!["total_return_pct", "sharpe_ratio", "max_drawdown_pct"].includes(objective)) throw new Error("Choose a supported optimization objective.");
+  if (!Number.isInteger(train_pct) || train_pct < 50 || train_pct > 90) throw new Error("Training percentage must be an integer from 50 to 90.");
+  if (!Number.isInteger(top_n) || top_n < 1 || top_n > 100) throw new Error("Top candidates must be an integer from 1 to 100.");
+  return { symbol: shared.symbols[0], start: shared.start, end: shared.end, starting_cash: shared.starting_cash,
+    position_size_pct: shared.position_size_pct ?? "100", fee_per_trade: shared.fee_per_trade ?? "0.00",
+    fee_bps: shared.fee_bps ?? "0", slippage_bps: shared.slippage_bps ?? "0", grid, objective, train_pct, top_n };
+}
+
+function isOptimizationSegment(value: unknown, bars: number, first: string, last: string): value is OptimizationSegment {
+  if (!hasFields(value, ["first_date", "last_date", "bars", "metrics", "warnings", "equity_curve"])
+    || value.first_date !== first || value.last_date !== last || value.bars !== bars || !isBacktestMetrics(value.metrics)
+    || !Array.isArray(value.warnings) || !value.warnings.every((warning) => typeof warning === "string")
+    || !Array.isArray(value.equity_curve) || value.equity_curve.length !== bars) return false;
+  let previous = "";
+  return value.equity_curve[0]?.date === first && value.equity_curve.at(-1)?.date === last
+    && value.equity_curve.every((point) => {
+      if (!hasFields(point, ["date", "cash", "positions_value", "equity", "drawdown_pct"])
+        || !isCalendarDate(point.date) || point.date <= previous || point.date < first || point.date > last
+        || !isMoney(point.cash, true) || !isMoney(point.positions_value, true) || !isMoney(point.equity, true)
+        || !isSignedDecimal(point.drawdown_pct) || Number(point.drawdown_pct) > 0) return false;
+      previous = point.date;
+      return true;
+    });
+}
+
+function isBacktestOptimization(value: unknown, query: BacktestOptimizationConfig): value is BacktestOptimization {
+  if (!hasFields(value, ["mode", "currency", "source", "config", "bars", "split", "better", "candidates_total", "candidates_evaluated", "candidates_skipped", "candidates_unranked", "ranked", "selected", "selection_reason", "limitations", "disclaimer"])
+    || value.mode !== "paper" || value.currency !== "USD" || value.source !== "yahoo_finance" || value.better !== "higher"
+    || !hasFields(value.config, ["symbol", "grid", "objective", "train_pct", "top_n", "start", "end", "starting_cash", "position_size_pct", "fee_per_trade", "fee_bps", "slippage_bps"])
+    || !Array.isArray(value.limitations) || !value.limitations.every((item) => typeof item === "string")
+    || typeof value.disclaimer !== "string" || !value.disclaimer.trim()) return false;
+  let config: BacktestOptimizationConfig;
+  try { config = normalizeOptimizationCreate(value.config as BacktestOptimizationCreate); } catch { return false; }
+  const gridKey = (grid: ParameterGrid): string => JSON.stringify(grid.kind === "sma_crossover" ? grid
+    : { ...grid, oversold: grid.oversold.map(Number), overbought: grid.overbought.map(Number) });
+  if (config.symbol !== query.symbol || config.start !== query.start || config.end !== query.end || config.objective !== query.objective
+    || config.train_pct !== query.train_pct || config.top_n !== query.top_n || gridKey(config.grid) !== gridKey(query.grid)
+    || (["starting_cash", "position_size_pct", "fee_per_trade", "fee_bps", "slippage_bps"] as const).some((key) => Number(config[key]) !== Number(query[key]))) return false;
+  const split = value.split;
+  if (!hasFields(split, ["train_pct", "train_bars", "train_first_date", "train_last_date", "test_bars", "test_first_date", "test_last_date"])
+    || split.train_pct !== config.train_pct || ![value.bars, split.train_bars, split.test_bars].every((n) => Number.isSafeInteger(n) && (n as number) > 0)
+    || value.bars !== (split.train_bars as number) + (split.test_bars as number)
+    || !isCalendarDate(split.train_first_date) || !isCalendarDate(split.train_last_date) || !isCalendarDate(split.test_first_date) || !isCalendarDate(split.test_last_date)
+    || split.train_first_date < config.start || split.train_first_date > split.train_last_date || split.train_last_date >= split.test_first_date
+    || split.test_first_date > split.test_last_date || split.test_last_date > config.end) return false;
+  const strategies = new Set(optimizationStrategies(config.grid).map(strategyKey));
+  if (value.candidates_total !== strategies.size || ![value.candidates_evaluated, value.candidates_skipped, value.candidates_unranked].every((n) => Number.isSafeInteger(n) && (n as number) >= 0)
+    || (value.candidates_evaluated as number) + (value.candidates_skipped as number) !== value.candidates_total
+    || (value.candidates_unranked as number) > (value.candidates_evaluated as number) || !Array.isArray(value.ranked)
+    || value.ranked.length !== Math.min(config.top_n, (value.candidates_evaluated as number) - (value.candidates_unranked as number))) return false;
+  const validStrategy = (strategy: unknown): strategy is BacktestConfig["strategy"] => isBacktestConfig({
+    symbols: [config.symbol], start: config.start, end: config.end, starting_cash: config.starting_cash, position_size_pct: config.position_size_pct,
+    fee_per_trade: config.fee_per_trade, fee_bps: config.fee_bps, slippage_bps: config.slippage_bps, strategy,
+  }) && strategies.has(strategyKey(strategy as BacktestStrategy));
+  let previous = Infinity;
+  const seen = new Set<string>();
+  if (!value.ranked.every((candidate, index) => {
+    if (!hasFields(candidate, ["rank", "strategy", "objective_value", "train_metrics"]) || candidate.rank !== index + 1
+      || !validStrategy(candidate.strategy) || !isSignedDecimal(candidate.objective_value) || !isBacktestMetrics(candidate.train_metrics)
+      || candidate.train_metrics[config.objective] === null || Number(candidate.objective_value) !== Number(candidate.train_metrics[config.objective])
+      || Number(candidate.objective_value) > previous || seen.has(strategyKey(candidate.strategy))) return false;
+    previous = Number(candidate.objective_value); seen.add(strategyKey(candidate.strategy)); return true;
+  })) return false;
+  if (value.selected === null) return value.ranked.length === 0 && typeof value.selection_reason === "string" && !!value.selection_reason.trim();
+  const selected = value.selected;
+  if (value.ranked.length === 0 || value.selection_reason !== null || !hasFields(selected, ["strategy", "train", "test", "overfitting"])
+    || !validStrategy(selected.strategy) || strategyKey(selected.strategy) !== strategyKey(value.ranked[0].strategy)
+    || !isOptimizationSegment(selected.train, split.train_bars as number, split.train_first_date, split.train_last_date)
+    || !isOptimizationSegment(selected.test, split.test_bars as number, split.test_first_date, split.test_last_date)) return false;
+  const report = selected.overfitting;
+  if (!hasFields(report, ["annualized_return_gap_pct", "sharpe_gap", "max_drawdown_gap_pct", "flags"]) || !Array.isArray(report.flags)
+    || !report.flags.every((flag) => hasFields(flag, ["code", "message"]) && ["return_reversal", "sharpe_decay", "few_trades", "edge_of_grid", "many_candidates"].includes(flag.code as string) && typeof flag.message === "string")) return false;
+  const train = selected.train.metrics, test = selected.test.metrics;
+  return ([["annualized_return_gap_pct", "annualized_return_pct"], ["sharpe_gap", "sharpe_ratio"], ["max_drawdown_gap_pct", "max_drawdown_pct"]] as const)
+    .every(([gap, metric]) => train[metric] === null || test[metric] === null ? report[gap] === null : isSignedDecimal(report[gap]));
+}
+
+export async function runBacktestOptimization(config: BacktestOptimizationCreate, signal?: AbortSignal): Promise<BacktestOptimization> {
+  const query = normalizeOptimizationCreate(config);
+  const data = await requestJson("/api/v1/backtests/optimizations", "strategy optimization", signal, undefined, query);
+  if (!isBacktestOptimization(data, query)) throw new Error("Backend returned an incompatible strategy optimization. No optimization data was accepted.");
+  return data;
+}
 
 export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
 export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
