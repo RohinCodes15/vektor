@@ -69,6 +69,15 @@ async function requestJson(path: string, name: "health" | "market history" | "po
       };
       if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
     }
+    if (name === "strategy optimization") {
+      const messages: Record<number, string> = {
+        404: "No historical data found for this optimization's symbol and date range.",
+        422: "Optimization was rejected. Check the parameter grid, objective, train/test split, dates, and costs.",
+        502: "The market data provider returned invalid data. No optimization was accepted.",
+        503: "The market data provider is unavailable. Try again later.",
+      };
+      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
+    }
     if (name === "strategy comparison") {
       const messages: Record<number, string> = {
         404: "No historical data found for this comparison's symbol and date range.",
@@ -690,6 +699,45 @@ export async function runBacktestComparison(config: BacktestComparisonCreate, si
   if (!isBacktestComparison(data, query)) throw new Error("Backend returned an incompatible strategy comparison. No comparison data was accepted.");
   return data;
 }
+
+export type OptimizationObjective = "total_return_pct" | "sharpe_ratio" | "max_drawdown_pct";
+export type ParameterGrid = Readonly<{ kind: "sma_crossover"; fast_windows: readonly number[]; slow_windows: readonly number[] }>
+  | Readonly<{ kind: "rsi"; periods: readonly number[]; oversold: readonly string[]; overbought: readonly string[] }>;
+export type BacktestOptimizationCreate = Omit<BacktestCreate, "symbols" | "strategy"> & Readonly<{
+  symbol: string; grid: ParameterGrid; objective: OptimizationObjective; train_pct?: number; top_n?: number;
+}>;
+export type BacktestOptimizationConfig = Omit<BacktestConfig, "symbols" | "strategy"> & Readonly<{
+  symbol: string; grid: ParameterGrid; objective: OptimizationObjective; train_pct: number; top_n: number;
+}>;
+export type OptimizationSplit = Readonly<{
+  train_pct: number; train_bars: number; train_first_date: string; train_last_date: string;
+  test_bars: number; test_first_date: string; test_last_date: string;
+}>;
+export type OptimizationCandidate = Readonly<{
+  rank: number; strategy: BacktestConfig["strategy"]; objective_value: string; train_metrics: BacktestMetrics;
+}>;
+export type OptimizationSegment = Readonly<{
+  first_date: string; last_date: string; bars: number; metrics: BacktestMetrics; warnings: readonly string[];
+  equity_curve: readonly BacktestEquityPoint[];
+}>;
+export type OverfittingCode = "return_reversal" | "sharpe_decay" | "few_trades" | "edge_of_grid" | "many_candidates";
+export type OverfittingFlag = Readonly<{ code: OverfittingCode; message: string }>;
+export type OverfittingReport = Readonly<{
+  annualized_return_gap_pct: string | null; sharpe_gap: string | null; max_drawdown_gap_pct: string | null;
+  flags: readonly OverfittingFlag[];
+}>;
+export type OptimizationSelection = Readonly<{
+  strategy: BacktestConfig["strategy"]; train: OptimizationSegment; test: OptimizationSegment; overfitting: OverfittingReport;
+}>;
+export type BacktestOptimization = Readonly<{
+  mode: "paper"; currency: "USD"; source: "yahoo_finance"; config: BacktestOptimizationConfig;
+  bars: number; split: OptimizationSplit; better: "higher"; candidates_total: number; candidates_evaluated: number;
+  candidates_skipped: number; candidates_unranked: number; ranked: readonly OptimizationCandidate[];
+  limitations: readonly string[]; disclaimer: string;
+}> & Readonly<
+  | { selected: OptimizationSelection; selection_reason: null }
+  | { selected: null; selection_reason: string }
+>;
 
 export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
 export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
