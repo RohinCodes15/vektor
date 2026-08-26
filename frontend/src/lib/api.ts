@@ -31,7 +31,7 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(path: string, name: "health" | "market history" | "portfolio" | "backtest" | "backtest analysis" | "strategy comparison", signal?: AbortSignal, params?: URLSearchParams, body?: unknown): Promise<unknown> {
+async function requestJson(path: string, name: "health" | "market history" | "portfolio" | "backtest" | "backtest analysis" | "strategy comparison" | "strategy optimization", signal?: AbortSignal, params?: URLSearchParams, body?: unknown): Promise<unknown> {
   const operation = name === "health" ? "health check" : `${name} request`;
   let url: URL;
   try {
@@ -43,7 +43,7 @@ async function requestJson(path: string, name: "health" | "market history" | "po
     throw new Error("Backend address is invalid. Check NEXT_PUBLIC_API_ORIGIN.");
   }
 
-  const timeout = AbortSignal.timeout(name === "backtest analysis" ? 300000 : name === "backtest" || name === "strategy comparison" ? 30000 : 5000);
+  const timeout = AbortSignal.timeout(name === "backtest analysis" ? 300000 : name === "backtest" || name === "strategy comparison" || name === "strategy optimization" ? 30000 : 5000);
   let response: Response;
   try {
     response = await fetch(url, {
@@ -60,6 +60,15 @@ async function requestJson(path: string, name: "health" | "market history" | "po
     throw new Error("Backend could not be reached. Check that it is running and allows this frontend origin.");
   }
   if (!response.ok) {
+    if (name === "strategy optimization") {
+      const messages: Record<number, string> = {
+        404: "No historical data found for this optimization's symbol and date range.",
+        422: "Optimization was rejected. Check the parameter grid, objective, train/test split, dates, and costs.",
+        502: "The market data provider returned invalid data. No optimization was accepted.",
+        503: "The market data provider is unavailable. Try again later.",
+      };
+      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
+    }
     if (name === "strategy comparison") {
       const messages: Record<number, string> = {
         404: "No historical data found for this comparison's symbol and date range.",
