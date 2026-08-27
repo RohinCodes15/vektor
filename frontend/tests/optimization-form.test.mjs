@@ -42,6 +42,32 @@ test("optimization offers only SMA/RSI supported parameters and chronological sp
   assert.equal(nodes(component.render()).filter((node) => node.props?.name === "optimization-objective").length, 3);
 });
 
+test("optimization submits SMA values and shared settings, exposes loading, and retains exact results", async () => {
+  let resolve, submitted, signal, calls = 0;
+  const response = { selected: { strategy: { kind: "sma_crossover" } }, ranked: ["exact result retained"] };
+  const { component, hook } = await form((config, abortSignal) => { calls++; submitted = config; signal = abortSignal; return new Promise((done) => { resolve = done; }); });
+  fill(component); change(component, "fast", "5, 10"); change(component, "slow", "20, 40");
+  change(component, "train", "80"); change(component, "capital", "5000.00"); change(component, "fee", "1.25"); change(component, "fee-bps", "2.50"); change(component, "slippage", "3.25");
+  choose(component, "objective", "max_drawdown_pct");
+  const pending = submit(component); await Promise.resolve();
+  await submit(component);
+  assert.equal(calls, 1);
+  assert.equal(find(component, (node) => node.props?.type === "submit").disabled, true);
+  assert.equal(find(component, (node) => node.type === "form")["aria-busy"], true);
+  assert.equal(nodes(component.render()).some((node) => node.type === MockResults), false);
+  assert.equal(find(component, (node) => node.props?.id === "optimization-symbol").disabled, true);
+  assert.deepEqual(submitted, { symbol: " aapl ", start: "2024-01-01", end: "2024-12-31", starting_cash: "5000.00", fee_per_trade: "1.25", fee_bps: "2.50", slippage_bps: "3.25", train_pct: 80, objective: "max_drawdown_pct", grid: { kind: "sma_crossover", fast_windows: [5, 10], slow_windows: [20, 40] } });
+  assert.equal(signal.aborted, false);
+  resolve(response); await pending;
+  assert.equal(hook.render().state.data, response);
+  assert.equal(find(component, (node) => node.type === MockResults).data, response);
+  assert.ok(nodes(component.render()).some((node) => node.props?.children === "Optimization complete."));
+  change(component, "capital", "6000.00");
+  assert.equal(nodes(component.render()).some((node) => node.props?.children === "Optimization complete."), false);
+  assert.equal(nodes(component.render()).some((node) => node.type === MockResults), false);
+  assert.equal(hook.render().state.data, response);
+});
+
 test("optimization submits RSI decimal lists without rounding and supports Sharpe objective", async () => {
   let submitted;
   const { component } = await form(async (config) => { submitted = config; return { selected: {} }; });
@@ -72,3 +98,14 @@ test("optimization validates parameter syntax and API bounds without network req
   assert.equal(request.mock.callCount(), 0);
 });
 
+test("optimization shows backend insufficient-data reasons and API failures without stale success", async () => {
+  let response = { selected: null, selection_reason: "No candidate has a defined training objective." };
+  const { component, hook } = await form(async () => { if (response instanceof Error) throw response; return response; });
+  await submit(component);
+  assert.equal(hook.render().state.status, "insufficient-data");
+  assert.ok(nodes(component.render()).some((node) => Array.isArray(node.props?.children) && node.props.children.includes(response.selection_reason)));
+  response = new ApiError("Market data provider is unavailable.", 503); await submit(component);
+  assert.equal(find(component, (node) => node.props?.role === "alert").children, response.message);
+  assert.equal(hook.render().state.statusCode, 503);
+  assert.equal(nodes(component.render()).some((node) => node.type === MockResults), false);
+});
