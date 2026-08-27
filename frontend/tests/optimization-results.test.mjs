@@ -78,6 +78,18 @@ test("optimization reuses interactive charts with each original segment and neve
   for (const label of ["Training · In-sample equity", "Training · In-sample drawdown", "Test · Out-of-sample equity", "Test · Out-of-sample drawdown"]) assert.ok(nodes(tree).some((node) => node.props?.["aria-label"] === label));
 });
 
+test("optimization exposes actual overfitting gaps, flags, warnings, limitations, and disclaimer", async () => {
+  const tree = await render();
+  const risk = nodes(tree).find((node) => node.props?.className === "optimization-risk");
+  assert.match(text(risk), /Annualized return gapUnavailable/);
+  assert.match(text(risk), /Sharpe gapUnavailable/);
+  assert.match(text(risk), /Max drawdown gap-1\.1234 pp/);
+  for (const flag of data.selected.overfitting.flags) assert.ok(text(risk).includes(flag.message));
+  for (const expected of ["out-of-sample minus in-sample", "Win rate unavailable for this segment.", data.limitations[0], data.disclaimer]) assert.ok(text(tree).includes(expected));
+  const noFlags = await render({ ...data, selected: { ...data.selected, overfitting: { ...data.selected.overfitting, flags: [] } } });
+  assert.match(text(noFlags), /No overfitting flags returned. This does not predict future performance/);
+});
+
 test("optimization handles no selected candidate and missing curve observations without fake data", async () => {
   const empty = await render({ ...data, ranked: [], selected: null, selection_reason: "No defined training objective." });
   assert.match(text(empty), /No ranked candidates returned/);
