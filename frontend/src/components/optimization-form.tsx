@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useBacktestOptimization } from "../hooks/use-backtest-optimization";
 import type { OptimizationObjective, ParameterGrid } from "../lib/api";
 import { Badge, Button, Field, Panel } from "./ui";
+import { OptimizationResults } from "./optimization-results";
 
 const latestCompletedDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
@@ -91,5 +92,6 @@ export function OptimizationForm() {
         {!edited && !error && state.status === "success" && <p role="status">Optimization complete.</p>}
       </form>
     </Panel>
+    {!edited && !error && (state.status === "success" || state.status === "insufficient-data") && <OptimizationResults data={state.data} />}
   </section>;
 }
