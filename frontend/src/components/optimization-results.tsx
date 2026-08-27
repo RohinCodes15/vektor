@@ -1,6 +1,7 @@
 import type { BacktestMetrics, BacktestOptimization, OptimizationObjective } from "../lib/api";
 import { comparisonStrategyLabel } from "../lib/comparison-chart";
 import { formatMoney } from "../lib/portfolio-values";
+import { BacktestChart } from "./backtest-chart";
 import { Badge, MetricCard, Panel } from "./ui";
 
 const objectives: Readonly<Record<OptimizationObjective, string>> = {
@@ -54,6 +55,14 @@ export function OptimizationResults({ data }: { data: BacktestOptimization }) {
           </table>
         </div>
       </Panel>
+      {([ ["train", "Training · In-sample"], ["test", "Test · Out-of-sample"] ] as const).map(([key, label]) => <section className="optimization-segment" key={key} aria-label={label}>
+        <div className="panel-heading"><h3>{label}</h3><p className="muted text-xs">{selected[key].first_date} to {selected[key].last_date} · {selected[key].bars} trading days</p></div>
+        <div className="backtest-chart-grid">{(["equity", "drawdown"] as const).map((kind) => <Panel key={kind} aria-label={`${label} ${kind}`}>
+          <div className="panel-heading"><h4>{kind === "equity" ? "Equity curve" : "Drawdown"}</h4><Badge>{kind === "equity" ? "Virtual USD" : "Peak-relative %"}</Badge></div>
+          {selected[key].equity_curve.length === 0 ? <p role="status">No observations returned for this segment.</p> : <BacktestChart points={selected[key].equity_curve} kind={kind} />}
+        </Panel>)}</div>
+        {selected[key].warnings.length > 0 && <div className="optimization-notes"><h4>{label} metric notes</h4><ul>{selected[key].warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></div>}
+      </section>)}
     </> : <Panel className="chart-state" role="status"><h3>No strategy selected</h3><p>{data.selection_reason}</p></Panel>}
     {data.limitations.length > 0 && <Panel className="optimization-notes"><h3>Limitations</h3><ul>{data.limitations.map((note, i) => <li key={i}>{note}</li>)}</ul></Panel>}
     <p className="chart-provenance">Yahoo Finance completed daily history · {data.disclaimer}</p>
