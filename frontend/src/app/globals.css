@@ -56,6 +56,24 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .optimization-ranges { min-width: 0; margin: 0; padding: 0; border: 0; }
 .optimization-ranges legend { margin-bottom: 10px; font-size: 12px; }
 .optimization-ranges .strategy-fields { margin-top: 16px; }
+.optimization-results { margin-top: 32px; min-width: 0; }
+.optimization-results > .panel, .optimization-segment { margin-top: 20px; }
+.optimization-counts, .optimization-gaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 16px; margin-block: 20px; }
+.optimization-counts .metric-value { overflow-wrap: anywhere; }
+.optimization-table th { padding: 14px; min-width: 140px; white-space: normal; }
+.optimization-table th .badge { display: block; width: fit-content; margin-top: 8px; }
+.optimization-selected { background: #86d5c10a; }
+.optimization-ranked > p, .optimization-risk > p { margin-block: 12px; line-height: 1.7; }
+.optimization-segment > .panel-heading { margin-bottom: 16px; }
+.optimization-segment-note { margin-block: 16px; color: var(--color-muted); font-size: 12px; line-height: 1.7; }
+.optimization-notes { font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.optimization-notes ul { padding-left: 18px; margin-top: 10px; }
+.optimization-segment .optimization-notes { margin-top: 16px; }
+.optimization-gaps > div { padding: 16px; border: 1px solid var(--color-line); border-radius: 5px; min-width: 0; }
+.optimization-gaps dt { color: var(--color-muted); font-size: 12px; }
+.optimization-gaps dd { margin: 12px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.optimization-flags { display: grid; gap: 16px; list-style: none; padding: 0; }
+.optimization-flags p { margin-top: 8px; line-height: 1.7; overflow-wrap: anywhere; }
 .comparison-strategies { display: grid; gap: 20px; min-width: 0; }
 .comparison-strategy { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--color-line); border-radius: 5px; }
 .comparison-strategy legend { padding-inline: 8px; font-size: 12px; }
