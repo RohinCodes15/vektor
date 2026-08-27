@@ -1,4 +1,4 @@
-import type { BacktestMetrics, BacktestOptimization, OptimizationObjective } from "../lib/api";
+import type { BacktestMetrics, BacktestOptimization, OptimizationObjective, OverfittingCode } from "../lib/api";
 import { comparisonStrategyLabel } from "../lib/comparison-chart";
 import { formatMoney } from "../lib/portfolio-values";
 import { BacktestChart } from "./backtest-chart";
@@ -6,6 +6,10 @@ import { Badge, MetricCard, Panel } from "./ui";
 
 const objectives: Readonly<Record<OptimizationObjective, string>> = {
   total_return_pct: "Total return", sharpe_ratio: "Sharpe ratio", max_drawdown_pct: "Max drawdown",
+};
+const riskLabels: Readonly<Record<OverfittingCode, string>> = {
+  return_reversal: "Return reversal", sharpe_decay: "Sharpe decay", few_trades: "Few trades",
+  edge_of_grid: "Edge of parameter grid", many_candidates: "Many candidates",
 };
 const metrics = [
   ["final_equity", "Final equity", "USD"], ["total_return_pct", "Total return", "%"],
@@ -63,6 +67,16 @@ export function OptimizationResults({ data }: { data: BacktestOptimization }) {
         </Panel>)}</div>
         {selected[key].warnings.length > 0 && <div className="optimization-notes"><h4>{label} metric notes</h4><ul>{selected[key].warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></div>}
       </section>)}
+      <Panel className="optimization-risk" aria-label="Risk and overfitting indicators">
+        <div className="panel-heading"><h3>Risk &amp; overfitting indicators</h3><Badge tone="warning">Historical evidence only</Badge></div>
+        <p className="muted text-xs">Gaps are out-of-sample minus in-sample. Warning signs are not proof of overfitting; no flags does not establish robustness.</p>
+        <dl className="optimization-gaps">
+          <div><dt>Annualized return gap</dt><dd>{metricValue(selected.overfitting.annualized_return_gap_pct, " pp")}</dd></div>
+          <div><dt>Sharpe gap</dt><dd>{metricValue(selected.overfitting.sharpe_gap, "")}</dd></div>
+          <div><dt>Max drawdown gap</dt><dd>{metricValue(selected.overfitting.max_drawdown_gap_pct, " pp")}</dd></div>
+        </dl>
+        {selected.overfitting.flags.length === 0 ? <p>No overfitting flags returned. This does not predict future performance.</p> : <ul className="optimization-flags">{selected.overfitting.flags.map((flag, i) => <li key={i}><Badge tone="warning">{riskLabels[flag.code]}</Badge><p>{flag.message}</p></li>)}</ul>}
+      </Panel>
     </> : <Panel className="chart-state" role="status"><h3>No strategy selected</h3><p>{data.selection_reason}</p></Panel>}
     {data.limitations.length > 0 && <Panel className="optimization-notes"><h3>Limitations</h3><ul>{data.limitations.map((note, i) => <li key={i}>{note}</li>)}</ul></Panel>}
     <p className="chart-provenance">Yahoo Finance completed daily history · {data.disclaimer}</p>
