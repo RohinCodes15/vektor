@@ -4,6 +4,7 @@ import { Reveal } from "@/components/reveal";
 import { PortfolioDashboard } from "@/components/portfolio-dashboard";
 import { BacktestForm } from "@/components/backtest-form";
 import { ComparisonForm } from "@/components/comparison-form";
+import { OptimizationForm } from "@/components/optimization-form";
 import { Badge, Panel } from "@/components/ui";
 
 export default function Home() {
@@ -27,6 +28,7 @@ export default function Home() {
         </section>
         <BacktestForm />
         <ComparisonForm />
+        <OptimizationForm />
         <MarketWorkspace />
 
       </Reveal>
