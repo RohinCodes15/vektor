@@ -67,3 +67,25 @@ test("optimization performance keeps training and holdout values separate, exact
   assert.ok(nodes(performance).some((node) => node.props?.role === "region" && node.props.tabIndex === 0));
 });
 
+test("optimization reuses interactive charts with each original segment and never joins holdout to training", async () => {
+  const tree = await render();
+  const charts = nodes(tree).filter((node) => node.type === MockChart);
+  assert.deepEqual(charts.map((node) => node.props.kind), ["equity", "drawdown", "equity", "drawdown"]);
+  assert.equal(charts[0].props.points, train.equity_curve);
+  assert.equal(charts[1].props.points, train.equity_curve);
+  assert.equal(charts[2].props.points, testSegment.equity_curve);
+  assert.equal(charts[3].props.points, testSegment.equity_curve);
+  for (const label of ["Training · In-sample equity", "Training · In-sample drawdown", "Test · Out-of-sample equity", "Test · Out-of-sample drawdown"]) assert.ok(nodes(tree).some((node) => node.props?.["aria-label"] === label));
+});
+
+test("optimization handles no selected candidate and missing curve observations without fake data", async () => {
+  const empty = await render({ ...data, ranked: [], selected: null, selection_reason: "No defined training objective." });
+  assert.match(text(empty), /No ranked candidates returned/);
+  assert.match(text(empty), /No strategy selected/);
+  assert.match(text(empty), /No defined training objective/);
+  assert.equal(nodes(empty).filter((node) => node.type === MockChart).length, 0);
+  assert.equal(nodes(empty).some((node) => node.props?.className === "optimization-performance"), false);
+  const noCurves = await render({ ...data, selected: { ...data.selected, train: { ...train, equity_curve: [] } } });
+  assert.equal(nodes(noCurves).filter((node) => node.type === MockChart).length, 2);
+  assert.match(text(noCurves), /No observations returned for this segment/);
+});
