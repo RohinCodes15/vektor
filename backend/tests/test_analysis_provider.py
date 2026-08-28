@@ -34,13 +34,15 @@ class FakeMessages:
 class FakeClientFactory:
     """Stands in for anthropic.Anthropic: records constructor options; no network."""
 
-    def __init__(self, outcome: Any) -> None:
+    def __init__(self, outcome: Any, resolved_key: str | None = "sk-resolved-by-sdk") -> None:
         self.messages = FakeMessages(outcome)
         self.options: dict[str, Any] = {}
+        self.resolved_key = resolved_key  # what the SDK would find in the environment when no key is passed
 
     def __call__(self, **options: Any) -> SimpleNamespace:
         self.options = options
-        return SimpleNamespace(messages=self.messages)
+        api_key = options.get("api_key", self.resolved_key)
+        return SimpleNamespace(messages=self.messages, api_key=api_key, auth_token=None, credentials=None)
 
 
 def reply(parsed: object = None, stop_reason: str = "end_turn") -> SimpleNamespace:
