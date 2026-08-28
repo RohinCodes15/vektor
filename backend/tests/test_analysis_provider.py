@@ -77,6 +77,13 @@ def test_missing_credentials_are_unavailable() -> None:
         provider(no_credentials, api_key=None).interpret("s", "p")
 
 
+def test_a_client_that_resolved_no_credentials_is_unavailable_without_sending() -> None:
+    factory = FakeClientFactory(reply(), resolved_key=None)
+    with pytest.raises(AnalysisUnavailable, match="no provider credentials"):
+        provider(factory, api_key=None).interpret("s", "p")
+    assert factory.messages.kwargs == {}
+
+
 @pytest.mark.parametrize(
     ("error", "expected", "message"),
     [
