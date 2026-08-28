@@ -76,11 +76,21 @@ class AnthropicProvider:
         options = {"timeout": self._timeout_seconds, "max_retries": MAX_RETRIES}
         try:
             if self._api_key is None:
-                return self._client_factory(**options)
-            return self._client_factory(api_key=self._api_key, **options)
+                client = self._client_factory(**options)
+            else:
+                client = self._client_factory(api_key=self._api_key, **options)
         except anthropic.AnthropicError:
+            client = None
+        # The SDK builds a client without credentials and only fails (TypeError) once a request is sent.
+        if client is None or not _has_credentials(client):
             logger.warning("AI provider credentials are missing", extra={"model": self.model})
-            raise AnalysisUnavailable("AI analysis is enabled but no provider credentials were found.") from None
+            raise AnalysisUnavailable("AI analysis is enabled but no provider credentials were found.")
+        return client
+
+
+def _has_credentials(client: anthropic.Anthropic) -> bool:
+    """True when the client resolved an API key, an auth token, or a credentials provider (env, profile, config)."""
+    return any(getattr(client, name, None) is not None for name in ("api_key", "auth_token", "credentials"))
 
 
 def _interpretation(stop_reason: str | None, parsed: object, model: str) -> AnalysisInterpretation:
