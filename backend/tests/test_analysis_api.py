@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -88,3 +89,25 @@ def test_the_endpoint_is_documented_under_v1(tmp_path: Path) -> None:
     paths = client_for(tmp_path, None).get("/openapi.json").json()["paths"]
     operation = paths["/api/v1/backtests/{backtest_id}/analysis"]["post"]
     assert set(operation["responses"]) >= {"200", "404", "422", "502", "503"}
+
+
+def test_enabled_provider_without_credentials_is_unavailable_not_a_server_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the real Anthropic client only failed at request time, so the endpoint answered 500."""
+    for name in [name for name in os.environ if name.startswith("ANTHROPIC_")]:
+        monkeypatch.delenv(name)
+    for name in ("HOME", "XDG_CONFIG_HOME", "APPDATA"):  # no credential profiles can be discovered
+        monkeypatch.setenv(name, str(tmp_path))
+    settings = Settings(
+        environment="test",
+        market_data_cache_path=tmp_path / "cache.sqlite3",
+        portfolio_db_path=tmp_path / "portfolios.sqlite3",
+        backtest_db_path=tmp_path / "backtests.sqlite3",
+        ai_provider="anthropic",
+        ai_api_key=None,
+    )
+    client = TestClient(create_app(settings, market_data_provider=FakeProvider(price_bars(SWING))))
+    _, res = analyze(client)
+    assert res.status_code == 503
+    assert res.json() == {"detail": "AI analysis is enabled but no provider credentials were found."}
