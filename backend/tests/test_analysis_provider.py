@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -82,6 +84,22 @@ def test_a_client_that_resolved_no_credentials_is_unavailable_without_sending() 
     with pytest.raises(AnalysisUnavailable, match="no provider credentials"):
         provider(factory, api_key=None).interpret("s", "p")
     assert factory.messages.kwargs == {}
+
+
+def test_real_sdk_client_without_any_credentials_is_unavailable_not_a_server_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regression: anthropic.Anthropic() succeeds with no credentials and only raises TypeError at request time."""
+    for name in [name for name in os.environ if name.startswith("ANTHROPIC_")]:
+        monkeypatch.delenv(name)
+    for name in ("HOME", "XDG_CONFIG_HOME", "APPDATA"):  # no credential profiles can be discovered
+        monkeypatch.setenv(name, str(tmp_path))
+
+    def offline_client(**options: Any) -> anthropic.Anthropic:
+        return anthropic.Anthropic(base_url="http://127.0.0.1:9", **options)  # never reachable, even if misused
+
+    with pytest.raises(AnalysisUnavailable, match="no provider credentials"):
+        provider(offline_client, api_key=None).interpret("s", "p")
 
 
 @pytest.mark.parametrize(
