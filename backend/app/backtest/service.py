@@ -74,14 +74,20 @@ OPTIMIZATION_LIMITATIONS = (
 
 class BacktestService:
     def __init__(
-        self, store: BacktestStore, market_data: MarketDataService, clock: Callable[[], datetime] = utc_now
+        self,
+        store: BacktestStore,
+        market_data: MarketDataService,
+        clock: Callable[[], datetime] = utc_now,
+        max_range_days: int | None = None,
     ) -> None:
         self._store = store
         self._market_data = market_data
         self._clock = clock
+        self._max_range_days = max_range_days  # None: unbounded (the app always sets a bound)
 
     def run(self, request: BacktestCreate) -> Backtest:
         """Simulate the request on adjusted daily bars and store the result. Raises BacktestRejected on unusable data."""
+        self._check_range(request)
         aligned = align({symbol: self._bars(symbol, request) for symbol in request.symbols})
         shortfall = _shortfall(request, request.strategy, aligned)
         if shortfall is not None:
@@ -106,6 +112,7 @@ class BacktestService:
         """Backtest each strategy on the same adjusted bars. Nothing is stored. Raises BacktestRejected on unusable
         data; a strategy with too little history for its warm-up is reported as unavailable instead.
         """
+        self._check_range(request)
         aligned = align({request.symbol: self._bars(request.symbol, request)})
         results = [_compared(request, strategy, aligned) for strategy in request.strategies]
         baseline = results[0].metrics
@@ -139,6 +146,7 @@ class BacktestService:
         """Grid-search one strategy's parameters: rank on the training days, evaluate the winner on the later test
         days. Nothing is stored. Raises BacktestRejected on unusable data or when no candidate fits both segments.
         """
+        self._check_range(request)
         aligned = align({request.symbol: self._bars(request.symbol, request)})
         split = split_calendar(aligned.calendar, request.train_pct)
         train, test = _slice(aligned, 0, len(split.train)), _slice(aligned, len(split.train), len(aligned.calendar))
@@ -204,6 +212,15 @@ class BacktestService:
 
     def list_backtests(self) -> list[BacktestSummary]:
         return self._store.list_summaries()
+
+    def _check_range(self, request: BacktestSettings) -> None:
+        """Bound the work before any market data is fetched: run time and response size grow with the range."""
+        days = (request.end - request.start).days
+        if self._max_range_days is not None and days > self._max_range_days:
+            raise BacktestRejected(
+                f"The date range spans {days} days; the limit is {self._max_range_days} days "
+                f"(about {self._max_range_days // 365} years). Choose a shorter range."
+            )
 
     def _bars(self, symbol: str, request: BacktestSettings) -> list[Bar]:
         query = MarketHistoryQuery(symbol=symbol, start=request.start, end=request.end)

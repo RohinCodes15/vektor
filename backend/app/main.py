@@ -83,7 +83,11 @@ def create_app(
     )
     app.state.market_data_service = market_data_service
     app.state.portfolio_service = PortfolioService(PortfolioStore(settings.portfolio_db_path), market_data_service)
-    backtest_service = BacktestService(BacktestStore(settings.backtest_db_path), market_data_service)
+    backtest_service = BacktestService(
+        BacktestStore(settings.backtest_db_path),
+        market_data_service,
+        max_range_days=settings.max_backtest_range_days,
+    )
     app.state.backtest_service = backtest_service
     provider = analysis_provider or build_analysis_provider(settings)
     app.state.analysis_service = AnalysisService(backtest_service, provider)
