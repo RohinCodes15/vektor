@@ -145,3 +145,10 @@ def test_unexpected_failures_never_expose_internal_details(tmp_path: Path) -> No
 def test_validation_errors_do_not_echo_submitted_values(tmp_path: Path) -> None:
     res = make_client(tmp_path).post("/api/v1/backtests", json={**BACKTEST, "starting_cash": "sk-ant-secret-xyz"})
     assert res.status_code == 422 and "sk-ant-secret-xyz" not in res.text
+
+
+def test_limit_responses_are_documented_for_expensive_endpoints(tmp_path: Path) -> None:
+    paths = make_client(tmp_path).get("/openapi.json").json()["paths"]
+    for path in ("/api/v1/backtests", "/api/v1/backtests/comparisons", "/api/v1/backtests/optimizations",
+                 "/api/v1/backtests/{backtest_id}/analysis"):
+        assert set(paths[path]["post"]["responses"]) >= {"413", "429", "503"}

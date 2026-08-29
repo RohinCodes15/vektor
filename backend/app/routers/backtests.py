@@ -21,36 +21,52 @@ router = APIRouter(prefix="/backtests", tags=["backtests"])
 
 NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse, "description": "Backtest not found"}}
 INVALID: dict[int | str, dict[str, Any]] = {422: {"model": ErrorResponse, "description": "Invalid id"}}
+# Every POST under /backtests is an expensive request: rate limited and capped in concurrency (app/middleware.py).
+LIMIT_RESPONSES: dict[int | str, dict[str, Any]] = {
+    413: {"model": ErrorResponse, "description": "Request body larger than the configured limit"},
+    429: {"model": ErrorResponse, "description": "Too many requests from this client; see the Retry-After header"},
+}
 RUN_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **LIMIT_RESPONSES,
     422: {
         "model": ErrorResponse,
-        "description": "Invalid request, unknown symbol, non-USD prices, or too little history for the strategy. "
-        "Nothing was stored.",
+        "description": "Invalid request, date range over the configured limit, unknown symbol, non-USD prices, or too "
+        "little history for the strategy. Nothing was stored.",
     },
     502: {"model": ErrorResponse, "description": "Market data provider returned invalid data"},
-    503: {"model": ErrorResponse, "description": "Market data provider unreachable, timed out, or rate limited"},
+    503: {
+        "model": ErrorResponse,
+        "description": "Market data provider unreachable, timed out, or rate limited, or the server is busy with other "
+        "backtests (see Retry-After)",
+    },
 }
 COMPARE_RESPONSES: dict[int | str, dict[str, Any]] = {
     **RUN_RESPONSES,
     422: {
         "model": ErrorResponse,
-        "description": "Invalid request, unknown symbol, or non-USD prices. A strategy with too little history is "
-        "reported as unavailable instead.",
+        "description": "Invalid request, date range over the configured limit, unknown symbol, or non-USD prices. A "
+        "strategy with too little history is reported as unavailable instead.",
     },
 }
 OPTIMIZE_RESPONSES: dict[int | str, dict[str, Any]] = {
     **RUN_RESPONSES,
     422: {
         "model": ErrorResponse,
-        "description": "Invalid request or grid (no valid or too many combinations), unknown symbol, non-USD prices, "
-        "or too little history for any candidate in both the training and the test segment.",
+        "description": "Invalid request or grid (no valid or too many combinations), date range over the configured "
+        "limit, unknown symbol, non-USD prices, or too little history for any candidate in both the training and the "
+        "test segment.",
     },
 }
 ANALYSIS_RESPONSES: dict[int | str, dict[str, Any]] = {
     **NOT_FOUND,
     **INVALID,
+    **LIMIT_RESPONSES,
     502: {"model": ErrorResponse, "description": "AI provider rejected the request or returned an invalid analysis"},
-    503: {"model": ErrorResponse, "description": "AI provider timed out, rate limited, unreachable, or unauthorized"},
+    503: {
+        "model": ErrorResponse,
+        "description": "AI provider timed out, rate limited, unreachable, or unauthorized, or the server is busy with "
+        "other backtests (see Retry-After)",
+    },
 }
 
 
