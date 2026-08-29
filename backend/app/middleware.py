@@ -3,6 +3,7 @@
 - RequestBodyLimit: 413 for a body over the limit, whether declared by Content-Length or streamed.
 - RateLimit: fixed one-minute windows per client IP, with a stricter bucket for expensive requests; 429 + Retry-After.
 - ExpensiveConcurrencyLimit: at most N expensive requests run at once across all clients; 503 + Retry-After.
+- SecurityHeaders: nosniff, no framing, no referrer, no caching, a deny-all CSP for API responses, HSTS in production.
 
 Behind a reverse proxy, run uvicorn with --proxy-headers so the client IP is the real one, not the proxy's.
 """
@@ -23,6 +24,8 @@ WINDOW_SECONDS = 60
 # Stale rate-limit windows are swept once this many clients are tracked, which bounds memory.
 MAX_TRACKED_KEYS = 10_000
 CONCURRENCY_RETRY_AFTER_SECONDS = 5
+# Swagger UI and ReDoc load scripts and styles, so the deny-all CSP would break them.
+DOCS_PATHS = ("/docs", "/redoc")
 
 
 def is_expensive(scope: Scope) -> bool:
@@ -156,3 +159,36 @@ class ExpensiveConcurrencyLimit:
             await self.app(scope, receive, send)
         finally:
             self.in_flight -= 1
+
+
+class SecurityHeaders:
+    def __init__(self, app: ASGIApp, hsts: bool) -> None:
+        self.app = app
+        self.hsts = hsts
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        docs = scope["path"].startswith(DOCS_PATHS)
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers: list[tuple[bytes, bytes]] = list(message.get("headers", []))
+                present = {name.lower() for name, _ in headers}
+                wanted = [
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"x-frame-options", b"DENY"),
+                    (b"referrer-policy", b"no-referrer"),
+                    (b"cross-origin-resource-policy", b"same-site"),
+                    (b"cache-control", b"no-store"),
+                ]
+                if not docs:
+                    wanted.append((b"content-security-policy", b"default-src 'none'; frame-ancestors 'none'"))
+                if self.hsts:
+                    wanted.append((b"strict-transport-security", b"max-age=31536000; includeSubDomains"))
+                headers += [(name, value) for name, value in wanted if name not in present]
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
