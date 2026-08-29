@@ -1,12 +1,37 @@
 """HTTP hardening as pure ASGI middleware: no dependencies, in-process state only (one server process).
 
 - RequestBodyLimit: 413 for a body over the limit, whether declared by Content-Length or streamed.
+- RateLimit: fixed one-minute windows per client IP, with a stricter bucket for expensive requests; 429 + Retry-After.
+
+Behind a reverse proxy, run uvicorn with --proxy-headers so the client IP is the real one, not the proxy's.
 """
+
+import logging
+import math
+import time
+from collections.abc import Callable
 
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.contracts import ErrorResponse
+
+logger = logging.getLogger("vektor.http")
+
+WINDOW_SECONDS = 60
+# Stale rate-limit windows are swept once this many clients are tracked, which bounds memory.
+MAX_TRACKED_KEYS = 10_000
+
+
+def is_expensive(scope: Scope) -> bool:
+    """Backtests, comparisons, optimizations, and AI analysis: every POST under /api/v1/backtests."""
+    path: str = scope["path"]
+    return scope["method"] == "POST" and (path == "/api/v1/backtests" or path.startswith("/api/v1/backtests/"))
+
+
+def client_ip(scope: Scope) -> str:
+    client = scope.get("client")
+    return str(client[0]) if client else "unknown"
 
 
 async def send_error(send: Send, status: int, detail: str, headers: list[tuple[bytes, bytes]] | None = None) -> None:
@@ -55,3 +80,51 @@ class RequestBodyLimit:
 
     def _message(self) -> str:
         return f"Request body is larger than the {self.max_bytes}-byte limit."
+
+
+class RateLimit:
+    def __init__(
+        self,
+        app: ASGIApp,
+        per_minute: int,
+        expensive_per_minute: int,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.app = app
+        self.limits = {"general": per_minute, "expensive": expensive_per_minute}
+        self.clock = clock
+        # (client ip, bucket) -> (window start, requests in the window). The event loop is single-threaded.
+        self.windows: dict[tuple[str, str], tuple[float, int]] = {}
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] == "OPTIONS":
+            await self.app(scope, receive, send)
+            return
+        bucket = "expensive" if is_expensive(scope) else "general"
+        retry_after = self._hit(client_ip(scope), bucket)
+        if retry_after is not None:
+            logger.warning("rate limit exceeded", extra={"bucket": bucket, "path": scope["path"]})
+            await send_error(
+                send,
+                429,
+                f"Too many requests. Try again in {retry_after} seconds.",
+                [(b"retry-after", str(retry_after).encode())],
+            )
+            return
+        await self.app(scope, receive, send)
+
+    def _hit(self, client: str, bucket: str) -> int | None:
+        """Count a request; the seconds until the window resets when it is over the limit, else None."""
+        limit = self.limits[bucket]
+        if limit == 0:
+            return None
+        now = self.clock()
+        if len(self.windows) >= MAX_TRACKED_KEYS:
+            self.windows = {k: v for k, v in self.windows.items() if now - v[0] < WINDOW_SECONDS}
+        start, count = self.windows.get((client, bucket), (now, 0))
+        if now - start >= WINDOW_SECONDS:
+            start, count = now, 0
+        if count >= limit:
+            return max(1, math.ceil(start + WINDOW_SECONDS - now))
+        self.windows[(client, bucket)] = (start, count + 1)
+        return None

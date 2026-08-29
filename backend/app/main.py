@@ -17,7 +17,7 @@ from app.logging_config import configure_logging
 from app.market_data.cache import HistoryCache
 from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
-from app.middleware import RequestBodyLimit
+from app.middleware import RateLimit, RequestBodyLimit
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
 from app.routers import backtests, market, portfolios
@@ -57,6 +57,11 @@ def build_analysis_provider(settings: Settings) -> AnalysisProvider | None:
 def add_middleware(app: FastAPI, settings: Settings) -> None:
     """Innermost first: each later middleware wraps the ones before it, so CORS headers reach every response."""
     app.add_middleware(RequestBodyLimit, max_bytes=settings.max_request_body_bytes)
+    app.add_middleware(
+        RateLimit,
+        per_minute=settings.rate_limit_per_minute,
+        expensive_per_minute=settings.expensive_rate_limit_per_minute,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
