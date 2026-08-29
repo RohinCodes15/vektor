@@ -45,6 +45,21 @@ def test_an_oversize_body_is_rejected_before_any_work(tmp_path: Path) -> None:
     assert provider.calls == []
 
 
+def test_expensive_requests_have_their_own_stricter_rate_limit(tmp_path: Path) -> None:
+    client = make_client(tmp_path, expensive_rate_limit_per_minute=2, rate_limit_per_minute=100)
+    assert [client.post("/api/v1/backtests", json=BACKTEST).status_code for _ in range(2)] == [201, 201]
+    limited = client.post("/api/v1/backtests/comparisons", json=COMPARISON, headers={"origin": ORIGIN})
+    assert limited.status_code == 429 and "Try again in" in limited.json()["detail"]
+    assert int(limited.headers["retry-after"]) >= 1
+    assert limited.headers["access-control-allow-origin"] == ORIGIN  # the browser can read the 429
+    assert client.get("/api/v1/backtests").status_code == 200  # reading results is not an expensive request
+
+
+def test_general_requests_are_rate_limited_too(tmp_path: Path) -> None:
+    client = make_client(tmp_path, rate_limit_per_minute=3)
+    assert [client.get("/api/v1/health").status_code for _ in range(4)] == [200, 200, 200, 429]
+
+
 @pytest.mark.parametrize(
     ("path", "body"),
     [("/api/v1/backtests", BACKTEST), ("/api/v1/backtests/comparisons", COMPARISON),
