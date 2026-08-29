@@ -85,3 +85,10 @@ def test_resource_limits_are_bounded(bad: dict[str, int]) -> None:
 def test_zero_turns_rate_limits_off() -> None:
     s = settings(rate_limit_per_minute=0, expensive_rate_limit_per_minute=0)
     assert (s.rate_limit_per_minute, s.expensive_rate_limit_per_minute) == (0, 0)
+
+
+def test_the_ai_api_key_never_appears_in_settings_output() -> None:
+    s = settings(ai_provider="anthropic", ai_api_key="sk-ant-very-secret")
+    for rendered in (repr(s), str(s), s.model_dump_json(), str(s.model_dump())):
+        assert "sk-ant-very-secret" not in rendered
+    assert s.ai_api_key is not None and s.ai_api_key.get_secret_value() == "sk-ant-very-secret"
