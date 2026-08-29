@@ -16,7 +16,7 @@ uv run uvicorn app.main:app --reload
 curl localhost:8000/api/v1/health
 ```
 
-Interactive API docs: http://localhost:8000/docs
+Interactive API docs: http://localhost:8000/docs (on by default except in production; see Phase 4A below).
 
 ## Tests
 
@@ -26,7 +26,51 @@ uv run pytest
 
 ## Configuration
 
-All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). The optional AI analysis settings (`VEKTOR_AI_*`) are described under Phase 3A.1 below. Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
+All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). The optional AI analysis settings (`VEKTOR_AI_*`) are described under Phase 3A.1 below. Security, resource limits, and production settings are described under Phase 4A below. Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
+
+## Security and production (Phase 4A)
+
+Local development needs no changes: the defaults below are generous for one person using the frontend. `VEKTOR_ENVIRONMENT=production` switches to locked-down defaults. There is no authentication: do not expose the API to people you do not trust. Paper only, as everywhere else.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `VEKTOR_ENVIRONMENT` | `development` | `development`, `test`, or `production` |
+| `VEKTOR_CORS_ORIGINS` | localhost:5173 and :3000; **none in production** | Browser origins allowed to call the API, as a JSON list of `scheme://host[:port]` (no path). Production rejects `*` and plain `http` except for localhost. |
+| `VEKTOR_DOCS_ENABLED` | `true`; **`false` in production** | `/docs`, `/redoc`, and `/openapi.json` |
+| `VEKTOR_MAX_REQUEST_BODY_BYTES` | `65536` (1 KiB to 10 MiB) | Larger bodies get 413, whether declared by `Content-Length` or streamed |
+| `VEKTOR_RATE_LIMIT_PER_MINUTE` | `300` (0 = off) | Requests per client IP per minute; over the limit gets 429 with `Retry-After` |
+| `VEKTOR_EXPENSIVE_RATE_LIMIT_PER_MINUTE` | `30` (0 = off) | The same, for expensive requests: every `POST` under `/api/v1/backtests` (backtests, comparisons, optimizations, AI analysis) |
+| `VEKTOR_MAX_CONCURRENT_EXPENSIVE_REQUESTS` | `4` (1 to 64) | Expensive requests running at once, across all clients; more get 503 with `Retry-After: 5` |
+| `VEKTOR_MAX_BACKTEST_RANGE_DAYS` | `7305`, about 20 years (30 to 36525) | Longest start-to-end span for a backtest, comparison, or optimization; longer gets 422 before any data is fetched |
+
+Explicitly set values always win, including in production (for example `VEKTOR_DOCS_ENABLED=true`).
+
+Other limits:
+- Backtests take at most 10 symbols, comparisons 5 strategies, and optimizations 100 parameter combinations (20 values per parameter).
+- AI analysis is bounded by `VEKTOR_AI_TIMEOUT_SECONDS`, one retry, and a fixed output token cap.
+
+### What every response carries
+
+- `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-site` and `Cache-Control: no-store`.
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` (except the docs pages, which need their scripts).
+- In production, `Strict-Transport-Security`.
+- An `X-Request-ID` header. A safe incoming value (1 to 64 letters, digits, `.`, `_`, `-`) is kept; otherwise one is generated. CORS exposes it and `Retry-After` to the frontend.
+
+Every error is `{"detail": "..."}`:
+- Unexpected failures answer `500 Internal server error` and are logged server-side only.
+- Validation messages never echo submitted values.
+
+### Logging
+
+JSON lines on stderr. Each request is logged with its request id, method, path, status, and duration. Query strings, headers, and bodies are never logged. The AI key is a secret value: it never appears in logs, responses, or the settings' printed form.
+
+### Deploying
+
+- Set `VEKTOR_ENVIRONMENT=production`, list your frontend's exact `https` origins in `VEKTOR_CORS_ORIGINS`, and serve the API over HTTPS behind a reverse proxy (HSTS assumes it).
+- The proxy must pass the client's address, and uvicorn must trust it, or every client shares one rate limit. For example: `uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header`.
+- Run **one** server process. Rate limits and the concurrency cap are kept in memory per process, and the SQLite databases expect a single writer.
+- Keep secrets in the environment or an untracked `backend/.env`, never in the repository.
+- Back up `VEKTOR_PORTFOLIO_DB_PATH` and `VEKTOR_BACKTEST_DB_PATH`. The market data cache is disposable.
 
 ## Historical market data (Phase 2A)
 

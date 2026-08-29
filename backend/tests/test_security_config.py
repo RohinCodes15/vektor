@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -92,3 +93,11 @@ def test_the_ai_api_key_never_appears_in_settings_output() -> None:
     for rendered in (repr(s), str(s), s.model_dump_json(), str(s.model_dump())):
         assert "sk-ant-very-secret" not in rendered
     assert s.ai_api_key is not None and s.ai_api_key.get_secret_value() == "sk-ant-very-secret"
+
+
+def test_the_example_env_file_keeps_production_locked_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    example = Path(__file__).resolve().parent.parent / ".env.example"
+    assert Settings(_env_file=example).cors_origins == DEVELOPMENT_CORS_ORIGINS
+    monkeypatch.setenv("VEKTOR_ENVIRONMENT", "production")
+    production = Settings(_env_file=example)
+    assert production.cors_origins == [] and production.docs_enabled is False
