@@ -17,6 +17,7 @@ from app.logging_config import configure_logging
 from app.market_data.cache import HistoryCache
 from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
+from app.middleware import RequestBodyLimit
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
 from app.routers import backtests, market, portfolios
@@ -53,6 +54,17 @@ def build_analysis_provider(settings: Settings) -> AnalysisProvider | None:
     return AnthropicProvider(settings.ai_model, key, settings.ai_timeout_seconds)
 
 
+def add_middleware(app: FastAPI, settings: Settings) -> None:
+    """Innermost first: each later middleware wraps the ones before it, so CORS headers reach every response."""
+    app.add_middleware(RequestBodyLimit, max_bytes=settings.max_request_body_bytes)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["*"],
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -69,12 +81,7 @@ def create_app(
         redoc_url="/redoc" if docs else None,
         openapi_url="/openapi.json" if docs else None,
     )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["*"],
-    )
+    add_middleware(app, settings)
     register_error_handlers(app)
     market_data_service = MarketDataService(
         provider=market_data_provider or YFinanceProvider(),
