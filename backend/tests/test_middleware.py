@@ -1,6 +1,8 @@
 import asyncio
 import json
+import logging
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from fastapi import FastAPI, Request
@@ -11,6 +13,7 @@ from app.middleware import (
     ExpensiveConcurrencyLimit,
     RateLimit,
     RequestBodyLimit,
+    RequestLogging,
     SecurityHeaders,
     is_expensive,
 )
@@ -235,3 +238,56 @@ def test_hsts_is_sent_when_enabled_and_docs_keep_their_scripts() -> None:
     assert client.get("/api/v1/health").headers["strict-transport-security"].startswith("max-age=31536000")
     docs = client.get("/docs")
     assert docs.status_code == 200 and "content-security-policy" not in docs.headers
+
+
+# --- request logging -----------------------------------------------------------------------------------------------
+
+
+def logged_client() -> TestClient:
+    app = echo_app()
+    app.add_middleware(RequestLogging)
+    return TestClient(app)
+
+
+def http_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if record.name == "vektor.http"]
+
+
+def test_each_request_is_logged_with_an_id_but_no_query_or_body(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger="vektor.http")
+    res = logged_client().post(
+        "/api/v1/backtests?token=sk-ant-query-secret", content=b'{"key":"sk-ant-body-secret"}',
+        headers={"authorization": "Bearer sk-ant-header-secret"},
+    )
+    (record,) = http_records(caplog)
+    fields: dict[str, Any] = vars(record)
+    assert fields["request_id"] == res.headers["x-request-id"] and len(fields["request_id"]) == 32
+    assert (fields["method"], fields["path"], fields["status"]) == ("POST", "/api/v1/backtests", 200)
+    assert isinstance(fields["duration_ms"], float)
+    rendered = json.dumps(fields, default=str)
+    assert "sk-ant" not in rendered and "token" not in rendered
+
+
+def test_a_safe_incoming_request_id_is_kept_and_an_unsafe_one_replaced(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger="vektor.http")
+    client = logged_client()
+    assert client.get("/api/v1/health", headers={"x-request-id": "trace-123.a_b"}).headers["x-request-id"] == (
+        "trace-123.a_b"
+    )
+    replaced = client.get("/api/v1/health", headers={"x-request-id": "bad id\n{json}"}).headers["x-request-id"]
+    assert replaced != "bad id\n{json}" and len(replaced) == 32
+    assert [record.request_id for record in http_records(caplog)] == ["trace-123.a_b", replaced]  # type: ignore[attr-defined]
+
+
+def test_a_request_that_crashes_is_still_logged_as_a_500(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger="vektor.http")
+    app = FastAPI()
+
+    @app.get("/boom")
+    def boom() -> None:
+        raise RuntimeError("internal detail")
+
+    app.add_middleware(RequestLogging)
+    assert TestClient(app, raise_server_exceptions=False).get("/boom").status_code == 500
+    (record,) = http_records(caplog)
+    assert record.status == 500  # type: ignore[attr-defined]

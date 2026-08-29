@@ -1,4 +1,4 @@
-"""Phase 4A hardening, exercised through the real app."""
+"""Phase 4A hardening, exercised through the real app: limits, headers, CORS, docs, and safe errors."""
 
 from pathlib import Path
 from typing import Any
@@ -35,6 +35,15 @@ def make_client(tmp_path: Path, provider: FakeProvider | None = None, **override
     settings = Settings(_env_file=None, **{key: value for key, value in values.items() if value is not None})
     app = create_app(settings, market_data_provider=provider or FakeProvider(price_bars(SWING)))
     return TestClient(app, raise_server_exceptions=False)
+
+
+def test_api_responses_carry_security_headers_and_a_request_id(tmp_path: Path) -> None:
+    res = make_client(tmp_path).get("/api/v1/health")
+    assert res.status_code == 200
+    assert res.headers["x-content-type-options"] == "nosniff" and res.headers["x-frame-options"] == "DENY"
+    assert res.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+    assert len(res.headers["x-request-id"]) == 32
+    assert "strict-transport-security" not in res.headers
 
 
 def test_an_oversize_body_is_rejected_before_any_work(tmp_path: Path) -> None:
