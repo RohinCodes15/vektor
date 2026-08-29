@@ -46,6 +46,48 @@ def test_api_responses_carry_security_headers_and_a_request_id(tmp_path: Path) -
     assert "strict-transport-security" not in res.headers
 
 
+def test_production_hides_docs_and_sends_hsts(tmp_path: Path) -> None:
+    client = make_client(tmp_path, environment="production", cors_origins=["https://vektor.example"])
+    assert [client.get(path).status_code for path in ("/docs", "/redoc", "/openapi.json")] == [404, 404, 404]
+    health = client.get("/api/v1/health")
+    assert health.status_code == 200 and health.json()["environment"] == "production"
+    assert health.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
+
+
+def test_development_keeps_the_interactive_docs(tmp_path: Path) -> None:
+    client = make_client(tmp_path, environment="development")
+    assert client.get("/docs").status_code == 200 and client.get("/openapi.json").status_code == 200
+
+
+def test_cors_allows_the_configured_origin_and_exposes_limit_headers(tmp_path: Path) -> None:
+    client = make_client(tmp_path)
+    preflight = client.options("/api/v1/backtests", headers={
+        "origin": ORIGIN, "access-control-request-method": "POST", "access-control-request-headers": "content-type",
+    })
+    assert preflight.status_code == 200 and preflight.headers["access-control-allow-origin"] == ORIGIN
+    assert "PUT" not in preflight.headers["access-control-allow-methods"]
+    res = client.get("/api/v1/health", headers={"origin": ORIGIN})
+    assert res.headers["access-control-allow-origin"] == ORIGIN
+    assert set(res.headers["access-control-expose-headers"].split(", ")) == {"x-request-id", "retry-after"}
+
+
+def test_cors_rejects_other_origins_and_unlisted_headers(tmp_path: Path) -> None:
+    client = make_client(tmp_path)
+    assert "access-control-allow-origin" not in client.get(
+        "/api/v1/health", headers={"origin": "https://evil.example"}
+    ).headers
+    preflight = client.options("/api/v1/backtests", headers={
+        "origin": ORIGIN, "access-control-request-method": "POST", "access-control-request-headers": "x-api-key",
+    })
+    assert preflight.status_code == 400
+
+
+def test_production_without_configured_origins_allows_no_browser_origin(tmp_path: Path) -> None:
+    client = make_client(tmp_path, environment="production", cors_origins=None)
+    res = client.get("/api/v1/health", headers={"origin": ORIGIN})
+    assert res.status_code == 200 and "access-control-allow-origin" not in res.headers
+
+
 def test_an_oversize_body_is_rejected_before_any_work(tmp_path: Path) -> None:
     provider = FakeProvider(price_bars(SWING))
     client = make_client(tmp_path, provider, max_request_body_bytes=1024)
@@ -91,3 +133,15 @@ def test_a_date_range_at_the_limit_runs(tmp_path: Path) -> None:
     client = make_client(tmp_path, provider, max_backtest_range_days=180)
     res = client.post("/api/v1/backtests", json={**BACKTEST, "start": "2024-01-01", "end": "2024-06-29"})
     assert res.status_code == 201 and len(provider.calls) == 1
+
+
+def test_unexpected_failures_never_expose_internal_details(tmp_path: Path) -> None:
+    client = make_client(tmp_path, FakeProvider(error=RuntimeError("db password=hunter2 at /srv/secret.py")))
+    res = client.post("/api/v1/backtests", json=BACKTEST)
+    assert res.status_code == 500 and res.json() == {"detail": "Internal server error"}
+    assert "hunter2" not in res.text
+
+
+def test_validation_errors_do_not_echo_submitted_values(tmp_path: Path) -> None:
+    res = make_client(tmp_path).post("/api/v1/backtests", json={**BACKTEST, "starting_cash": "sk-ant-secret-xyz"})
+    assert res.status_code == 422 and "sk-ant-secret-xyz" not in res.text
