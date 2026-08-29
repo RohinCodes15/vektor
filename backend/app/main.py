@@ -68,8 +68,10 @@ def add_middleware(app: FastAPI, settings: Settings) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["content-type", "x-request-id"],
+        expose_headers=["x-request-id", "retry-after"],
+        max_age=600,
     )
 
 
