@@ -5,9 +5,10 @@ from collections.abc import Iterator
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from starlette.types import Message
+from starlette.types import Message, Receive, Scope, Send
 
 from app.middleware import (
+    ExpensiveConcurrencyLimit,
     RateLimit,
     RequestBodyLimit,
     is_expensive,
@@ -142,3 +143,68 @@ def test_over_the_limit_the_api_answers_429_with_retry_after() -> None:
     assert res.status_code == 429 and int(res.headers["retry-after"]) >= 1
     assert res.json()["detail"].startswith("Too many requests. Try again in")
     assert [client.get("/api/v1/health").status_code for _ in range(3)] == [200, 200, 429]
+
+
+# --- expensive concurrency limit ---------------------------------------------------------------------------------
+
+
+def test_expensive_requests_beyond_the_concurrency_limit_are_turned_away() -> None:
+    async def run() -> tuple[list[int], int]:
+        release = asyncio.Event()
+        started = 0
+
+        async def slow_app(scope: Scope, receive: Receive, send: Send) -> None:
+            nonlocal started
+            started += 1
+            await release.wait()
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"{}"})
+
+        limiter = ExpensiveConcurrencyLimit(slow_app, max_concurrent=2)
+
+        async def call(method: str = "POST") -> int:
+            statuses: list[int] = []
+
+            async def receive() -> Message:
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message: Message) -> None:
+                if message["type"] == "http.response.start":
+                    statuses.append(message["status"])
+
+            await limiter({"type": "http", "method": method, "path": "/api/v1/backtests", "headers": []},
+                          receive, send)
+            return statuses[0]
+
+        running = [asyncio.create_task(call()) for _ in range(2)]
+        await asyncio.sleep(0)
+        rejected = await call()
+        cheap = asyncio.create_task(call("GET"))  # not expensive: never counted or blocked
+        await asyncio.sleep(0)
+        release.set()
+        statuses = [await task for task in running] + [rejected, await cheap]
+        after = await call()  # slots are released afterwards
+        return statuses, after if limiter.in_flight == 0 else -1
+
+    statuses, after = asyncio.run(run())
+    assert statuses == [200, 200, 503, 200] and after == 200
+
+
+def test_the_busy_response_is_a_safe_error_with_retry_after() -> None:
+    async def run() -> list[Message]:
+        sent: list[Message] = []
+        limiter = ExpensiveConcurrencyLimit(echo_app(), max_concurrent=1)
+        limiter.in_flight = 1
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b""}
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        await limiter({"type": "http", "method": "POST", "path": "/api/v1/backtests", "headers": []}, receive, send)
+        return sent
+
+    start, body = asyncio.run(run())
+    assert start["status"] == 503 and (b"retry-after", b"5") in start["headers"]
+    assert json.loads(body["body"]) == {"detail": "The server is busy with other backtests. Try again shortly."}
