@@ -37,6 +37,14 @@ def make_client(tmp_path: Path, provider: FakeProvider | None = None, **override
     return TestClient(app, raise_server_exceptions=False)
 
 
+def test_an_oversize_body_is_rejected_before_any_work(tmp_path: Path) -> None:
+    provider = FakeProvider(price_bars(SWING))
+    client = make_client(tmp_path, provider, max_request_body_bytes=1024)
+    res = client.post("/api/v1/backtests", json={**BACKTEST, "padding": "x" * 2000})
+    assert res.status_code == 413 and res.json() == {"detail": "Request body is larger than the 1024-byte limit."}
+    assert provider.calls == []
+
+
 @pytest.mark.parametrize(
     ("path", "body"),
     [("/api/v1/backtests", BACKTEST), ("/api/v1/backtests/comparisons", COMPARISON),
