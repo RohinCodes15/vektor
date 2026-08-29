@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Read from the environment only; never logged or returned. Unset: the SDK falls back to ANTHROPIC_API_KEY.
     ai_api_key: SecretStr | None = None
     ai_timeout_seconds: float = Field(default=120, gt=0, le=600)
+    # Resource limits (Phase 4A). Rate limits count requests per client IP per minute; 0 turns a limit off.
+    max_request_body_bytes: int = Field(default=64 * 1024, ge=1024, le=10 * 1024 * 1024)
+    rate_limit_per_minute: int = Field(default=300, ge=0, le=100_000)
+    # Backtests, comparisons, optimizations, and AI analysis: every POST under /api/v1/backtests.
+    expensive_rate_limit_per_minute: int = Field(default=30, ge=0, le=10_000)
+    max_concurrent_expensive_requests: int = Field(default=4, ge=1, le=64)
+    # Longest start-to-end span a backtest, comparison, or optimization may request (about 20 years).
+    max_backtest_range_days: int = Field(default=7305, ge=30, le=36_525)
 
     @field_validator("cors_origins")
     @classmethod
