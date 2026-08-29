@@ -2,6 +2,7 @@
 
 - RequestBodyLimit: 413 for a body over the limit, whether declared by Content-Length or streamed.
 - RateLimit: fixed one-minute windows per client IP, with a stricter bucket for expensive requests; 429 + Retry-After.
+- ExpensiveConcurrencyLimit: at most N expensive requests run at once across all clients; 503 + Retry-After.
 
 Behind a reverse proxy, run uvicorn with --proxy-headers so the client IP is the real one, not the proxy's.
 """
@@ -21,6 +22,7 @@ logger = logging.getLogger("vektor.http")
 WINDOW_SECONDS = 60
 # Stale rate-limit windows are swept once this many clients are tracked, which bounds memory.
 MAX_TRACKED_KEYS = 10_000
+CONCURRENCY_RETRY_AFTER_SECONDS = 5
 
 
 def is_expensive(scope: Scope) -> bool:
@@ -128,3 +130,29 @@ class RateLimit:
             return max(1, math.ceil(start + WINDOW_SECONDS - now))
         self.windows[(client, bucket)] = (start, count + 1)
         return None
+
+
+class ExpensiveConcurrencyLimit:
+    def __init__(self, app: ASGIApp, max_concurrent: int) -> None:
+        self.app = app
+        self.max_concurrent = max_concurrent
+        self.in_flight = 0
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not is_expensive(scope):
+            await self.app(scope, receive, send)
+            return
+        if self.in_flight >= self.max_concurrent:
+            logger.warning("expensive request concurrency limit reached", extra={"path": scope["path"]})
+            await send_error(
+                send,
+                503,
+                "The server is busy with other backtests. Try again shortly.",
+                [(b"retry-after", str(CONCURRENCY_RETRY_AFTER_SECONDS).encode())],
+            )
+            return
+        self.in_flight += 1
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            self.in_flight -= 1
