@@ -11,6 +11,7 @@ from app.middleware import (
     ExpensiveConcurrencyLimit,
     RateLimit,
     RequestBodyLimit,
+    SecurityHeaders,
     is_expensive,
 )
 
@@ -208,3 +209,29 @@ def test_the_busy_response_is_a_safe_error_with_retry_after() -> None:
     start, body = asyncio.run(run())
     assert start["status"] == 503 and (b"retry-after", b"5") in start["headers"]
     assert json.loads(body["body"]) == {"detail": "The server is busy with other backtests. Try again shortly."}
+
+
+# --- security headers ----------------------------------------------------------------------------------------------
+
+
+def headers_client(hsts: bool) -> TestClient:
+    app = echo_app()
+    app.add_middleware(SecurityHeaders, hsts=hsts)
+    return TestClient(app)
+
+
+def test_security_headers_are_added_to_api_responses() -> None:
+    headers = headers_client(hsts=False).get("/api/v1/health").headers
+    assert headers["x-content-type-options"] == "nosniff"
+    assert headers["x-frame-options"] == "DENY"
+    assert headers["referrer-policy"] == "no-referrer"
+    assert headers["cache-control"] == "no-store"
+    assert headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+    assert "strict-transport-security" not in headers
+
+
+def test_hsts_is_sent_when_enabled_and_docs_keep_their_scripts() -> None:
+    client = headers_client(hsts=True)
+    assert client.get("/api/v1/health").headers["strict-transport-security"].startswith("max-age=31536000")
+    docs = client.get("/docs")
+    assert docs.status_code == 200 and "content-security-policy" not in docs.headers
