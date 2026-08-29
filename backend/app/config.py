@@ -1,13 +1,14 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DEVELOPMENT_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
 
 
 class Settings(BaseSettings):
@@ -18,8 +19,10 @@ class Settings(BaseSettings):
     app_name: str = "Vektor"
     environment: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    # Browser origins allowed to call the API: scheme://host[:port], no path.
+    # Browser origins allowed to call the API: scheme://host[:port], no path. Production defaults to none.
     cors_origins: list[str] = Field(default_factory=lambda: list(DEVELOPMENT_CORS_ORIGINS))
+    # Interactive API docs (/docs, /redoc, /openapi.json). Production defaults to off.
+    docs_enabled: bool = True
     # Paper-only by construction: any other value fails validation at startup.
     trading_mode: Literal["paper"] = "paper"
     # Local SQLite cache for read-only historical prices. Relative paths resolve from the working directory.
@@ -44,6 +47,23 @@ class Settings(BaseSettings):
             if origin != "*" and not _is_origin(origin):
                 raise ValueError("each CORS origin must be scheme://host[:port] with http or https and no path")
         return origins
+
+    @model_validator(mode="after")
+    def production_defaults(self) -> Self:
+        """Production locks down what development leaves open, unless a value is set explicitly."""
+        if self.environment != "production":
+            return self
+        if "cors_origins" not in self.model_fields_set:
+            self.cors_origins = []
+        if "docs_enabled" not in self.model_fields_set:
+            self.docs_enabled = False
+        for origin in self.cors_origins:
+            if origin == "*":
+                raise ValueError("a wildcard CORS origin is not allowed in production: list the exact origins")
+            parts = urlsplit(origin)
+            if parts.scheme != "https" and parts.hostname not in {host.strip("[]") for host in LOOPBACK_HOSTS}:
+                raise ValueError("production CORS origins must use https (plain http is allowed for localhost only)")
+        return self
 
 
 def _is_origin(value: str) -> bool:

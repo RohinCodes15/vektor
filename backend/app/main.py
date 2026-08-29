@@ -61,7 +61,14 @@ def create_app(
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
-    app = FastAPI(title=settings.app_name, version=VERSION)
+    docs = settings.docs_enabled
+    app = FastAPI(
+        title=settings.app_name,
+        version=VERSION,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -88,6 +95,8 @@ def create_app(
             "environment": settings.environment,
             "trading_mode": settings.trading_mode,
             "ai_provider": settings.ai_provider,
+            "docs_enabled": settings.docs_enabled,
+            "cors_origins": len(settings.cors_origins),
         },
     )
     return app
