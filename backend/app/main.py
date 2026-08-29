@@ -17,7 +17,7 @@ from app.logging_config import configure_logging
 from app.market_data.cache import HistoryCache
 from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
-from app.middleware import ExpensiveConcurrencyLimit, RateLimit, RequestBodyLimit, SecurityHeaders
+from app.middleware import ExpensiveConcurrencyLimit, RateLimit, RequestBodyLimit, RequestLogging, SecurityHeaders
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
 from app.routers import backtests, market, portfolios
@@ -64,6 +64,7 @@ def add_middleware(app: FastAPI, settings: Settings) -> None:
         expensive_per_minute=settings.expensive_rate_limit_per_minute,
     )
     app.add_middleware(SecurityHeaders, hsts=settings.environment == "production")
+    app.add_middleware(RequestLogging)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

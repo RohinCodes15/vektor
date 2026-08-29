@@ -4,14 +4,18 @@
 - RateLimit: fixed one-minute windows per client IP, with a stricter bucket for expensive requests; 429 + Retry-After.
 - ExpensiveConcurrencyLimit: at most N expensive requests run at once across all clients; 503 + Retry-After.
 - SecurityHeaders: nosniff, no framing, no referrer, no caching, a deny-all CSP for API responses, HSTS in production.
+- RequestLogging: one JSON line per request (request id, method, path, status, duration). Never the query string,
+  headers, or body, so no credentials or payloads reach the logs.
 
 Behind a reverse proxy, run uvicorn with --proxy-headers so the client IP is the real one, not the proxy's.
 """
 
 import logging
 import math
+import re
 import time
 from collections.abc import Callable
+from uuid import uuid4
 
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -24,6 +28,8 @@ WINDOW_SECONDS = 60
 # Stale rate-limit windows are swept once this many clients are tracked, which bounds memory.
 MAX_TRACKED_KEYS = 10_000
 CONCURRENCY_RETRY_AFTER_SECONDS = 5
+REQUEST_ID_HEADER = b"x-request-id"
+SAFE_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 # Swagger UI and ReDoc load scripts and styles, so the deny-all CSP would break them.
 DOCS_PATHS = ("/docs", "/redoc")
 
@@ -192,3 +198,40 @@ class SecurityHeaders:
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+class RequestLogging:
+    def __init__(self, app: ASGIApp, clock: Callable[[], float] = time.perf_counter) -> None:
+        self.app = app
+        self.clock = clock
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        incoming = dict(scope["headers"]).get(REQUEST_ID_HEADER, b"").decode("latin-1")
+        request_id = incoming if SAFE_REQUEST_ID.fullmatch(incoming) else uuid4().hex
+        started = self.clock()
+        status = 500  # if the app fails before responding, the error handler's 500 is what the client sees
+
+        async def send_with_id(message: Message) -> None:
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                headers = [(n, v) for n, v in message.get("headers", []) if n.lower() != REQUEST_ID_HEADER]
+                message = {**message, "headers": [*headers, (REQUEST_ID_HEADER, request_id.encode())]}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_id)
+        finally:
+            logger.info(
+                "request completed",
+                extra={
+                    "request_id": request_id,
+                    "method": scope["method"],
+                    "path": scope["path"],
+                    "status": status,
+                    "duration_ms": round((self.clock() - started) * 1000, 1),
+                },
+            )
