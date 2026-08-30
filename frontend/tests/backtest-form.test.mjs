@@ -41,6 +41,7 @@ test("backtest form submits API configuration and reports loading and success", 
   tree = component.render();
   assert.equal(find(tree, (node) => node.props?.type === "submit").props.disabled, true);
   assert.equal(find(tree, (node) => node.props?.type === "submit").props.children, "Running backtest…");
+  assert.equal(find(tree, (node) => node.type === MockResults).props.state.status, "loading");
   assert.deepEqual(submitted, {
     symbols: [" aapl "], start: "2024-01-01", end: "2024-12-31", starting_cash: "10000.00",
     strategy: { kind: "buy_and_hold" }, fee_per_trade: "0.00", fee_bps: "0", slippage_bps: "0",
@@ -48,7 +49,7 @@ test("backtest form submits API configuration and reports loading and success", 
   resolve({ bars: 252, config: { symbols: ["AAPL"] } });
   await submitting;
   tree = component.render();
-  assert.equal(find(tree, (node) => node.type === "strong").props.children, "Backtest complete.");
+  assert.equal(find(tree, (node) => node.type === MockResults).props.state.status, "success");
   assert.equal(find(tree, (node) => node.props?.type === "submit").props.disabled, false);
 });
 
@@ -56,6 +57,6 @@ test("backtest form exposes API errors without stale success", async () => {
   const component = await mount("../src/components/backtest-form.tsx", imports(async () => { throw new Error("Backtest configuration was rejected."); }), "BacktestForm");
   const tree = component.render();
   await find(tree, (node) => node.type === "form").props.onSubmit({ preventDefault() {} });
-  const error = find(component.render(), (node) => node.props?.role === "alert");
-  assert.equal(error.props.children, "Backtest configuration was rejected.");
+  const error = find(component.render(), (node) => node.type === MockResults).props.state;
+  assert.deepEqual(error, { status: "error", message: "Backtest configuration was rejected." });
 });

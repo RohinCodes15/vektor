@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { runBacktest, type Backtest, type BacktestStrategy } from "../lib/api";
 import { Badge, Button, Field, Panel } from "./ui";
+import { BacktestResults, type BacktestResultState } from "./backtest-results";
 
 type StrategyKind = BacktestStrategy["kind"];
 const latestCompletedDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -24,6 +25,7 @@ export function BacktestForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Backtest | null>(null);
+  const resultState: BacktestResultState = loading ? { status: "loading" } : error ? { status: "error", message: error } : result ? { status: "success", data: result } : { status: "idle" };
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -82,12 +84,9 @@ export function BacktestForm() {
           </fieldset>
 
           <div className="backtest-actions"><Button type="submit" disabled={loading}>{loading ? "Running backtest…" : "Run backtest"}</Button><p className="muted text-xs">Signals use completed daily bars. No orders leave this machine.</p></div>
-          <div className="backtest-status" aria-live="polite">
-            {error && <p role="alert">{error}</p>}
-            {result && <p role="status"><strong>Backtest complete.</strong> {result.bars} shared trading days simulated for {result.config.symbols.join(", ")}. Results charts come next.</p>}
-          </div>
         </form>
       </Panel>
+      <div aria-live="polite"><BacktestResults state={resultState} /></div>
     </section>
   );
 }
