@@ -23,3 +23,16 @@ test("results expose loading, empty, and error states", async () => {
   assert.ok(nodes(await render({ status: "loading" })).some((node) => node.props?.children === "Running paper simulation…"));
   assert.equal(nodes(await render({ status: "error", message: "Provider unavailable." })).find((node) => node.props?.role === "alert")?.props.children, "Provider unavailable.");
 });
+
+test("results show exact metrics, unavailable values, and both interactive curves", async () => {
+  const tree = await render({ status: "success", data: result });
+  const cards = nodes(tree).filter((node) => node.props?.label);
+  assert.equal(cards.find((card) => card.props.label === "Total return").props.value, "5.2500%");
+  assert.equal(cards.find((card) => card.props.label === "Annualized return").props.value, "Unavailable");
+  assert.equal(cards.find((card) => card.props.label === "Sharpe ratio").props.value, "Unavailable");
+  const charts = nodes(tree).filter((node) => node.type === MockChart);
+  assert.deepEqual(charts.map((chart) => chart.props.kind), ["equity", "drawdown"]);
+  assert.ok(charts.every((chart) => chart.props.points === result.equity_curve));
+  assert.equal(JSON.stringify(tree).includes("trade history"), true);
+  assert.equal(JSON.stringify(tree).includes("trades"), false);
+});
