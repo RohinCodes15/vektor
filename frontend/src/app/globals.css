@@ -197,6 +197,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .activity-panel { flex-wrap: wrap; }
   .activity-panel .button { margin-left: 60px; }
   .backtest-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .backtest-chart-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
   html { scroll-padding-top: 84px; }
