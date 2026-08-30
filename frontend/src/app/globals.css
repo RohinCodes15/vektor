@@ -65,12 +65,18 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .backtest-status { min-height: 24px; font-size: 12px; }
 .backtest-status [role="alert"] { color: #f0cf91; }
 .backtest-status strong { color: var(--color-teal); }
+.backtest-results { margin-top: 32px; }
+.backtest-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.backtest-metrics .metric-value { font-size: 26px; overflow-wrap: anywhere; }
+.backtest-warnings { margin-bottom: 20px; padding-block: 18px; }
+.backtest-warnings ul { margin: 10px 0 0; padding-left: 18px; color: var(--color-muted); font-size: 11px; }
 .backtest-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .backtest-chart { padding-top: 20px; min-width: 0; }
 .backtest-chart-line { fill: none; stroke: var(--color-teal); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .backtest-drawdown-chart .backtest-chart-line { stroke: #a6a3ef; }
 .backtest-drawdown-chart .chart-point { fill: #a6a3ef; }
 .chart-zero-line { stroke: var(--color-control); stroke-width: 1; }
+.backtest-provenance { text-align: right; }
 .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-teal); flex-shrink: 0; }
 .eyebrow { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--color-muted); display: flex; gap: 9px; align-items: center; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid var(--color-control); border-radius: 5px; background: transparent; color: var(--color-ink); font-size: 18px; }
