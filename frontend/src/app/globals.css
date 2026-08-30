@@ -269,6 +269,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .quote-unavailable { font-size: 8px; }
   .backtest-fields { grid-template-columns: minmax(0, 1fr); }
   .strategy-picker { display: grid; }
+  .backtest-metrics { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
