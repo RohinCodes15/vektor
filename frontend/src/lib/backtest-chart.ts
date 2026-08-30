@@ -25,3 +25,13 @@ export function backtestChartGeometry(values: readonly Readonly<{ date: string; 
   };
 }
 
+export function nearestBacktestPoint(points: readonly BacktestChartPoint[], x: number): number {
+  if (!points.length) return -1;
+  let left = 0, right = points.length - 1;
+  while (left < right) {
+    const middle = Math.floor((left + right) / 2);
+    if (points[middle].x < x) left = middle + 1;
+    else right = middle;
+  }
+  return left > 0 && Math.abs(points[left - 1].x - x) <= Math.abs(points[left].x - x) ? left - 1 : left;
+}
