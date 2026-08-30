@@ -19,3 +19,13 @@ test("drawdown geometry supports zero and negative values", () => {
   assert.ok(!/NaN|Infinity/.test(chart.path));
   assert.equal(nearestBacktestPoint(chart.points, chart.points[1].x), 1);
 });
+
+test("empty, single, flat, and narrow chart inputs remain finite", () => {
+  assert.equal(backtestChartGeometry([], 200).path, "");
+  for (const input of [[{ date: "2024-01-01", value: 0 }], [{ date: "2024-01-01", value: -2 }, { date: "2024-01-02", value: -2 }]]) {
+    const chart = backtestChartGeometry(input, 200);
+    assert.ok(!/NaN|Infinity/.test(chart.path));
+    assert.ok(chart.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)));
+  }
+  assert.equal(nearestBacktestPoint([], 0), -1);
+});
