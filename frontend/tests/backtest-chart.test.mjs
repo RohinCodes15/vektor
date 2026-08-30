@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { backtestChartGeometry, nearestBacktestPoint } from "../src/lib/backtest-chart.ts";
+import { formatMoney } from "../src/lib/portfolio-values.ts";
+import { mount, nodes } from "./component-runtime.mjs";
 
 const values = [{ date: "2024-01-05", value: 10000 }, { date: "2024-01-08", value: 10100 }, { date: "2024-01-09", value: 9900 }];
 
@@ -28,4 +30,17 @@ test("empty, single, flat, and narrow chart inputs remain finite", () => {
     assert.ok(chart.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)));
   }
   assert.equal(nearestBacktestPoint([], 0), -1);
+});
+
+test("chart slider exposes and selects each exact returned observation", async () => {
+  const points = values.map(({ date, value }) => ({ date, equity: value.toFixed(2), drawdown_pct: value === 9900 ? "-2.0000" : "0", cash: "0.00", positions_value: value.toFixed(2) }));
+  const component = await mount("../src/components/backtest-chart.tsx", {
+    "../lib/api": {}, "../lib/backtest-chart": { backtestChartGeometry, nearestBacktestPoint }, "../lib/portfolio-values": { formatMoney },
+  }, "BacktestChart", { points, kind: "drawdown" });
+  let tree = component.render();
+  const slider = nodes(tree).find((node) => node.props?.type === "range");
+  assert.match(slider.props["aria-valuetext"], /2024-01-09.*-2\.0000%/);
+  slider.props.onChange({ target: { value: "0" } });
+  tree = component.render();
+  assert.match(nodes(tree).find((node) => node.props?.type === "range").props["aria-valuetext"], /2024-01-05.*0%/);
 });
