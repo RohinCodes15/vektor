@@ -11,3 +11,11 @@ test("backtest chart preserves returned dates and signed values", () => {
   assert.ok(chart.points[1].y < chart.points[0].y);
   assert.equal(chart.path.split("L").length, values.length);
 });
+
+test("drawdown geometry supports zero and negative values", () => {
+  const chart = backtestChartGeometry([{ date: "2024-01-01", value: 0 }, { date: "2024-01-02", value: -12.5 }], 300);
+  assert.ok(chart.zeroY !== null);
+  assert.ok(chart.points[0].y < chart.points[1].y);
+  assert.ok(!/NaN|Infinity/.test(chart.path));
+  assert.equal(nearestBacktestPoint(chart.points, chart.points[1].x), 1);
+});
