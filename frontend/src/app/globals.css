@@ -271,6 +271,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .backtest-actions { align-items: stretch; flex-direction: column; }
   .backtest-actions .button { width: 100%; }
   .backtest-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trade-scroll-hint { display: block; }
 }
 @media (max-width: 400px) {
   .mobile-break { display: initial; }
