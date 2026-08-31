@@ -1,5 +1,6 @@
 import type { Backtest } from "../lib/api";
 import { BacktestChart } from "./backtest-chart";
+import { BacktestTrades } from "./backtest-trades";
 import { Badge, MetricCard, Panel } from "./ui";
 
 export type BacktestResultState = { status: "idle" | "loading" } | { status: "error"; message: string } | { status: "success"; data: Backtest };
@@ -31,7 +32,8 @@ export function BacktestResults({ state }: { state: BacktestResultState }) {
           <Panel><div className="panel-heading"><div><h3>Equity curve</h3><p className="muted text-xs">Virtual account value at each completed close</p></div><Badge>USD</Badge></div><BacktestChart points={result.equity_curve} kind="equity" /></Panel>
           <Panel><div className="panel-heading"><div><h3>Drawdown</h3><p className="muted text-xs">Decline from the highest equity reached</p></div><Badge>Peak-relative</Badge></div><BacktestChart points={result.equity_curve} kind="drawdown" /></Panel>
         </div>
-        <p className="chart-provenance backtest-provenance">Yahoo Finance completed daily history · {result.first_date} to {result.last_date} · Paper simulation only · No trade history shown</p>
+        <BacktestTrades trades={result.trades} />
+        <p className="chart-provenance backtest-provenance">Yahoo Finance completed daily history · {result.first_date} to {result.last_date} · Paper simulation only</p>
       </>}
     </section>
   );

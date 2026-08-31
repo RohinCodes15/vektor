@@ -35,6 +35,5 @@ test("results show exact metrics, unavailable values, and both interactive curve
   const charts = nodes(tree).filter((node) => node.type === MockChart);
   assert.deepEqual(charts.map((chart) => chart.props.kind), ["equity", "drawdown"]);
   assert.ok(charts.every((chart) => chart.props.points === result.equity_curve));
-  assert.equal(JSON.stringify(tree).includes("trade history"), true);
-  assert.equal(JSON.stringify(tree).includes("trades"), false);
+  assert.equal(nodes(tree).find((node) => node.type === MockTrades)?.props.trades, result.trades);
 });
