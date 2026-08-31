@@ -27,3 +27,18 @@ test("trade table shows exact real fill fields and unavailable buy P&L", async (
   assert.ok(nodes(tree).some((node) => node.props?.["aria-label"] === "Not available"));
   assert.match(nodes(tree).find((node) => node.type === "caption").props.children.flat(Infinity).join(""), /3 simulated fills/);
 });
+
+test("every trade column sorts and reports direction accessibly", async () => {
+  const component = await componentFor(trades);
+  let tree = component.render();
+  assert.equal(rows(tree)[0].props.children[0].props.children.props.dateTime, "2024-01-02");
+  const quantity = nodes(tree).find((node) => node.type === "button" && node.props.children[0] === "Quantity");
+  quantity.props.onClick();
+  tree = component.render();
+  assert.equal(nodes(tree).find((node) => node.type === "th" && node.props.children.props.children[0] === "Quantity").props["aria-sort"], "ascending");
+  assert.equal(rows(tree)[0].props.children[3].props.children, 5);
+  nodes(tree).find((node) => node.type === "button" && node.props.children[0] === "Quantity").props.onClick();
+  tree = component.render();
+  assert.equal(rows(tree)[0].props.children[3].props.children, 12);
+  assert.equal(nodes(tree).find((node) => node.type === "th" && node.props.children.props.children[0] === "Quantity").props["aria-sort"], "descending");
+});
