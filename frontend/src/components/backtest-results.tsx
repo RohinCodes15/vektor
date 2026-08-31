@@ -23,6 +23,7 @@ export function BacktestResults({ state }: { state: BacktestResultState }) {
       {state.status === "loading" && <Panel className="chart-state" role="status"><h3>Running paper simulation…</h3><p>Loading historical bars and calculating the strategy.</p></Panel>}
       {state.status === "error" && <Panel className="chart-state"><h3>Backtest unavailable</h3><p role="alert">{state.message}</p></Panel>}
       {result && <>
+        <p className="sr-only" role="status">Backtest complete. {result.bars} trading days and {result.trades.length} fills returned.</p>
         <div className="metrics-grid backtest-metrics">{metrics.map((metric) => {
           const value = result.metrics[metric.key];
           return <MetricCard key={metric.key} label={metric.label} value={value === null ? "Unavailable" : `${value}${metric.suffix}`} detail={metric.detail} />;
