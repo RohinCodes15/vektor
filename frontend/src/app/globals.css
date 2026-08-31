@@ -87,6 +87,9 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .backtest-trade-table td { padding: 13px 14px; border-bottom: 1px solid var(--color-line); white-space: nowrap; }
 .backtest-trade-table tbody tr:last-child td { border-bottom: 0; }
 .backtest-trade-table tbody tr:hover { background: #ffffff03; }
+.trade-empty { min-height: 190px; display: grid; place-items: center; align-content: center; gap: 8px; text-align: center; }
+.trade-empty .empty-icon { margin-bottom: 4px; }
+.trade-empty p { color: var(--color-muted); font-size: 12px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-teal); flex-shrink: 0; }
 .eyebrow { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--color-muted); display: flex; gap: 9px; align-items: center; }
