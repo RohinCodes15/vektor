@@ -4,6 +4,7 @@ import { mount, nodes } from "./component-runtime.mjs";
 
 const ui = Object.fromEntries(["Badge", "MetricCard", "Panel"].map((name) => [name, function Mock(props) { return { type: name, props }; }]));
 function MockChart(props) { return { type: "BacktestChart", props }; }
+function MockTrades(props) { return { type: "BacktestTrades", props }; }
 const result = {
   bars: 2, first_date: "2024-01-02", last_date: "2024-01-03", config: { symbols: ["AAPL"] }, warnings: ["Sharpe ratio is unavailable."],
   metrics: { total_return_pct: "5.2500", annualized_return_pct: null, sharpe_ratio: null, volatility_pct: "12.3000", max_drawdown_pct: "-3.1000", win_rate_pct: null },
@@ -11,10 +12,11 @@ const result = {
     { date: "2024-01-02", cash: "10000.00", positions_value: "0.00", equity: "10000.00", drawdown_pct: "0" },
     { date: "2024-01-03", cash: "0.00", positions_value: "10525.00", equity: "10525.00", drawdown_pct: "-3.1000" },
   ],
+  trades: [{ symbol: "AAPL", side: "buy", signal_date: "2024-01-02", fill_date: "2024-01-03", quantity: 10, price: "100.0000", notional: "1000.00", fee: "0.00", realized_pnl: null }],
 };
 
 async function render(state) {
-  const component = await mount("../src/components/backtest-results.tsx", { "../lib/api": {}, "./backtest-chart": { BacktestChart: MockChart }, "./ui": ui }, "BacktestResults", { state });
+  const component = await mount("../src/components/backtest-results.tsx", { "../lib/api": {}, "./backtest-chart": { BacktestChart: MockChart }, "./backtest-trades": { BacktestTrades: MockTrades }, "./ui": ui }, "BacktestResults", { state });
   return component.render();
 }
 
