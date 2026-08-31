@@ -86,7 +86,7 @@ export function BacktestForm() {
           <div className="backtest-actions"><Button type="submit" disabled={loading}>{loading ? "Running backtest…" : "Run backtest"}</Button><p className="muted text-xs">Signals use completed daily bars. No orders leave this machine.</p></div>
         </form>
       </Panel>
-      <div aria-live="polite"><BacktestResults state={resultState} /></div>
+      <BacktestResults state={resultState} />
     </section>
   );
 }
