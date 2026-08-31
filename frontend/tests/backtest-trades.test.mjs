@@ -42,3 +42,9 @@ test("every trade column sorts and reports direction accessibly", async () => {
   assert.equal(rows(tree)[0].props.children[3].props.children, 12);
   assert.equal(nodes(tree).find((node) => node.type === "th" && node.props.children.props.children[0] === "Quantity").props["aria-sort"], "descending");
 });
+
+test("trade history has a clear zero-fill state", async () => {
+  const tree = (await componentFor([])).render();
+  assert.ok(nodes(tree).some((node) => node.props?.children === "No trades executed."));
+  assert.equal(nodes(tree).some((node) => node.type === "table"), false);
+});
