@@ -287,6 +287,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .strategy-picker { display: grid; }
   .backtest-metrics { grid-template-columns: minmax(0, 1fr); }
   .backtest-results > .section-heading { align-items: flex-start; flex-direction: column; }
+  .backtest-chart-grid > .panel, .backtest-trades { padding-inline: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
