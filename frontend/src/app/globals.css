@@ -272,6 +272,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .backtest-actions .button { width: 100%; }
   .backtest-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trade-scroll-hint { display: block; }
+  .backtest-provenance { text-align: left; }
 }
 @media (max-width: 400px) {
   .mobile-break { display: initial; }
