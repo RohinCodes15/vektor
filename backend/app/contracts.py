@@ -456,10 +456,12 @@ class BacktestCreate(Contract):
         if not isinstance(value, list):
             return value
         symbols = [item.strip().upper() if isinstance(item, str) else item for item in value]
-        for symbol in symbols:
-            if isinstance(symbol, str) and not _TRADABLE_SYMBOL.fullmatch(symbol):
+        # Non-strings are left for the list[str] check, which rejects them; they may not even be hashable.
+        tickers = [symbol for symbol in symbols if isinstance(symbol, str)]
+        for symbol in tickers:
+            if not _TRADABLE_SYMBOL.fullmatch(symbol):
                 raise ValueError("each symbol must be a ticker of 1-15 letters, digits, '.' or '-'")
-        if len(set(symbols)) != len(symbols):
+        if len(set(tickers)) != len(tickers):
             raise ValueError("symbols must not repeat")
         return symbols
 
