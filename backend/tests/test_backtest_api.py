@@ -122,3 +122,10 @@ def test_endpoints_are_documented_under_v1(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
     assert set(paths[URL]) == {"get", "post"}
     assert set(paths[f"{URL}/{{backtest_id}}"]) == {"get"}
+
+
+@pytest.mark.parametrize("symbols", [[{"ticker": "AAPL"}], [["AAPL"]]])
+def test_non_string_symbols_are_unprocessable_not_a_server_error(client: TestClient, symbols: list[Any]) -> None:
+    res = client.post(URL, json={**BODY, "symbols": symbols})
+    assert res.status_code == 422
+    assert "valid string" in res.json()["detail"]
