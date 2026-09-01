@@ -334,7 +334,7 @@ The simulation is deterministic: the same request on the same market data gives 
 | Field | Formula | Undefined (`null`) when |
 |-------|---------|-------------------------|
 | `total_return_pct` | `Eₙ / starting cash − 1` | never |
-| `annualized_return_pct` | `(Eₙ / starting cash)^(252 / n) − 1`, n = number of daily returns; −100 if equity reaches 0 | fewer than 1 daily return |
+| `annualized_return_pct` | `(Eₙ / starting cash)^(252 / n) − 1`, n = number of daily returns; −100 if equity reaches 0 | fewer than 1 daily return, or the result exceeds 10²² % (a large gain over very few days, too big for 4 decimal places) |
 | `volatility_pct` | sample standard deviation of daily returns `Eₜ / Eₜ₋₁ − 1` × √252 | fewer than 2 daily returns |
 | `sharpe_ratio` | mean daily return / sample standard deviation × √252, risk-free rate 0 | fewer than 2 daily returns, or zero volatility (for example, nothing was bought) |
 | `max_drawdown_pct` | lowest `Eₜ / max(E₀ … Eₜ) − 1`; each `equity_curve` point has its own `drawdown_pct` | never |
