@@ -4,7 +4,8 @@ Formulas (also in backend/README.md), with E_0..E_n the equity at each close and
 - Daily return r_t = E_t / E_(t-1) - 1 (a day after zero equity has no return).
 - Total return: E_n / starting cash - 1.
 - Annualized return: (E_n / starting cash) ^ (252 / n) - 1, with n the number of daily returns. -100% when the
-  account is worth nothing.
+  account is worth nothing. Undefined above 10^22%, which a large gain over very few days can reach: such a value
+  does not fit 4 decimal places in Decimal's 28 digits.
 - Volatility: sample standard deviation of daily returns * sqrt(252); needs at least 2 returns.
 - Sharpe ratio: mean daily return / sample standard deviation * sqrt(252), risk-free rate 0; needs at least 2
   returns and is undefined when volatility is zero (for example, when nothing was ever bought).
@@ -23,6 +24,8 @@ from app.portfolio.analytics import TRADING_DAYS_PER_YEAR, mean, sample_stdev
 
 ONE = Decimal(1)
 ANNUALIZER = Decimal(TRADING_DAYS_PER_YEAR).sqrt()
+# Largest annualized growth factor reported (10^22 %); anything above it is null with a warning.
+MAX_ANNUALIZED_GROWTH = Decimal("1e20")
 
 
 @dataclass(frozen=True)
@@ -48,9 +51,16 @@ def compute_performance(
     # The running peak is at least the starting cash, which is positive.
     drawdowns = tuple(pct(e / peak - ONE) for e, peak in zip(equity, accumulate(equity, max), strict=True))
     winners = sum(1 for pnl in realized_pnl if pnl > 0)
+    periods = len(equity) - 1
+    annualized = _annualized(equity[-1] / starting_cash, periods)
     warnings: list[str] = []
-    if len(equity) < 2:
+    if periods < 1:
         warnings.append("Annualized return needs at least 1 daily return.")
+    elif annualized is None:
+        warnings.append(
+            f"Annualized return is too large to report: compounding {periods} daily "
+            f"{'return' if periods == 1 else 'returns'} over {TRADING_DAYS_PER_YEAR} trading days exceeds 10^22%."
+        )
     if stdev is None:
         warnings.append("Volatility and Sharpe ratio need at least 2 daily returns.")
     elif stdev == 0:
@@ -59,7 +69,7 @@ def compute_performance(
         warnings.append("Win rate is undefined: no trade was closed.")
     return Performance(
         total_return_pct=pct(equity[-1] / starting_cash - ONE),
-        annualized_return_pct=_annualized(equity[-1] / starting_cash, len(equity) - 1),
+        annualized_return_pct=annualized,
         volatility_pct=pct(stdev * ANNUALIZER) if stdev is not None else None,
         max_drawdown_pct=min(drawdowns),
         sharpe_ratio=rounded(mean(returns) / stdev * ANNUALIZER) if stdev else None,
@@ -76,4 +86,7 @@ def _annualized(growth: Decimal, periods: int) -> Decimal | None:
         return None
     if growth <= 0:
         return pct(-ONE)
-    return pct((growth.ln() * TRADING_DAYS_PER_YEAR / periods).exp() - ONE)
+    exponent = growth.ln() * TRADING_DAYS_PER_YEAR / periods
+    if exponent > MAX_ANNUALIZED_GROWTH.ln():
+        return None
+    return pct(exponent.exp() - ONE)
