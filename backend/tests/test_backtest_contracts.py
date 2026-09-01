@@ -48,6 +48,8 @@ def test_costs_are_canonical_in_the_json_contract() -> None:
     [
         ({"symbols": []}, "at least 1"),
         ({"symbols": ["AAPL", "aapl"]}, "must not repeat"),
+        ({"symbols": [{"ticker": "AAPL"}]}, "valid string"),
+        ({"symbols": [["AAPL"], ["AAPL"]]}, "valid string"),
         ({"symbols": ["^GSPC"]}, "ticker"),
         ({"symbols": [f"S{i}" for i in range(11)]}, "at most 10"),
         ({"start": "2024-06-28"}, "start must be before end"),
