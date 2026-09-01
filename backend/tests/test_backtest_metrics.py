@@ -59,3 +59,12 @@ def test_a_worthless_account_annualizes_to_minus_100() -> None:
     assert (result.total_return_pct, result.annualized_return_pct, result.max_drawdown_pct) == (
         D("-100.0000"), D("-100.0000"), D("-100.0000"),
     )
+
+
+def test_an_annualized_return_too_large_to_represent_is_null_with_a_warning() -> None:
+    # +30% in one day compounds to 1.3^252 - 1, about 10^28 %: more digits than Decimal holds at 4 places.
+    result = compute_performance(CASH, equity("1000", "1300"), [])
+    assert (result.total_return_pct, result.annualized_return_pct) == (D("30.0000"), None)
+    assert result.warnings[0] == (
+        "Annualized return is too large to report: compounding 1 daily return over 252 trading days exceeds 10^22%."
+    )
