@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 import yfinance as yf
@@ -16,9 +16,9 @@ START, END = date(2024, 1, 2), date(2024, 1, 5)
 class FakeTicker:
     """Stands in for yfinance.Ticker; records the history() call. No network."""
 
-    instances: list["FakeTicker"] = []
+    instances: ClassVar[list["FakeTicker"]] = []
     result: Any = None
-    metadata: Any = {"currency": "USD"}
+    metadata: ClassVar[Any] = {"currency": "USD"}
 
     def __init__(self, symbol: str) -> None:
         self.symbol = symbol
