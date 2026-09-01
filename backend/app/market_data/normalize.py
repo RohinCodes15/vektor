@@ -1,5 +1,6 @@
 """Turn a provider's daily OHLCV frame into validated PriceBar contracts. Pure: no I/O."""
 
+import math
 from datetime import date
 from numbers import Integral
 from typing import TYPE_CHECKING, Any
@@ -82,4 +83,4 @@ def _number(value: Any) -> int | float | None:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return None if number != number else number  # NaN is missing
+    return None if math.isnan(number) else number  # NaN is missing
