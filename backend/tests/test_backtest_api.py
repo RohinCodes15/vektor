@@ -129,3 +129,20 @@ def test_non_string_symbols_are_unprocessable_not_a_server_error(client: TestCli
     res = client.post(URL, json={**BODY, "symbols": symbols})
     assert res.status_code == 422
     assert "valid string" in res.json()["detail"]
+
+
+def test_a_short_backtest_with_a_huge_gain_reports_a_null_annualized_return(
+    client: TestClient, provider: FakeProvider
+) -> None:
+    provider.bars = [
+        PriceBar(date=FIRST_DAY, open=10, high=11, low=9, close=10, adjusted_close=10, volume=1000),
+        PriceBar(date=FIRST_DAY + timedelta(days=1), open=10, high=14, low=9, close=13, adjusted_close=13, volume=1000),
+    ]
+    res = client.post(URL, json=BODY)
+    assert res.status_code == 201
+    metrics = res.json()["metrics"]
+    # 99 shares bought at 10.01 + 1.00 fee, marked at 13: equity 1295.01.
+    assert (metrics["final_equity"], metrics["total_return_pct"], metrics["annualized_return_pct"]) == (
+        "1295.01", "29.5010", None,
+    )
+    assert any(w.startswith("Annualized return is too large to report") for w in res.json()["warnings"])
