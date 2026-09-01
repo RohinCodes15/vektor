@@ -68,3 +68,11 @@ def test_an_annualized_return_too_large_to_represent_is_null_with_a_warning() ->
     assert result.warnings[0] == (
         "Annualized return is too large to report: compounding 1 daily return over 252 trading days exceeds 10^22%."
     )
+
+
+def test_the_largest_representable_annualized_return_is_still_reported() -> None:
+    # +20% in one day annualizes to 1.2^252 - 1, about 9 * 10^21 %, which still fits.
+    result = compute_performance(CASH, equity("1000", "1200"), [])
+    assert result.annualized_return_pct is not None
+    assert float(result.annualized_return_pct) == pytest.approx((1.2 ** 252 - 1) * 100, rel=1e-9)
+    assert not any("Annualized" in warning for warning in result.warnings)
