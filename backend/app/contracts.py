@@ -10,6 +10,7 @@ places, prices 4, percentages 2 (see app/portfolio/accounting.py); analytics, al
 import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from itertools import pairwise
 from typing import Annotated, Literal, Self
 from uuid import UUID
 
@@ -131,7 +132,7 @@ class MarketHistoryResponse(Contract):
     @model_validator(mode="after")
     def check_bars(self) -> Self:
         dates = [bar.date for bar in self.bars]
-        if any(earlier >= later for earlier, later in zip(dates, dates[1:], strict=False)):
+        if any(earlier >= later for earlier, later in pairwise(dates)):
             raise ValueError("bars must be in ascending date order without duplicates")
         if dates and (dates[0] < self.start or dates[-1] > self.end):
             raise ValueError("bars must fall within start and end")
