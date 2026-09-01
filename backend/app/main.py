@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +28,7 @@ v1 = APIRouter(prefix="/api/v1")
 
 
 @v1.get("/health", response_model=HealthResponse, tags=["system"])
-def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
+def health(settings: Annotated[Settings, Depends(get_settings)]) -> HealthResponse:
     return HealthResponse(
         status="ok",
         app=settings.app_name,
