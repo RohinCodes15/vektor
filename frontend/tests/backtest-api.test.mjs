@@ -48,3 +48,12 @@ test("runBacktest maps API failures without exposing response bodies", async (t)
   t.mock.method(globalThis, "fetch", async () => new Response("private provider details", { status: 422 }));
   await assert.rejects(runBacktest(config), (error) => error instanceof ApiError && error.statusCode === 422 && !error.message.includes("private"));
 });
+
+test("backtests receive a simulation-sized timeout", async (t) => {
+  t.mock.method(AbortSignal, "timeout", (milliseconds) => {
+    assert.equal(milliseconds, 30000);
+    return AbortSignal.abort(new DOMException("timeout", "TimeoutError"));
+  });
+  t.mock.method(globalThis, "fetch", async (_url, { signal }) => { throw signal.reason; });
+  await assert.rejects(runBacktest(config), /backtest request timed out/);
+});
