@@ -542,7 +542,7 @@ function isBacktest(value: unknown): value is Backtest {
     || !isCalendarDate(value.first_date) || !isCalendarDate(value.last_date) || value.first_date > value.last_date || !isBacktestMetrics(value.metrics)
     || !Array.isArray(value.warnings) || !value.warnings.every((warning) => typeof warning === "string") || !Array.isArray(value.equity_curve)
     || !Array.isArray(value.trades) || !Array.isArray(value.rejected_orders) || !Array.isArray(value.open_positions)) return false;
-  if (value.equity_curve.length !== value.bars
+  if (value.equity_curve.length !== value.bars || value.metrics.trades !== value.trades.length
     || value.equity_curve[0]?.date !== value.first_date || value.equity_curve.at(-1)?.date !== value.last_date) return false;
   return value.equity_curve.every((point) => hasFields(point, ["date", "cash", "positions_value", "equity", "drawdown_pct"])
       && isCalendarDate(point.date) && isMoney(point.cash, true) && isMoney(point.positions_value, true) && isMoney(point.equity, true) && isSignedDecimal(point.drawdown_pct))
