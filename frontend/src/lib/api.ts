@@ -516,7 +516,9 @@ function isBacktestConfig(value: unknown): value is BacktestConfig {
   const strategy = value.strategy as Record<string, unknown>;
   return strategy.kind === "buy_and_hold" ? hasFields(strategy, ["kind"])
     : strategy.kind === "sma_crossover" ? hasFields(strategy, ["kind", "fast_window", "slow_window"])
-      && Number.isInteger(strategy.fast_window) && Number.isInteger(strategy.slow_window)
+      && Number.isInteger(strategy.fast_window) && (strategy.fast_window as number) >= 2 && (strategy.fast_window as number) <= 250
+      && Number.isInteger(strategy.slow_window) && (strategy.slow_window as number) >= 3 && (strategy.slow_window as number) <= 500
+      && (strategy.fast_window as number) < (strategy.slow_window as number)
     : strategy.kind === "rsi" && hasFields(strategy, ["kind", "period", "oversold", "overbought"])
       && Number.isInteger(strategy.period) && isBoundedDecimal(strategy.oversold, Number.MIN_VALUE, 99.99)
       && isBoundedDecimal(strategy.overbought, Number.MIN_VALUE, 99.99);
