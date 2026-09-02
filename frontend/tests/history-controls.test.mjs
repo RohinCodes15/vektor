@@ -26,6 +26,7 @@ test("history hook loads, ignores late responses, handles errors/empty data, and
     const attempt = hook.load(query); await Promise.resolve();
     requests.at(-1).reject(new ApiError("Unavailable", status)); await attempt;
     assert.equal(app.render().state.statusCode, status);
+    assert.deepEqual(app.render().state.query, query);
   }
   const retry = hook.load(query); await Promise.resolve();
   requests.at(-1).resolve({ symbol: "AAPL", bars: [] }); await retry;

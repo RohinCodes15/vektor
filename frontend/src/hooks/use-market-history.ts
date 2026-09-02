@@ -7,7 +7,7 @@ export type MarketHistoryState =
   | { status: "idle" }
   | { status: "loading"; query: MarketHistoryQuery }
   | { status: "success"; data: MarketHistoryResponse }
-  | { status: "error"; message: string; statusCode?: number };
+  | { status: "error"; query: MarketHistoryQuery; message: string; statusCode?: number };
 
 export function useMarketHistory(): { state: MarketHistoryState; load: (query: MarketHistoryQuery) => Promise<void> } {
   const [state, setState] = useState<MarketHistoryState>({ status: "idle" });
@@ -26,7 +26,7 @@ export function useMarketHistory(): { state: MarketHistoryState; load: (query: M
       const data = await getMarketHistory(query, controller.signal);
       if (!controller.signal.aborted) setState({ status: "success", data });
     } catch (error) {
-      if (!controller.signal.aborted) setState({ status: "error", message: error instanceof Error ? error.message : "Market history request failed. Try again.", statusCode: error instanceof ApiError ? error.statusCode : undefined });
+      if (!controller.signal.aborted) setState({ status: "error", query, message: error instanceof Error ? error.message : "Market history request failed. Try again.", statusCode: error instanceof ApiError ? error.statusCode : undefined });
     }
   }, []);
 
