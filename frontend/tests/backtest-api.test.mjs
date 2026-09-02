@@ -11,7 +11,10 @@ const result = {
   created_at: "2024-02-02T12:00:00Z", source: "yahoo_finance", bars: 2, first_date: "2024-01-02", last_date: "2024-01-03",
   metrics: { final_equity: "10000.00", total_return_pct: "0", annualized_return_pct: null, volatility_pct: null, max_drawdown_pct: "0", sharpe_ratio: null, win_rate_pct: null, trades: 0, closed_trades: 0, winning_trades: 0, total_fees: "0.00" },
   warnings: ["Annualized return is unavailable."],
-  equity_curve: [{ date: "2024-01-02", cash: "10000.00", positions_value: "0.00", equity: "10000.00", drawdown_pct: "0" }],
+  equity_curve: [
+    { date: "2024-01-02", cash: "10000.00", positions_value: "0.00", equity: "10000.00", drawdown_pct: "0" },
+    { date: "2024-01-03", cash: "10000.00", positions_value: "0.00", equity: "10000.00", drawdown_pct: "0" },
+  ],
   trades: [], rejected_orders: [], open_positions: [],
 };
 
