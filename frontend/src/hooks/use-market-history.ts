@@ -5,7 +5,7 @@ import { ApiError, getMarketHistory, type MarketHistoryQuery, type MarketHistory
 
 export type MarketHistoryState =
   | { status: "idle" }
-  | { status: "loading" }
+  | { status: "loading"; query: MarketHistoryQuery }
   | { status: "success"; data: MarketHistoryResponse }
   | { status: "error"; message: string; statusCode?: number };
 
@@ -18,7 +18,7 @@ export function useMarketHistory(): { state: MarketHistoryState; load: (query: M
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
-    setState({ status: "loading" });
+    setState({ status: "loading", query });
     try {
       // Let Strict Mode cleanup and same-turn symbol changes cancel before fetching.
       await Promise.resolve();

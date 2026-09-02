@@ -15,7 +15,7 @@ test("history hook loads, ignores late responses, handles errors/empty data, and
   let hook = app.render(); app.flush();
   assert.equal(hook.state.status, "idle");
   const first = hook.load(query); await Promise.resolve();
-  assert.equal(app.render().state.status, "loading");
+  assert.deepEqual(app.render().state, { status: "loading", query });
   const second = hook.load({ ...query, symbol: "MSFT" }); await Promise.resolve();
   assert.equal(requests[0].signal.aborted, true);
   requests[1].resolve({ symbol: "MSFT", bars: [] }); await second;
