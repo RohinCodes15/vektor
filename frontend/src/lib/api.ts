@@ -529,6 +529,7 @@ function isBacktestMetrics(value: unknown): value is BacktestMetrics {
   if (!hasFields(value, ["final_equity", "total_return_pct", "annualized_return_pct", "volatility_pct", "max_drawdown_pct", "sharpe_ratio", "win_rate_pct", "trades", "closed_trades", "winning_trades", "total_fees"])) return false;
   const nullable = [value.annualized_return_pct, value.volatility_pct, value.sharpe_ratio, value.win_rate_pct];
   return isMoney(value.final_equity, true) && isSignedDecimal(value.total_return_pct) && isSignedDecimal(value.max_drawdown_pct)
+    && Number(value.max_drawdown_pct) <= 0
     && nullable.every((item) => item === null || isSignedDecimal(item)) && [value.trades, value.closed_trades, value.winning_trades].every((item) => Number.isSafeInteger(item) && (item as number) >= 0)
     && (value.closed_trades as number) <= (value.trades as number) && (value.winning_trades as number) <= (value.closed_trades as number) && isMoney(value.total_fees, true);
 }
