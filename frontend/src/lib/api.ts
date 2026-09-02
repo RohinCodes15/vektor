@@ -521,7 +521,8 @@ function isBacktestConfig(value: unknown): value is BacktestConfig {
       && (strategy.fast_window as number) < (strategy.slow_window as number)
     : strategy.kind === "rsi" && hasFields(strategy, ["kind", "period", "oversold", "overbought"])
       && Number.isInteger(strategy.period) && (strategy.period as number) >= 2 && (strategy.period as number) <= 100
-      && isBoundedDecimal(strategy.oversold, Number.MIN_VALUE, 99.99) && isBoundedDecimal(strategy.overbought, Number.MIN_VALUE, 99.99);
+      && isBoundedDecimal(strategy.oversold, Number.MIN_VALUE, 99.99) && isBoundedDecimal(strategy.overbought, Number.MIN_VALUE, 99.99)
+      && Number(strategy.oversold) < Number(strategy.overbought);
 }
 
 function isBacktestMetrics(value: unknown): value is BacktestMetrics {
