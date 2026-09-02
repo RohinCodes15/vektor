@@ -30,7 +30,10 @@ test("runBacktest validates, normalizes, and posts exact decimal strings", async
 test("runBacktest accepts unavailable metrics and rejects incompatible results", async (t) => {
   const request = t.mock.method(globalThis, "fetch", async () => Response.json(result));
   assert.equal((await runBacktest(config)).metrics.sharpe_ratio, null);
-  for (const bad of [{ mode: "live" }, { secret: "leaked" }, { metrics: { ...result.metrics, final_equity: null } }]) {
+  for (const bad of [
+    { mode: "live" }, { secret: "leaked" }, { metrics: { ...result.metrics, final_equity: null } },
+    { config: { ...config, starting_cash: "0.00" } },
+  ]) {
     request.mock.mockImplementation(async () => Response.json({ ...result, ...bad }));
     await assert.rejects(runBacktest(config), /incompatible backtest result/);
   }
