@@ -549,7 +549,7 @@ function isBacktest(value: unknown): value is Backtest {
     const valid = hasFields(point, ["date", "cash", "positions_value", "equity", "drawdown_pct"])
       && isCalendarDate(point.date) && point.date > previousDate && isMoney(point.cash, true)
       && isMoney(point.positions_value, true) && isMoney(point.equity, true)
-      && isSignedDecimal(point.drawdown_pct);
+      && isSignedDecimal(point.drawdown_pct) && Number(point.drawdown_pct) <= 0;
     if (valid) previousDate = point.date as string;
     return valid;
   })
