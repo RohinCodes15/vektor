@@ -72,11 +72,15 @@ test("range controls deduplicate requests, preserve range across symbols, and hi
   assert.equal(nodes(tree).filter((node) => node.type === "chart").length, 0);
   app.flush();
   assert.deepEqual(requests.at(-1), { ...requests[1], symbol: "MSFT" });
-  for (const next of [{ status: "loading" }, { status: "error", statusCode: 404 }, { status: "success", data: { ...requests.at(-1), bars: [] } }, { status: "error", statusCode: 503, message: "Provider unavailable" }]) {
+  const currentQuery = requests.at(-1);
+  for (const next of [{ status: "loading", query: currentQuery }, { status: "error", query: currentQuery, statusCode: 404 }, { status: "success", data: { ...currentQuery, bars: [] } }, { status: "error", query: currentQuery, statusCode: 503, message: "Provider unavailable" }]) {
     state = next; tree = app.render({ symbol: "MSFT" });
     assert.equal(nodes(tree).filter((node) => node.type === "chart").length, 0);
     assert.equal(nodes(tree).some((node) => node.props?.role === "alert"), next.statusCode === 503);
   }
+  state = { status: "error", query: requests[1], statusCode: 503, message: "Old AAPL failure" };
+  tree = app.render({ symbol: "MSFT" });
+  assert.equal(nodes(tree).some((node) => node.props?.role === "alert"), false);
 });
 
 

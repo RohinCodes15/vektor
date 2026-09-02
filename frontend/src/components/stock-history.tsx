@@ -13,8 +13,10 @@ export function StockHistory({ symbol }: { symbol: string }) {
   const [end, setEnd] = useState(() => historyRange("1Y").end);
   const [dates, setDates] = useState(() => historyRange("1Y"));
   useEffect(() => { void load({ symbol, ...dates }); }, [symbol, dates, load]);
-  const state = result.status === "success" && (result.data.symbol !== symbol || result.data.start !== dates.start || result.data.end !== dates.end)
-    ? { status: "loading" as const } : result;
+  const current = result.status === "idle" || (result.status === "success"
+    ? result.data.symbol === symbol && result.data.start === dates.start && result.data.end === dates.end
+    : result.query.symbol === symbol && result.query.start === dates.start && result.query.end === dates.end);
+  const state = current ? result : { status: "loading" as const, query: { symbol, ...dates } };
 
   const noData = (state.status === "success" && state.data.bars.length === 0) || (state.status === "error" && state.statusCode === 404);
 
