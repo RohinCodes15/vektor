@@ -544,8 +544,15 @@ function isBacktest(value: unknown): value is Backtest {
     || !Array.isArray(value.trades) || !Array.isArray(value.rejected_orders) || !Array.isArray(value.open_positions)) return false;
   if (value.equity_curve.length !== value.bars || value.metrics.trades !== value.trades.length
     || value.equity_curve[0]?.date !== value.first_date || value.equity_curve.at(-1)?.date !== value.last_date) return false;
-  return value.equity_curve.every((point) => hasFields(point, ["date", "cash", "positions_value", "equity", "drawdown_pct"])
-      && isCalendarDate(point.date) && isMoney(point.cash, true) && isMoney(point.positions_value, true) && isMoney(point.equity, true) && isSignedDecimal(point.drawdown_pct))
+  let previousDate = "";
+  return value.equity_curve.every((point) => {
+    const valid = hasFields(point, ["date", "cash", "positions_value", "equity", "drawdown_pct"])
+      && isCalendarDate(point.date) && point.date > previousDate && isMoney(point.cash, true)
+      && isMoney(point.positions_value, true) && isMoney(point.equity, true)
+      && isSignedDecimal(point.drawdown_pct);
+    if (valid) previousDate = point.date as string;
+    return valid;
+  })
     && value.trades.every((trade) => hasFields(trade, ["symbol", "side", "signal_date", "fill_date", "quantity", "price", "notional", "fee", "realized_pnl"])
       && isTicker(trade.symbol) && (trade.side === "buy" || trade.side === "sell") && isCalendarDate(trade.signal_date) && isCalendarDate(trade.fill_date)
       && Number.isSafeInteger(trade.quantity) && (trade.quantity as number) > 0 && isDecimal(trade.price, true) && isMoney(trade.notional, true) && isMoney(trade.fee, true)
