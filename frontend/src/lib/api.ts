@@ -509,7 +509,8 @@ function isBacktestConfig(value: unknown): value is BacktestConfig {
   if (!hasFields(value, ["symbols", "start", "end", "starting_cash", "strategy", "position_size_pct", "fee_per_trade", "fee_bps", "slippage_bps"])
     || !Array.isArray(value.symbols) || value.symbols.length < 1 || value.symbols.length > 10 || !value.symbols.every(isTicker)
     || new Set(value.symbols).size !== value.symbols.length || !isCalendarDate(value.start) || !isCalendarDate(value.end)
-    || value.start >= value.end || value.end >= today || !isMoney(value.starting_cash, true) || !isBoundedDecimal(value.position_size_pct, Number.MIN_VALUE, 100)
+    || value.start >= value.end || value.end >= today || !isBoundedDecimal(value.starting_cash, Number.MIN_VALUE, 999999999999.99)
+    || !isBoundedDecimal(value.position_size_pct, Number.MIN_VALUE, 100)
     || !isMoney(value.fee_per_trade, true) || !isBoundedDecimal(value.fee_bps, 0, 1000) || !isBoundedDecimal(value.slippage_bps, 0, 1000)
     || typeof value.strategy !== "object" || value.strategy === null || Array.isArray(value.strategy)) return false;
   const strategy = value.strategy as Record<string, unknown>;
