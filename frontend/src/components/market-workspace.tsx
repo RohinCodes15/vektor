@@ -23,7 +23,7 @@ export function MarketWorkspace() {
 
   return (
     <section id="market" aria-labelledby="market-title">
-      <div className="section-heading"><div><span className="eyebrow">02 / EXPLORE</span><h2 id="market-title">Market workspace</h2></div><Badge>Historical data · Not live</Badge></div>
+      <div className="section-heading"><div><span className="eyebrow">03 / EXPLORE</span><h2 id="market-title">Market workspace</h2></div><Badge>Historical data · Not live</Badge></div>
       <div className="market-grid">
         <Panel className="watchlist" aria-labelledby="watchlist-title">
           <div className="panel-heading"><h3 id="watchlist-title">Reference symbols</h3><span className="mono muted text-xs">04</span></div>

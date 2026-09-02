@@ -33,6 +33,7 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     assert.match(html, /Buy &amp; Hold/);
     assert.match(html, /SMA Crossover/);
     assert.ok(html.indexOf('href="#activity"') < html.indexOf('href="#backtest"'));
+    assert.match(html, /03 \/ EXPLORE/);
     assert.match(html, /<label for="symbol-search">Find a symbol<\/label>/);
     assert.match(html, /aria-describedby="symbol-search-hint"/);
     assert.match(html, /id="symbol-search-hint"/);
