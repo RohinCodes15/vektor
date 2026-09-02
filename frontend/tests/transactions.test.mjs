@@ -38,11 +38,12 @@ function browser(t) {
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
   const listeners = new EventTarget();
+  const documentListeners = new EventTarget();
   let tick;
-  globalThis.document = { visibilityState: "visible" };
+  globalThis.document = { visibilityState: "visible", addEventListener: documentListeners.addEventListener.bind(documentListeners), removeEventListener: documentListeners.removeEventListener.bind(documentListeners) };
   globalThis.window = { setInterval: (callback, delay) => { assert.equal(delay, 15000); tick = callback; return 1; }, clearInterval() {}, addEventListener: listeners.addEventListener.bind(listeners), removeEventListener: listeners.removeEventListener.bind(listeners) };
   t.after(() => { if (priorWindow) globalThis.window = priorWindow; else delete globalThis.window; if (priorDocument) globalThis.document = priorDocument; else delete globalThis.document; });
-  return { tick: () => tick(), focus: () => listeners.dispatchEvent(new Event("focus")) };
+  return { tick: () => tick(), focus: () => listeners.dispatchEvent(new Event("focus")), visible: () => documentListeners.dispatchEvent(new Event("visibilitychange")) };
 }
 
 async function history(getPortfolioTransactions, onTrades = () => {}) {
