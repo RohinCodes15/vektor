@@ -86,9 +86,10 @@ test("new trades refresh balances after polling, focus and manual refresh; hidde
   const before = calls; view.tick(); await settle(); assert.equal(calls, before);
   globalThis.document.visibilityState = "visible";
   result = [...result, { ...trade, id: "new-trade" }];
+  view.visible(); await settle(); assert.equal(updates, 2);
   const tree = app.render(); nodes(tree).find((node) => node.type === "button").props.onClick();
   app.render(); app.flush(); await settle(); assert.equal(updates, 2);
-  app.unmount(); view.focus(); await settle(); assert.equal(updates, 2);
+  app.unmount(); view.focus(); view.visible(); await settle(); assert.equal(updates, 2);
 });
 
 test("history aborts on portfolio switch and ignores late results", async (t) => {

@@ -39,7 +39,8 @@ export function TransactionHistory({ id, onTrades }: { id: string; onTrades: () 
     void Promise.resolve().then(() => load());
     const timer = window.setInterval(refreshVisible, 15000);
     window.addEventListener("focus", refreshVisible);
-    return () => { stopped = true; controller?.abort(); window.clearInterval(timer); window.removeEventListener("focus", refreshVisible); };
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => { stopped = true; controller?.abort(); window.clearInterval(timer); window.removeEventListener("focus", refreshVisible); document.removeEventListener("visibilitychange", refreshVisible); };
   }, [id, onTrades, revision]);
 
   return (
