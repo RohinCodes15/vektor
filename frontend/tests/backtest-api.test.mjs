@@ -33,6 +33,7 @@ test("runBacktest accepts unavailable metrics and rejects incompatible results",
   for (const bad of [
     { mode: "live" }, { secret: "leaked" }, { metrics: { ...result.metrics, final_equity: null } },
     { config: { ...config, starting_cash: "0.00" } },
+    { config: { ...config, strategy: { kind: "sma_crossover", fast_window: 50, slow_window: 20 } } },
   ]) {
     request.mock.mockImplementation(async () => Response.json({ ...result, ...bad }));
     await assert.rejects(runBacktest(config), /incompatible backtest result/);
