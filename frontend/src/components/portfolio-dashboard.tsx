@@ -35,7 +35,7 @@ export function PortfolioDashboard() {
       <div className="section-heading"><div><span className="eyebrow">01 / YOUR CAPITAL, SIMULATED</span><h2>Portfolio overview</h2></div><Badge>Virtual USD · Paper only</Badge></div>
       {list.status === "loading" && <Panel className="chart-state"><p role="status">Loading paper portfolios…</p></Panel>}
       {list.status === "error" && <Panel className="chart-state"><h3>Portfolios unavailable</h3><p role="alert">{list.message}</p><Button variant="secondary" onClick={refresh}>Retry portfolios</Button></Panel>}
-      {list.status === "success" && !portfolio && <Panel className="chart-state"><h3>No paper portfolios yet.</h3><p>Create a portfolio through the local portfolio API to see its virtual cash and holdings here.</p><Button variant="secondary" onClick={refresh}>Refresh portfolios</Button></Panel>}
+      {list.status === "success" && !portfolio && <Panel className="chart-state"><h3 role="status">No paper portfolios yet.</h3><p>Create a portfolio through the local portfolio API to see its virtual cash and holdings here.</p><Button variant="secondary" onClick={refresh}>Refresh portfolios</Button></Panel>}
       {portfolio && <>
         <div className="portfolio-controls"><div className="field"><label htmlFor="portfolio-select">Paper portfolio</label><select id="portfolio-select" value={portfolio.id} onChange={(event) => setSelected(event.target.value)}>{list.status === "success" && list.data.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><Button variant="secondary" onClick={refresh}>Refresh portfolios</Button></div>
         <PortfolioDetails key={`${portfolio.id}:${revision}`} id={portfolio.id} />
