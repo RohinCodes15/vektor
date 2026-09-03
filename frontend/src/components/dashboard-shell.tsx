@@ -36,7 +36,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         if (event.key === "Escape" && mobileOpen) closeMobileNavigation();
       }}>
         <div className="sidebar-header">
-          <a className="brand" href="#overview" aria-label="Vektor home">
+          <a className="brand" href="#overview" aria-label="Vektor home" onClick={() => { if (mobileOpen) closeMobileNavigation(); }}>
             <span className="brand-mark" aria-hidden="true">∨</span><span className="brand-name">vektor<span className="brand-period">.</span></span>
           </a>
           <button ref={mobileToggle} className="icon-button mobile-toggle" type="button" aria-label={mobileOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileOpen} aria-controls="sidebar-navigation" onClick={() => setMobileOpen(!mobileOpen)}>
