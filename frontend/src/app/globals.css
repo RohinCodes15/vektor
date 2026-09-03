@@ -325,7 +325,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .history-status { font-size: 11px; color: var(--color-muted); margin-top: 16px; }
 .history-status:empty { display: none; }
 .history-loaded-range { font-family: var(--font-mono); font-size: 10px; margin-top: 12px; }
-.chart-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; text-align: center; gap: 12px; padding: 24px 8px; }
+.chart-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; text-align: center; gap: 12px; padding: 24px 8px; overflow-wrap: anywhere; }
 .chart-state p, .chart-state > span:last-child { font-size: 12px; color: var(--color-muted); line-height: 1.8; max-width: 48ch; }
 .chart-state .empty-icon { margin-bottom: 0; }
 .chart-state .button { margin-top: 8px; }
