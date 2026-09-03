@@ -379,6 +379,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .holdings-panel .panel-heading { flex-wrap: wrap; gap: 12px; }
 .holdings-panel time { overflow-wrap: anywhere; }
 .holdings-scroll { overflow-x: auto; margin-top: 20px; }
+.holdings-scroll:focus-visible { outline-offset: -2px; }
 .holdings-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 .holdings-table caption { text-align: left; padding-bottom: 12px; }
 .holdings-table th, .holdings-table td { padding: 14px 12px; border-bottom: 1px solid var(--color-line); white-space: nowrap; }
