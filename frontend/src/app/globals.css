@@ -85,6 +85,7 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .backtest-trade-table th { border-block: 1px solid var(--color-line); text-align: left; }
 .backtest-trade-table th button { width: 100%; min-height: 44px; padding: 10px 14px; border: 0; color: var(--color-muted); background: var(--color-canvas); text-align: left; white-space: nowrap; }
 .backtest-trade-table th button:hover { color: var(--color-teal); }
+.backtest-trade-table th button:focus-visible { outline-offset: -3px; }
 .backtest-trade-table td { padding: 13px 14px; border-bottom: 1px solid var(--color-line); white-space: nowrap; }
 .backtest-trade-table tbody tr:last-child td { border-bottom: 0; }
 .backtest-trade-table tbody tr:hover { background: #ffffff03; }
