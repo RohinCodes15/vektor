@@ -47,7 +47,7 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .panel-heading p { margin-top: 4px; }
 .field { display: grid; gap: 8px; min-width: 0; }
 .field label { font-size: 12px; }
-.field input { min-height: 42px; width: 100%; background: var(--color-canvas); border: 1px solid var(--color-control); border-radius: 5px; padding: 10px 12px; color: var(--color-ink); font-size: 12px; }
+.field input { min-height: 44px; width: 100%; background: var(--color-canvas); border: 1px solid var(--color-control); border-radius: 5px; padding: 10px 12px; color: var(--color-ink); font-size: 12px; }
 .field input::placeholder { color: var(--color-muted); }
 .backtest-panel { padding: 28px; }
 .backtest-form { display: grid; gap: 24px; }
