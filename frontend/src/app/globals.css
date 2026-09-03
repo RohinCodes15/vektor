@@ -147,7 +147,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .data-notice p { flex: 1; }
 .data-notice strong { font-weight: 550; margin-right: 10px; }
 .data-notice p > span { color: var(--color-muted); }
-.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
 .section-heading h2 { margin-top: 6px; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; margin-bottom: 20px; }
 .metric-card { padding: 20px 24px; }
