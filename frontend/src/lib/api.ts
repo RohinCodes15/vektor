@@ -31,7 +31,7 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(path: string, name: "health" | "market history" | "portfolio" | "backtest", signal?: AbortSignal, params?: URLSearchParams, body?: unknown): Promise<unknown> {
+async function requestJson(path: string, name: "health" | "market history" | "portfolio" | "backtest" | "backtest analysis", signal?: AbortSignal, params?: URLSearchParams, body?: unknown): Promise<unknown> {
   const operation = name === "health" ? "health check" : `${name} request`;
   let url: URL;
   try {
