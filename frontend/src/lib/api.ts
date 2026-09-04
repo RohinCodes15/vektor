@@ -60,6 +60,15 @@ async function requestJson(path: string, name: "health" | "market history" | "po
     throw new Error("Backend could not be reached. Check that it is running and allows this frontend origin.");
   }
   if (!response.ok) {
+    if (name === "backtest analysis") {
+      const messages: Record<number, string> = {
+        404: "This backtest no longer exists.",
+        422: "Choose a valid backtest to analyze.",
+        502: "The AI provider returned an invalid analysis. No interpretation was accepted.",
+        503: "The AI provider is unavailable. Try again later.",
+      };
+      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
+    }
     if (name === "backtest") {
       const messages: Record<number, string> = {
         404: "This backtest no longer exists.",
