@@ -66,3 +66,10 @@ test("analysis validates ids before fetching and maps HTTP errors without exposi
       && message.test(error.message) && !error.message.includes("private"));
   }
 });
+
+test("analysis handles network errors and invalid JSON", async (t) => {
+  const request = t.mock.method(globalThis, "fetch", async () => { throw new Error("private"); });
+  await assert.rejects(getBacktestAnalysis(id), /could not be reached/);
+  request.mock.mockImplementation(async () => new Response("not JSON"));
+  await assert.rejects(getBacktestAnalysis(id), /invalid backtest analysis response/);
+});
