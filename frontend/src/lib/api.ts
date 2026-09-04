@@ -578,3 +578,17 @@ export async function runBacktest(config: BacktestCreate, signal?: AbortSignal):
   if (!isBacktest(data)) throw new Error("Backend returned an incompatible backtest result. No simulation data was accepted.");
   return data;
 }
+
+export type AnalysisFact = Readonly<{ id: string; label: string; value: string }>;
+export type AnalysisInsight = Readonly<{ text: string; evidence: readonly string[] }>;
+export type AnalysisInterpretation = Readonly<{
+  summary: string; strategy_behavior: readonly AnalysisInsight[]; strengths: readonly AnalysisInsight[];
+  weaknesses: readonly AnalysisInsight[]; risk_factors: readonly AnalysisInsight[]; limitations: readonly AnalysisInsight[];
+}>;
+export type BacktestAnalysis = Readonly<{
+  backtest_id: string; mode: "paper"; generated_at: string; facts: readonly AnalysisFact[]; disclaimer: string;
+}> & Readonly<
+  | { status: "available"; unavailable_reason: null; provider: "anthropic"; model: string; interpretation: AnalysisInterpretation }
+  | { status: "unavailable"; unavailable_reason: string; provider: null; model: null; interpretation: null }
+>;
+
