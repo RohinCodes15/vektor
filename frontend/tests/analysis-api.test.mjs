@@ -55,3 +55,14 @@ test("analysis rejects incompatible fields, state combinations, and unmeasured e
     await assert.rejects(getBacktestAnalysis(id), /incompatible backtest analysis/);
   }
 });
+
+test("analysis validates ids before fetching and maps HTTP errors without exposing bodies", async (t) => {
+  const request = t.mock.method(globalThis, "fetch");
+  await assert.rejects(getBacktestAnalysis("../other"), /valid backtest/);
+  assert.equal(request.mock.callCount(), 0);
+  for (const [status, message] of [[404, /no longer exists/], [422, /valid backtest/], [502, /invalid analysis/], [503, /AI provider is unavailable/], [500, /HTTP 500/]]) {
+    request.mock.mockImplementation(async () => new Response("private provider details", { status }));
+    await assert.rejects(getBacktestAnalysis(id), (error) => error instanceof ApiError && error.statusCode === status
+      && message.test(error.message) && !error.message.includes("private"));
+  }
+});
