@@ -73,3 +73,15 @@ test("analysis handles network errors and invalid JSON", async (t) => {
   request.mock.mockImplementation(async () => new Response("not JSON"));
   await assert.rejects(getBacktestAnalysis(id), /invalid backtest analysis response/);
 });
+
+test("analysis allows time for provider retries and preserves caller cancellation", async (t) => {
+  t.mock.method(AbortSignal, "timeout", (milliseconds) => {
+    assert.equal(milliseconds, 300000);
+    return AbortSignal.abort(new DOMException("timeout", "TimeoutError"));
+  });
+  t.mock.method(globalThis, "fetch", async (_url, { signal }) => { throw signal.reason; });
+  await assert.rejects(getBacktestAnalysis(id), /backtest analysis request timed out/);
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(getBacktestAnalysis(id, controller.signal), (error) => error === controller.signal.reason);
+});
