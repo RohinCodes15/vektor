@@ -592,3 +592,37 @@ export type BacktestAnalysis = Readonly<{
   | { status: "unavailable"; unavailable_reason: string; provider: null; model: null; interpretation: null }
 >;
 
+function isAnalysisInterpretation(value: unknown, factIds: ReadonlySet<string>): value is AnalysisInterpretation {
+  if (!hasFields(value, ["summary", "strategy_behavior", "strengths", "weaknesses", "risk_factors", "limitations"])
+    || typeof value.summary !== "string" || value.summary.length < 1 || value.summary.length > 800) return false;
+  return ["strategy_behavior", "strengths", "weaknesses", "risk_factors", "limitations"].every((key) => {
+    const insights = value[key];
+    return Array.isArray(insights) && insights.length <= 5
+      && (!(key === "strategy_behavior" || key === "limitations") || insights.length >= 1)
+      && insights.every((insight) => hasFields(insight, ["text", "evidence"])
+        && typeof insight.text === "string" && insight.text.length >= 1 && insight.text.length <= 600
+        && Array.isArray(insight.evidence) && insight.evidence.length >= 1 && insight.evidence.length <= 6
+        && insight.evidence.every((id) => typeof id === "string" && factIds.has(id)));
+  });
+}
+
+function isBacktestAnalysis(value: unknown, id: string): value is BacktestAnalysis {
+  if (!hasFields(value, ["backtest_id", "mode", "status", "unavailable_reason", "generated_at", "provider", "model", "facts", "interpretation", "disclaimer"])
+    || typeof value.backtest_id !== "string" || value.backtest_id.toLowerCase() !== id.toLowerCase() || value.mode !== "paper"
+    || !isAwareTimestamp(value.generated_at) || typeof value.disclaimer !== "string" || !value.disclaimer.trim()
+    || !Array.isArray(value.facts) || !value.facts.every((fact) => hasFields(fact, ["id", "label", "value"])
+      && typeof fact.id === "string" && typeof fact.label === "string" && typeof fact.value === "string")) return false;
+  const factIds = new Set<string>(value.facts.map((fact) => fact.id));
+  if (factIds.size !== value.facts.length) return false;
+  if (value.status === "unavailable") return typeof value.unavailable_reason === "string" && !!value.unavailable_reason.trim()
+    && value.provider === null && value.model === null && value.interpretation === null;
+  return value.status === "available" && value.unavailable_reason === null && value.provider === "anthropic"
+    && typeof value.model === "string" && !!value.model.trim() && isAnalysisInterpretation(value.interpretation, factIds);
+}
+
+export async function getBacktestAnalysis(id: string, signal?: AbortSignal): Promise<BacktestAnalysis> {
+  if (!isUuid(id)) throw new Error("Choose a valid backtest to analyze.");
+  const data = await requestJson(`/api/v1/backtests/${id}/analysis`, "backtest analysis", signal);
+  if (!isBacktestAnalysis(data, id)) throw new Error("Backend returned an incompatible backtest analysis. No analysis was accepted.");
+  return data;
+}
