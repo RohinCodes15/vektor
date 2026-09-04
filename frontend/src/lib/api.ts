@@ -47,7 +47,7 @@ async function requestJson(path: string, name: "health" | "market history" | "po
   let response: Response;
   try {
     response = await fetch(url, {
-      method: body === undefined ? "GET" : "POST",
+      method: name === "backtest analysis" || body !== undefined ? "POST" : "GET",
       cache: "no-store",
       credentials: "omit",
       redirect: "error",
