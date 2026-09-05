@@ -76,6 +76,8 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .chart-zero-line { stroke: var(--color-control); stroke-width: 1; }
 .backtest-provenance { text-align: right; }
 .backtest-trades { margin-top: 20px; }
+.backtest-insights { margin-top: 20px; overflow-wrap: anywhere; }
+.backtest-insights > * + * { margin-top: 20px; }
 .backtest-trades .panel-heading { flex-wrap: wrap; }
 .trade-scroll-hint { display: none; margin-top: 16px; font-size: 10px; }
 .trade-table-scroll { margin-top: 20px; overflow-x: auto; border: 1px solid var(--color-line); border-radius: 5px; }
