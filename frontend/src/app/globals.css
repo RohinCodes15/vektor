@@ -86,6 +86,9 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .insights-grid li + li { margin-top: 16px; }
 .insights-grid li .muted { margin-top: 6px; }
 .backtest-insights summary { cursor: pointer; }
+.insights-facts { margin-top: 12px; font-size: 12px; }
+.insights-facts > div { padding-block: 8px; border-bottom: 1px solid var(--color-line); }
+.insights-facts dd { margin: 4px 0 0; color: var(--color-muted); white-space: pre-wrap; }
 .backtest-trades .panel-heading { flex-wrap: wrap; }
 .trade-scroll-hint { display: none; margin-top: 16px; font-size: 10px; }
 .trade-table-scroll { margin-top: 20px; overflow-x: auto; border: 1px solid var(--color-line); border-radius: 5px; }
