@@ -58,3 +58,46 @@ test("unavailable and error states offer retry without fabricated interpretation
     assert.equal(nodes(tree).find((node) => node.type === ui.Button).props.children, "Try again");
   }
 });
+
+test("analysis hook handles loading, unavailable, errors, superseded results, and unmount cancellation", async () => {
+  const pending = [];
+  const component = await mount("../src/hooks/use-backtest-analysis.ts", {
+    "../lib/api": { ApiError, getBacktestAnalysis: (id, signal) => new Promise((resolve, reject) => pending.push({ id, signal, resolve, reject })) },
+  }, "useBacktestAnalysis");
+  assert.equal(component.render().state.status, "idle");
+  component.flush();
+  const first = component.render().load(id);
+  assert.equal(component.render().state.status, "loading");
+  await Promise.resolve();
+  pending[0].resolve(data);
+  await first;
+  assert.equal(component.render().state.status, "success");
+  const second = component.render().load(id);
+  assert.equal(component.render().state.data, undefined);
+  await Promise.resolve();
+  pending[1].resolve({ ...data, status: "unavailable", interpretation: null });
+  await second;
+  assert.equal(component.render().state.status, "unavailable");
+  const third = component.render().load(id);
+  await Promise.resolve();
+  pending[2].reject(new ApiError("Provider unavailable.", 503));
+  await third;
+  assert.equal(component.render().state.statusCode, 503);
+  const stale = component.render().load(id);
+  await Promise.resolve();
+  const current = component.render().load("another-id");
+  await Promise.resolve();
+  assert.equal(pending[3].signal.aborted, true);
+  pending[4].resolve(data);
+  await current;
+  pending[3].reject(new Error("Stale error"));
+  await stale;
+  assert.equal(component.render().state.status, "success");
+  const last = component.render().load(id);
+  await Promise.resolve();
+  component.unmount();
+  assert.equal(pending[5].signal.aborted, true);
+  pending[5].resolve(data);
+  await last;
+  assert.equal(component.render().state.status, "loading");
+});
