@@ -37,3 +37,12 @@ test("insights are requested explicitly; loading disables repeat requests", asyn
   assert.equal(nodes(loading).find((node) => node.type === ui.Button).props.disabled, true);
   assert.doesNotMatch(text(loading), /Response-specific summary/);
 });
+
+test("insights render actual response text, evidence, empty categories, and disclaimer safely", async () => {
+  const tree = await panel({ status: "success", data });
+  const content = text(tree);
+  for (const expected of [data.interpretation.summary, insight.text, "Response-specific strength.", "Response-specific risk.", "Response-specific limitation.", "Trades: 7", data.disclaimer, "None returned by the provider."]) assert.ok(content.includes(expected), expected);
+  assert.deepEqual(nodes(tree).filter((node) => node.type === "h4").map(text), ["Strategy summary", "Strategy behavior", "Strengths", "Weaknesses", "Risks", "Limitations"]);
+  assert.ok(!nodes(tree).some((node) => node.type === "script" || node.props?.dangerouslySetInnerHTML));
+  assert.equal(nodes(tree).find((node) => node.type === ui.Button).props.children, "Regenerate AI insights");
+});
