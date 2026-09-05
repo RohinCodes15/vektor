@@ -85,6 +85,7 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .insights-grid ul { padding-left: 18px; }
 .insights-grid li + li { margin-top: 16px; }
 .insights-grid li .muted { margin-top: 6px; }
+.backtest-insights summary { cursor: pointer; }
 .backtest-trades .panel-heading { flex-wrap: wrap; }
 .trade-scroll-hint { display: none; margin-top: 16px; font-size: 10px; }
 .trade-table-scroll { margin-top: 20px; overflow-x: auto; border: 1px solid var(--color-line); border-radius: 5px; }
