@@ -46,3 +46,15 @@ test("insights render actual response text, evidence, empty categories, and disc
   assert.ok(!nodes(tree).some((node) => node.type === "script" || node.props?.dangerouslySetInnerHTML));
   assert.equal(nodes(tree).find((node) => node.type === ui.Button).props.children, "Regenerate AI insights");
 });
+
+test("unavailable and error states offer retry without fabricated interpretations", async () => {
+  const unavailable = await panel({ status: "unavailable", data: { ...data, status: "unavailable", unavailable_reason: "No provider configured.", interpretation: null, provider: null, model: null } });
+  assert.match(text(unavailable), /No provider configured/);
+  assert.ok(nodes(unavailable).some((node) => node.type === "details"));
+  const error = await panel({ status: "error", backtestId: id, message: "The AI provider is unavailable." });
+  assert.equal(nodes(error).find((node) => node.props?.role === "alert").props.children, "The AI provider is unavailable.");
+  for (const tree of [unavailable, error]) {
+    assert.doesNotMatch(text(tree), /Response-specific summary|Strategy summary/);
+    assert.equal(nodes(tree).find((node) => node.type === ui.Button).props.children, "Try again");
+  }
+});
