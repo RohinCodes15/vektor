@@ -13,6 +13,8 @@ from uuid import UUID, uuid4
 
 from app.contracts import (
     AssetAllocation,
+    AssetCorrelation,
+    AssetRisk,
     EquitySnapshot,
     MarketHistoryQuery,
     PaperOrder,
@@ -21,6 +23,7 @@ from app.contracts import (
     PortfolioAnalytics,
     PortfolioCreate,
     PortfolioHoldings,
+    PortfolioRisk,
     PortfolioUpdate,
     Transaction,
 )
@@ -30,6 +33,7 @@ from app.portfolio.accounting import Quote, Valuation, fill_order, to_price, val
 from app.portfolio.allocation import concentration, pct, rounded
 from app.portfolio.analytics import compute_metrics
 from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound, SnapshotRejected
+from app.portfolio.risk import AlignedReturns, align, compute_risk
 from app.portfolio.store import PortfolioStore
 
 logger = logging.getLogger("vektor.portfolio")
@@ -39,6 +43,9 @@ PRICE_LOOKBACK_DAYS = 14
 PORTFOLIO_CURRENCY = "USD"
 # A close older than this many calendar days is stale; covers a weekend plus a market holiday.
 STALE_AFTER_DAYS = 4
+# Risk metrics: calendar days of history requested (about 80 trading days) and aligned returns required.
+RISK_LOOKBACK_DAYS = 120
+MIN_RISK_OBSERVATIONS = 20
 
 
 class PriceUnavailable(Exception):
@@ -224,6 +231,77 @@ class PortfolioService:
             top_holding_pct=pct(weights.position_weights[weights.top_symbol]) if weights else None,
             hhi=rounded(weights.hhi) if weights else None,
         )
+
+    def risk(self, portfolio_id: UUID) -> PortfolioRisk:
+        """Volatility contribution and correlations of the current holdings, from aligned daily returns.
+
+        Returns status "unavailable" with a reason instead of metrics whenever the data is insufficient.
+        """
+        portfolio, valuation, quotes = self._value(portfolio_id)
+        today = self._clock().date()
+        window = (today - timedelta(days=RISK_LOOKBACK_DAYS), today - timedelta(days=1))
+
+        def report(reason: str | None, aligned: AlignedReturns | None = None, **metrics: object) -> PortfolioRisk:
+            return PortfolioRisk.model_validate({
+                "portfolio_id": portfolio.id, "currency": portfolio.currency, "valued_at": self._clock(),
+                "status": "unavailable" if reason else "available", "unavailable_reason": reason,
+                "window_start": window[0], "window_end": window[1],
+                "observations": aligned.observations if aligned else 0, "min_observations": MIN_RISK_OBSERVATIONS,
+                "returns_as_of": aligned.dates[-1] if aligned and aligned.dates else None,
+                "portfolio_volatility_pct": None, "assets": [], "correlations": [], **metrics,
+            })
+
+        unpriced = sorted(symbol for symbol, quote in quotes.items() if quote is None)
+        if unpriced:
+            return report(f"No recent price for {', '.join(unpriced)}; current weights are unknown.")
+        if not quotes:
+            return report("The portfolio holds only cash; there are no asset returns.")
+        if not valuation.equity:
+            return report("Equity is zero; weights are undefined.")
+        closes: dict[str, dict[date, Decimal]] = {}
+        for symbol in quotes:
+            history = self._closes(symbol, *window)
+            if history is None:
+                return report(f"No daily history for {symbol} between {window[0]} and {window[1]}.")
+            closes[symbol] = history
+        aligned = align(closes)
+        if aligned.observations < MIN_RISK_OBSERVATIONS:
+            return report(
+                f"Only {aligned.observations} aligned daily returns across all holdings; "
+                f"at least {MIN_RISK_OBSERVATIONS} are needed.",
+                aligned,
+            )
+        if _is_stale(aligned.dates[-1], today):
+            return report(f"The latest close shared by every holding is {aligned.dates[-1]}, which is stale.", aligned)
+        weights = {h.symbol: h.market_value / valuation.equity for h in valuation.holdings if h.market_value is not None}
+        result = compute_risk(weights, aligned)
+        return report(
+            None,
+            aligned,
+            portfolio_volatility_pct=pct(result.portfolio_volatility),
+            assets=[
+                AssetRisk(
+                    symbol=a.symbol,
+                    weight_pct=pct(weights[a.symbol]),
+                    volatility_pct=pct(a.volatility),
+                    volatility_contribution_pct=pct(a.contribution) if a.contribution is not None else None,
+                    contribution_share_pct=pct(a.contribution_share) if a.contribution_share is not None else None,
+                )
+                for a in result.assets
+            ],
+            correlations=[
+                AssetCorrelation(symbol_a=a, symbol_b=b, correlation=rounded(c) if c is not None else None)
+                for a, b, c in result.correlations
+            ],
+        )
+
+    def _closes(self, symbol: str, start: date, end: date) -> dict[date, Decimal] | None:
+        """Adjusted closes by date (dividends and splits included), or None when the provider has no bars."""
+        try:
+            history = self._market_data.get_history(MarketHistoryQuery(symbol=symbol, start=start, end=end))
+        except MarketDataNotFound:
+            return None
+        return {bar.date: Decimal(str(bar.adjusted_close)) for bar in history.bars}
 
     def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
         """Value one consistent read of cash and positions at the latest completed closes."""
