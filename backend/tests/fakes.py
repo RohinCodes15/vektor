@@ -14,9 +14,14 @@ class FakeProvider:
     source: MarketDataSource = "yahoo_finance"
 
     def __init__(
-        self, bars: list[PriceBar] | None = None, currency: str | None = "USD", error: Exception | None = None
+        self,
+        bars: list[PriceBar] | None = None,
+        currency: str | None = "USD",
+        error: Exception | None = None,
+        bars_by_symbol: dict[str, list[PriceBar]] | None = None,
     ) -> None:
         self.bars = bars if bars is not None else [make_bar("2024-01-02"), make_bar("2024-01-03", 11.5)]
+        self.bars_by_symbol = bars_by_symbol or {}  # per-symbol overrides of `bars`
         self.currency = currency
         self.error = error
         self.calls: list[tuple[str, date, date]] = []
@@ -25,4 +30,5 @@ class FakeProvider:
         self.calls.append((symbol, start, end))
         if self.error is not None:
             raise self.error
-        return ProviderHistory(self.currency, tuple(bar for bar in self.bars if start <= bar.date <= end))
+        bars = self.bars_by_symbol.get(symbol, self.bars)
+        return ProviderHistory(self.currency, tuple(bar for bar in bars if start <= bar.date <= end))
