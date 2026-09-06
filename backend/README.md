@@ -211,3 +211,59 @@ Analytics are computed from snapshots only, as of the latest snapshot (`as_of`).
 - History starts at portfolio creation and grows only as snapshots are recorded; past values are never reconstructed.
 - Snapshot equity uses completed daily closes, so it lags the market by up to a day and inherits the corporate-action limitation above.
 - Volatility and Sharpe ratio from a handful of observations are statistically weak. The response reports `daily_observations` so clients can judge.
+
+## Allocation and risk (Phase 2F.1)
+
+Current allocation, concentration, and return-based risk for a paper portfolio's actual holdings. Values come from the latest completed daily closes and the daily history Yahoo reports. Nothing is estimated. When the data is not enough, the response says `"status": "unavailable"` and gives an `unavailable_reason`, and the affected metrics are `null`.
+
+| Method and path (under `/api/v1`) | Does | Success |
+|-----------------------------------|------|---------|
+| `GET /portfolios/{id}/allocation` | Weight of each asset and of cash, top holding, HHI | 200 `PortfolioAllocation` |
+| `GET /portfolios/{id}/risk` | Portfolio volatility, each asset's contribution, pairwise correlations | 200 `PortfolioRisk` |
+
+Errors are the same as `GET /holdings`: 404 for an unknown portfolio, 422 for an invalid id, and 502/503 when the provider returns invalid data or is unreachable. A provider failure is an error, never a partial result. Contracts: `PortfolioAllocation`, `AssetAllocation`, `PortfolioRisk`, `AssetRisk`, `AssetCorrelation` in `app/contracts.py`. Percentages, the HHI, and correlations have 4 decimal places, `ROUND_HALF_EVEN`. All arithmetic uses `Decimal`.
+
+### Allocation formulas
+
+Holdings are valued exactly like `GET /holdings`: `market value = quantity × latest completed close`, and `equity = cash + Σ market value`.
+
+| Field | Formula |
+|-------|---------|
+| `weight_pct` | `market value / equity × 100`. Cash counts as an asset, so the asset weights plus `cash_weight_pct` make 100 (before rounding) |
+| `cash_weight_pct` | `cash / equity × 100` |
+| `position_weight_pct` | `market value / positions value × 100`: share of the invested amount, cash excluded |
+| `top_holding_pct` | The largest `position_weight_pct`. On a tie, the alphabetically first symbol |
+| `hhi` | Herfindahl-Hirschman index `Σ wᵢ²`, where `wᵢ` are position weights as fractions (cash excluded). It runs from `1/N` (N equal positions) to `1` (one position). Computed from unrounded weights |
+
+- **Missing price:** if any holding has no close in the last 14 days, it is listed in `unpriced_symbols`, `equity` is unknown, and every weight is `null` (status `unavailable`). Weights are never computed from a partial valuation.
+- **Cash only:** `cash_weight_pct` is `100` and `assets` is empty. Concentration is undefined, so the status is `unavailable`.
+- **Zero value:** with zero equity, every weight is `null`. A position whose value rounds to $0.00 gives no position weights.
+- **Stale prices:** a close more than 4 calendar days before today (UTC) sets `stale: true` on that asset and lists the symbol in `stale_symbols`. Four days covers a weekend plus a market holiday. Stale prices are still the latest real closes, so the weights are still reported. `prices_as_of` is the oldest close date used.
+
+### Risk formulas
+
+The window is the 120 calendar days before today, ending yesterday (UTC), which is about 80 trading days.
+
+1. **Aligned returns:** keep only the dates on which every held symbol has a bar. A daily return is `adjusted_close on one aligned date / adjusted_close on the previous aligned date − 1`, so it includes splits and dividends. A day missing for one symbol is dropped for all of them, never filled, and the next return spans the gap for every symbol alike.
+2. **Covariance `S`:** sample covariance (divided by n − 1) of the aligned daily returns.
+3. **Weights `w`:** current `market value / equity`. Cash is part of equity with zero variance, so it lowers portfolio volatility.
+4. `portfolio_volatility_pct = √(wᵀ S w) × √252 × 100`, annualized.
+5. `volatility_contribution_pct` for asset i is `wᵢ (S w)ᵢ / √(wᵀ S w) × √252 × 100`. The contributions add up to the portfolio volatility. `contribution_share_pct` is the contribution divided by the portfolio volatility, times 100, and the shares add up to 100. A negative contribution means the asset hedges the others. Both are `null` when portfolio volatility is zero.
+6. `volatility_pct` is the asset's own annualized volatility, `√Sᵢᵢ × √252 × 100`.
+7. `correlation` is `Sᵢⱼ / √(Sᵢᵢ Sⱼⱼ)` for each pair of holdings. It is `null` when either series is constant.
+
+Risk metrics are `available` only when **all** of these hold. Otherwise `unavailable_reason` gives the first one that fails:
+
+- Every holding has a recent price (no price means weights are unknown).
+- The portfolio holds at least one position. Cash alone has no asset returns.
+- Equity is positive.
+- Every holding has daily history in the window.
+- There are at least **20** aligned daily returns (`min_observations`). `observations` reports how many were found.
+- The latest aligned date (`returns_as_of`) is no more than 4 calendar days old.
+
+### Assumptions and limitations
+
+- Risk uses the current quantities as if they had been held through the whole window. Past trades are not replayed, so this measures the risk of the portfolio as it is now, not its realized history (see Phase 2E.1 analytics for that).
+- Covariance from 20 to 80 observations is noisy, and √252 annualization assumes one return per trading day.
+- Weights use the split-adjusted `close`, while returns use `adjusted_close`. A recent corporate action can make the two disagree until stored quantities are adjusted (see the Phase 2C limitation).
+- Each held symbol's history is fetched once per day and then served from the market data cache.
