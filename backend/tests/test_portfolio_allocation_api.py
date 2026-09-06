@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.market_data.errors import MarketDataUnavailable
 from tests.fakes import FakeProvider, make_bar
 
 URL = "/api/v1/portfolios"
@@ -61,13 +62,35 @@ def test_allocation_endpoint(client: TestClient, portfolio_id: str) -> None:
     assert (body["top_holding_symbol"], body["top_holding_pct"], body["hhi"]) == ("AAPL", "85.7143", "0.7551")
 
 
-def test_cash_only_allocation(client: TestClient) -> None:
+def test_risk_endpoint(client: TestClient, portfolio_id: str) -> None:
+    res = client.get(f"{URL}/{portfolio_id}/risk")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "available" and body["observations"] == 25 and body["min_observations"] == 20
+    assert body["returns_as_of"] == YESTERDAY.isoformat()
+    assert isinstance(body["portfolio_volatility_pct"], str)
+    assert [a["symbol"] for a in body["assets"]] == ["AAPL", "MSFT"]
+    assert body["assets"][0].keys() == {
+        "symbol", "weight_pct", "volatility_pct", "volatility_contribution_pct", "contribution_share_pct",
+    }
+    assert [(c["symbol_a"], c["symbol_b"]) for c in body["correlations"]] == [("AAPL", "MSFT")]
+
+
+def test_risk_endpoint_reports_unavailable_for_cash_only(client: TestClient) -> None:
     portfolio_id = client.post(URL, json={"name": "Cash", "starting_cash": "10"}).json()["id"]
+    body = client.get(f"{URL}/{portfolio_id}/risk").json()
+    assert body["status"] == "unavailable" and body["portfolio_volatility_pct"] is None
+    assert body["observations"] == 0 and body["returns_as_of"] is None
     assert client.get(f"{URL}/{portfolio_id}/allocation").json()["cash_weight_pct"] == "100.0000"
 
 
-@pytest.mark.parametrize("path", ["allocation"])
+@pytest.mark.parametrize("path", ["allocation", "risk"])
 def test_unknown_or_invalid_portfolio(client: TestClient, path: str) -> None:
     assert client.get(f"{URL}/{uuid4()}/{path}").status_code == 404
     assert client.get(f"{URL}/not-a-uuid/{path}").status_code == 422
 
+
+def test_risk_provider_outage_is_503(client: TestClient, provider: FakeProvider, portfolio_id: str) -> None:
+    provider.error = MarketDataUnavailable("down")
+    res = client.get(f"{URL}/{portfolio_id}/risk")
+    assert res.status_code == 503 and res.json().keys() == {"detail"}

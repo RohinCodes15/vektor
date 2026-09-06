@@ -12,6 +12,7 @@ from app.contracts import (
     PortfolioAnalytics,
     PortfolioCreate,
     PortfolioHoldings,
+    PortfolioRisk,
     PortfolioUpdate,
     Transaction,
 )
@@ -133,3 +134,8 @@ def portfolio_allocation(portfolio_id: UUID, service: Service) -> PortfolioAlloc
     """Weight of each asset and of cash, top-holding concentration, and HHI at the latest completed closes."""
     return service.allocation(portfolio_id)
 
+
+@router.get("/{portfolio_id}/risk", response_model=PortfolioRisk, responses={**NOT_FOUND, **INVALID, **MARKET_DATA})
+def portfolio_risk(portfolio_id: UUID, service: Service) -> PortfolioRisk:
+    """Volatility contribution and asset correlations from aligned daily returns, or an explicit unavailable state."""
+    return service.risk(portfolio_id)
