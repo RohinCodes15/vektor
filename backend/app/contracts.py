@@ -347,3 +347,44 @@ class PortfolioAllocation(Contract):
     # Herfindahl-Hirschman index of position weights (fractions, cash excluded): 1/N to 1.
     hhi: Decimal | None
 
+
+class AssetRisk(Contract):
+    symbol: str
+    weight_pct: Decimal
+    # Annualized volatility of the asset's own daily returns.
+    volatility_pct: Decimal
+    # Annualized volatility points this asset adds to the portfolio; they sum to portfolio_volatility_pct.
+    volatility_contribution_pct: Decimal | None
+    # Share of portfolio volatility; the shares sum to 100. Null when portfolio volatility is zero.
+    contribution_share_pct: Decimal | None
+
+
+class AssetCorrelation(Contract):
+    symbol_a: str
+    symbol_b: str
+    # Pearson correlation of aligned daily returns; null when either series is constant.
+    correlation: Decimal | None
+
+
+class PortfolioRisk(Contract):
+    """Volatility contribution and correlation from aligned daily returns of the current holdings.
+
+    Metrics are present only when `status` is "available": every holding is priced and has at least
+    `min_observations` aligned daily returns ending within 4 days of today. Otherwise `unavailable_reason` says why.
+    """
+
+    portfolio_id: UUID
+    currency: PortfolioCurrency
+    valued_at: AwareDatetime
+    status: MetricStatus
+    unavailable_reason: str | None
+    # Requested history window (inclusive) and the aligned returns found in it.
+    window_start: date
+    window_end: date
+    observations: int
+    min_observations: int
+    # Last aligned close date; null when no date is shared by every holding.
+    returns_as_of: date | None
+    portfolio_volatility_pct: Decimal | None
+    assets: list[AssetRisk]
+    correlations: list[AssetCorrelation]
