@@ -6,15 +6,18 @@ are open, and Yahoo can report it with missing values. Completed-day ranges are 
 
 import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from functools import partial
 from uuid import UUID, uuid4
 
 from app.contracts import (
+    AssetAllocation,
     EquitySnapshot,
     MarketHistoryQuery,
     PaperOrder,
     Portfolio,
+    PortfolioAllocation,
     PortfolioAnalytics,
     PortfolioCreate,
     PortfolioHoldings,
@@ -24,6 +27,7 @@ from app.contracts import (
 from app.market_data.errors import MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
 from app.portfolio.accounting import Quote, Valuation, fill_order, to_price, value_portfolio
+from app.portfolio.allocation import concentration, pct, rounded
 from app.portfolio.analytics import compute_metrics
 from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound, SnapshotRejected
 from app.portfolio.store import PortfolioStore
@@ -33,6 +37,8 @@ logger = logging.getLogger("vektor.portfolio")
 # How many completed days to search for the latest close; covers weekends and multi-day market holidays.
 PRICE_LOOKBACK_DAYS = 14
 PORTFOLIO_CURRENCY = "USD"
+# A close older than this many calendar days is stale; covers a weekend plus a market holiday.
+STALE_AFTER_DAYS = 4
 
 
 class PriceUnavailable(Exception):
@@ -177,6 +183,48 @@ class PortfolioService:
             sharpe_ratio=metrics.sharpe_ratio,
         )
 
+    def allocation(self, portfolio_id: UUID) -> PortfolioAllocation:
+        """Weights and concentration of the current holdings at their latest completed closes. Never estimated."""
+        portfolio, valuation, quotes = self._value(portfolio_id)
+        today = self._clock().date()
+        unpriced = sorted(symbol for symbol, quote in quotes.items() if quote is None)
+        stale = sorted(s for s, q in quotes.items() if q is not None and _is_stale(q.price_date, today))
+        equity = valuation.equity
+        values = {h.symbol: h.market_value for h in valuation.holdings if h.market_value is not None}
+        weights = concentration(values) if not unpriced else None
+        price_dates = [quote.price_date for quote in quotes.values() if quote is not None]
+        assets = [
+            AssetAllocation(
+                symbol=h.symbol,
+                quantity=h.quantity,
+                last_price=h.last_price,
+                price_date=h.price_date,
+                market_value=h.market_value,
+                weight_pct=pct(h.market_value / equity) if equity and h.market_value is not None else None,
+                position_weight_pct=pct(weights.position_weights[h.symbol]) if weights else None,
+                stale=h.symbol in stale,
+            )
+            for h in valuation.holdings
+        ]
+        return PortfolioAllocation(
+            portfolio_id=portfolio.id,
+            currency=portfolio.currency,
+            valued_at=self._clock(),
+            status="available" if weights else "unavailable",
+            unavailable_reason=None if weights else _allocation_gap(unpriced, len(quotes)),
+            cash=portfolio.cash,
+            positions_value=valuation.positions_value,
+            equity=equity,
+            cash_weight_pct=pct(portfolio.cash / equity) if equity else None,
+            prices_as_of=min(price_dates) if price_dates else None,
+            unpriced_symbols=unpriced,
+            stale_symbols=stale,
+            assets=assets,
+            top_holding_symbol=weights.top_symbol if weights else None,
+            top_holding_pct=pct(weights.position_weights[weights.top_symbol]) if weights else None,
+            hhi=rounded(weights.hhi) if weights else None,
+        )
+
     def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
         """Value one consistent read of cash and positions at the latest completed closes."""
         state = self._store.state(portfolio_id)
@@ -216,6 +264,18 @@ class PortfolioService:
             )
         bar = history.bars[-1]
         return Quote(price=to_price(bar.close), price_date=bar.date)
+
+
+def _is_stale(price_date: date, today: date) -> bool:
+    return (today - price_date).days > STALE_AFTER_DAYS
+
+
+def _allocation_gap(unpriced: list[str], positions: int) -> str:
+    if unpriced:
+        return f"No recent price for {', '.join(unpriced)}; weights cannot be computed."
+    if positions == 0:
+        return "The portfolio holds only cash; there are no positions to weigh."
+    return "Positions are worth $0.00 at their latest closes; weights are undefined."
 
 
 def _replay(earlier: Transaction, order: PaperOrder) -> Transaction:
