@@ -2,9 +2,9 @@
 
 Simulation models are contracts only; no endpoints serve them yet.
 Market history models back the read-only GET /api/v1/market/history endpoint.
-Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots and analytics live
-under the same prefix. Money is a Decimal, serialized as a
-JSON string: cash, cost and P&L have 2 decimal places, prices 4, percentages 2 (see app/portfolio/accounting.py).
+Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots, analytics, allocation
+and risk live under the same prefix. Money is a Decimal, serialized as a JSON string: cash, cost and P&L have 2 decimal
+places, prices 4, percentages 2 (see app/portfolio/accounting.py); analytics, allocation and risk metrics have 4.
 """
 
 import re
@@ -298,3 +298,52 @@ class PortfolioAnalytics(Contract):
     max_drawdown_pct: Decimal | None
     # Annualized, risk-free rate 0: mean daily return / standard deviation * sqrt(252).
     sharpe_ratio: Decimal | None
+
+
+# Allocation and risk (Phase 2F.1). Computed now from actual holdings and completed daily closes; never estimated.
+MetricStatus = Literal["available", "unavailable"]
+
+
+class AssetAllocation(Contract):
+    """One held asset. Value and weights are null when the holding has no recent price."""
+
+    symbol: str
+    quantity: Decimal
+    last_price: Decimal | None
+    price_date: date | None
+    market_value: Decimal | None
+    # Share of equity (cash + positions).
+    weight_pct: Decimal | None
+    # Share of the positions value (cash excluded).
+    position_weight_pct: Decimal | None
+    # True when price_date is more than 4 calendar days before today (UTC).
+    stale: bool
+
+
+class PortfolioAllocation(Contract):
+    """Current allocation and concentration. Percentages and the HHI have 4 decimal places.
+
+    `status` is "unavailable" when a holding has no recent price (every weight is then null), when there are no
+    positions, or when equity is zero; `unavailable_reason` says which. See backend/README.md for the formulas.
+    """
+
+    portfolio_id: UUID
+    currency: PortfolioCurrency
+    valued_at: AwareDatetime
+    status: MetricStatus
+    unavailable_reason: str | None
+    cash: Decimal
+    positions_value: Decimal | None
+    equity: Decimal | None
+    cash_weight_pct: Decimal | None
+    # Oldest price date used; null for a cash-only portfolio or when no holding is priced.
+    prices_as_of: date | None
+    unpriced_symbols: list[str]
+    stale_symbols: list[str]
+    assets: list[AssetAllocation]
+    top_holding_symbol: str | None
+    # Largest position_weight_pct.
+    top_holding_pct: Decimal | None
+    # Herfindahl-Hirschman index of position weights (fractions, cash excluded): 1/N to 1.
+    hhi: Decimal | None
+
