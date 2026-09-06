@@ -8,6 +8,7 @@ from app.contracts import (
     ErrorResponse,
     PaperOrder,
     Portfolio,
+    PortfolioAllocation,
     PortfolioAnalytics,
     PortfolioCreate,
     PortfolioHoldings,
@@ -123,3 +124,12 @@ def equity_history(portfolio_id: UUID, service: Service) -> list[EquitySnapshot]
 def portfolio_analytics(portfolio_id: UUID, service: Service) -> PortfolioAnalytics:
     """Total return, P&L, daily return, volatility, max drawdown, and Sharpe ratio from recorded snapshots."""
     return service.analytics(portfolio_id)
+
+
+@router.get(
+    "/{portfolio_id}/allocation", response_model=PortfolioAllocation, responses={**NOT_FOUND, **INVALID, **MARKET_DATA}
+)
+def portfolio_allocation(portfolio_id: UUID, service: Service) -> PortfolioAllocation:
+    """Weight of each asset and of cash, top-holding concentration, and HHI at the latest completed closes."""
+    return service.allocation(portfolio_id)
+
