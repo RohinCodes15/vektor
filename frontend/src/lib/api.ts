@@ -323,3 +323,59 @@ export async function getPortfolioEquityHistory(id: string, signal?: AbortSignal
     throw new Error("Backend returned incompatible recorded equity history. No observations were accepted.");
   return data;
 }
+
+export type AssetAllocation = Readonly<{
+  symbol: string; quantity: string; last_price: string | null; price_date: string | null;
+  market_value: string | null; weight_pct: string | null; position_weight_pct: string | null; stale: boolean;
+}>;
+export type PortfolioAllocation = Readonly<{
+  portfolio_id: string; currency: "USD"; valued_at: string; status: "available" | "unavailable";
+  unavailable_reason: string | null; cash: string; positions_value: string | null; equity: string | null;
+  cash_weight_pct: string | null; prices_as_of: string | null; unpriced_symbols: readonly string[];
+  stale_symbols: readonly string[]; assets: readonly AssetAllocation[]; top_holding_symbol: string | null;
+  top_holding_pct: string | null; hhi: string | null;
+}>;
+
+function isTicker(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(value);
+}
+
+function isPercentage(value: unknown): value is string {
+  return isDecimal(value) && Number(value) <= 100;
+}
+
+function isMetricStatus(value: Record<string, unknown>): boolean {
+  return value.status === "available" ? value.unavailable_reason === null
+    : value.status === "unavailable" && typeof value.unavailable_reason === "string" && value.unavailable_reason.trim().length > 0;
+}
+
+function isAssetAllocation(value: unknown): value is AssetAllocation {
+  if (!hasFields(value, ["symbol", "quantity", "last_price", "price_date", "market_value", "weight_pct", "position_weight_pct", "stale"])
+    || !isTicker(value.symbol) || !isDecimal(value.quantity, true) || typeof value.stale !== "boolean"
+    || !(value.weight_pct === null || isPercentage(value.weight_pct))
+    || !(value.position_weight_pct === null || isPercentage(value.position_weight_pct))) return false;
+  return value.last_price === null ? value.price_date === null && value.market_value === null && value.weight_pct === null && value.position_weight_pct === null
+    : isDecimal(value.last_price, true) && isCalendarDate(value.price_date) && isMoney(value.market_value, true);
+}
+
+export async function getPortfolioAllocation(id: string, signal?: AbortSignal): Promise<PortfolioAllocation> {
+  if (!isUuid(id)) throw new Error("Choose a valid portfolio.");
+  const data = await requestJson(`/api/v1/portfolios/${id}/allocation`, "portfolio", signal);
+  if (!hasFields(data, ["portfolio_id", "currency", "valued_at", "status", "unavailable_reason", "cash", "positions_value", "equity", "cash_weight_pct", "prices_as_of", "unpriced_symbols", "stale_symbols", "assets", "top_holding_symbol", "top_holding_pct", "hhi"])
+    || data.portfolio_id !== id || data.currency !== "USD" || !isAwareTimestamp(data.valued_at) || !isMetricStatus(data)
+    || !isMoney(data.cash, true) || !(data.positions_value === null || isMoney(data.positions_value, true))
+    || !(data.equity === null || isMoney(data.equity, true)) || !(data.cash_weight_pct === null || isPercentage(data.cash_weight_pct))
+    || !(data.prices_as_of === null || isCalendarDate(data.prices_as_of))
+    || !Array.isArray(data.assets) || !data.assets.every(isAssetAllocation)
+    || new Set(data.assets.map((asset) => asset.symbol)).size !== data.assets.length
+    || ![data.unpriced_symbols, data.stale_symbols].every((symbols) => Array.isArray(symbols) && symbols.every(isTicker) && new Set(symbols).size === symbols.length && symbols.every((symbol) => (data.assets as AssetAllocation[]).some((asset) => asset.symbol === symbol)))
+    || !(data.top_holding_symbol === null || isTicker(data.top_holding_symbol) && data.assets.some((asset) => asset.symbol === data.top_holding_symbol))
+    || !(data.top_holding_pct === null || isPercentage(data.top_holding_pct))
+    || !(data.hhi === null || isDecimal(data.hhi) && Number(data.hhi) <= 1))
+    throw new Error("Backend returned incompatible portfolio allocation. No weights were accepted.");
+  if (data.status === "available" && (data.cash_weight_pct === null || data.top_holding_symbol === null || data.top_holding_pct === null || data.hhi === null || data.assets.some((asset) => asset.weight_pct === null || asset.position_weight_pct === null))
+    || (data.unpriced_symbols as string[]).length > 0 && (data.equity !== null || data.cash_weight_pct !== null || data.assets.some((asset) => asset.weight_pct !== null || asset.position_weight_pct !== null)))
+    throw new Error("Backend returned inconsistent allocation availability. No weights were accepted.");
+  return data as PortfolioAllocation;
+}
+
