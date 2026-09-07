@@ -21,3 +21,17 @@ export function RiskContribution({ risk }: { risk: PortfolioRisk }) {
     <div className="holdings-scroll" role="region" aria-label="Risk contribution values" tabIndex={0}><table className="holdings-table"><caption className="muted">Backend risk contributions · Annualized</caption><thead><tr><th scope="col">Asset</th><th scope="col">Equity weight</th><th scope="col">Asset volatility</th><th scope="col">Contribution (points)</th><th scope="col">Contribution share</th></tr></thead><tbody>{risk.assets.map((asset) => <tr key={asset.symbol}><th scope="row">{asset.symbol}</th><td>{asset.weight_pct}%</td><td>{asset.volatility_pct}%</td><td>{asset.volatility_contribution_pct ?? "Unavailable"}</td><td>{asset.contribution_share_pct === null ? "Unavailable" : `${asset.contribution_share_pct}%`}</td></tr>)}</tbody></table></div>
   </>;
 }
+
+export function CorrelationHeatmap({ risk }: { risk: PortfolioRisk }) {
+  const [active, setActive] = useState("Focus or hover over a correlation to inspect its value.");
+  const pairs = new Map(risk.correlations.map((pair) => [`${pair.symbol_a}:${pair.symbol_b}`, pair.correlation]));
+  if (risk.correlations.length === 0) return <p className="chart-state" role="status">No correlation observations were provided.</p>;
+  return <><div className="holdings-scroll" role="region" aria-label="Asset correlation heatmap" tabIndex={0}><table className="holdings-table correlation-table"><caption className="muted">Pearson correlations · −1 inverse, 0 uncorrelated, +1 aligned · Unavailable cells are never inferred</caption><thead><tr><th scope="col">Asset</th>{risk.assets.map((asset) => <th scope="col" key={asset.symbol}>{asset.symbol}</th>)}</tr></thead><tbody>{risk.assets.map((row) => <tr key={row.symbol}><th scope="row">{row.symbol}</th>{risk.assets.map((column) => {
+    const direct = `${row.symbol}:${column.symbol}`;
+    const reverse = `${column.symbol}:${row.symbol}`;
+    const value = (pairs.has(direct) ? pairs.get(direct) : pairs.get(reverse)) ?? null;
+    const label = `${row.symbol} / ${column.symbol}: ${value === null ? "Unavailable (constant series or no reported pair)" : value}`;
+    const intensity = value === null ? 0 : 0.2 + Math.abs(Number(value)) * 0.6;
+    return <td key={column.symbol} tabIndex={0} title={label} aria-label={label} onFocus={() => setActive(label)} onPointerEnter={() => setActive(label)} style={{ backgroundColor: value === null ? undefined : Number(value) < 0 ? `rgb(93 64 132 / ${intensity})` : `rgb(0 94 85 / ${intensity})` }}>{value ?? "Unavailable"}</td>;
+  })}</tr>)}</tbody></table></div><p className="allocation-tooltip" role="status" aria-live="polite">{active}</p></>;
+}
