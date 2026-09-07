@@ -379,3 +379,42 @@ export async function getPortfolioAllocation(id: string, signal?: AbortSignal): 
   return data as PortfolioAllocation;
 }
 
+export type AssetRisk = Readonly<{
+  symbol: string; weight_pct: string; volatility_pct: string;
+  volatility_contribution_pct: string | null; contribution_share_pct: string | null;
+}>;
+export type AssetCorrelation = Readonly<{ symbol_a: string; symbol_b: string; correlation: string | null }>;
+export type PortfolioRisk = Readonly<{
+  portfolio_id: string; currency: "USD"; valued_at: string; status: "available" | "unavailable";
+  unavailable_reason: string | null; window_start: string; window_end: string;
+  observations: number; min_observations: number; returns_as_of: string | null;
+  portfolio_volatility_pct: string | null; assets: readonly AssetRisk[]; correlations: readonly AssetCorrelation[];
+}>;
+
+function isAssetRisk(value: unknown): value is AssetRisk {
+  return hasFields(value, ["symbol", "weight_pct", "volatility_pct", "volatility_contribution_pct", "contribution_share_pct"])
+    && isTicker(value.symbol) && isPercentage(value.weight_pct) && isDecimal(value.volatility_pct)
+    && (value.volatility_contribution_pct === null || isSignedDecimal(value.volatility_contribution_pct))
+    && (value.contribution_share_pct === null || isSignedDecimal(value.contribution_share_pct));
+}
+
+export async function getPortfolioRisk(id: string, signal?: AbortSignal): Promise<PortfolioRisk> {
+  if (!isUuid(id)) throw new Error("Choose a valid portfolio.");
+  const data = await requestJson(`/api/v1/portfolios/${id}/risk`, "portfolio", signal);
+  if (!hasFields(data, ["portfolio_id", "currency", "valued_at", "status", "unavailable_reason", "window_start", "window_end", "observations", "min_observations", "returns_as_of", "portfolio_volatility_pct", "assets", "correlations"])
+    || data.portfolio_id !== id || data.currency !== "USD" || !isAwareTimestamp(data.valued_at) || !isMetricStatus(data)
+    || !isCalendarDate(data.window_start) || !isCalendarDate(data.window_end) || data.window_start > data.window_end
+    || typeof data.observations !== "number" || !Number.isSafeInteger(data.observations) || data.observations < 0
+    || typeof data.min_observations !== "number" || !Number.isSafeInteger(data.min_observations) || data.min_observations < 1
+    || !(data.returns_as_of === null || isCalendarDate(data.returns_as_of))
+    || !(data.portfolio_volatility_pct === null || isDecimal(data.portfolio_volatility_pct))
+    || !Array.isArray(data.assets) || !data.assets.every(isAssetRisk) || new Set(data.assets.map((asset) => asset.symbol)).size !== data.assets.length
+    || !Array.isArray(data.correlations) || !data.correlations.every((pair) => hasFields(pair, ["symbol_a", "symbol_b", "correlation"])
+      && (data.assets as AssetRisk[]).some((asset) => asset.symbol === pair.symbol_a) && (data.assets as AssetRisk[]).some((asset) => asset.symbol === pair.symbol_b)
+      && (pair.correlation === null || isSignedDecimal(pair.correlation) && Math.abs(Number(pair.correlation)) <= 1))
+    || new Set(data.correlations.map((pair) => `${pair.symbol_a}:${pair.symbol_b}`)).size !== data.correlations.length
+    || (data.status === "available" && (data.portfolio_volatility_pct === null || data.returns_as_of === null || data.observations < data.min_observations))
+    || (data.status === "unavailable" && (data.portfolio_volatility_pct !== null || data.assets.length > 0 || data.correlations.length > 0)))
+    throw new Error("Backend returned incompatible portfolio risk. No risk metrics were accepted.");
+  return data as PortfolioRisk;
+}
