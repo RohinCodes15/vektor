@@ -342,3 +342,16 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .allocation-panel h4 { margin-block: 24px 12px; font-size: 14px; }
 .allocation-panel .chart-provenance { line-height: 1.7; }
 .allocation-layout { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+.allocation-donut { min-width: 0; padding-top: 16px; }
+.allocation-donut svg { display: block; width: 100%; max-width: 300px; margin-inline: auto; }
+.donut-segment { cursor: pointer; opacity: .72; }
+.donut-active, .donut-segment:focus-visible { stroke-width: 36; opacity: 1; }
+.donut-segment:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+.donut-label { fill: var(--color-muted); font-size: 13px; }
+.donut-value { fill: var(--color-ink); font: 20px var(--font-mono); }
+.allocation-tooltip { min-height: 40px; padding-block: 12px; font-size: 12px; color: var(--color-ink); overflow-wrap: anywhere; }
+.allocation-legend { display: grid; gap: 4px; }
+.allocation-legend button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px; color: var(--color-ink); border: 1px solid transparent; border-radius: 6px; text-align: left; font-size: 12px; cursor: pointer; }
+.allocation-legend button[aria-pressed="true"] { border-color: var(--color-control); background: var(--color-raised); }
+.allocation-legend button > span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+.allocation-swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
