@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { PortfolioRisk } from "../lib/api";
+import { Badge, Panel } from "./ui";
 
 export function RiskContribution({ risk }: { risk: PortfolioRisk }) {
   const [active, setActive] = useState<string | null>(null);
@@ -34,4 +35,11 @@ export function CorrelationHeatmap({ risk }: { risk: PortfolioRisk }) {
     const intensity = value === null ? 0 : 0.2 + Math.abs(Number(value)) * 0.6;
     return <td key={column.symbol} tabIndex={0} title={label} aria-label={label} onFocus={() => setActive(label)} onPointerEnter={() => setActive(label)} style={{ backgroundColor: value === null ? undefined : Number(value) < 0 ? `rgb(93 64 132 / ${intensity})` : `rgb(0 94 85 / ${intensity})` }}>{value ?? "Unavailable"}</td>;
   })}</tr>)}</tbody></table></div><p className="allocation-tooltip" role="status" aria-live="polite">{active}</p></>;
+}
+
+export function PortfolioRiskView({ risk }: { risk: PortfolioRisk }) {
+  return <Panel className="allocation-panel" aria-labelledby="risk-title"><div className="panel-heading"><div><h3 id="risk-title">Correlation & risk contribution</h3><p className="muted text-xs">Current holdings · Adjusted daily returns</p></div><Badge>{risk.status === "available" ? "Aligned returns" : "Risk unavailable"}</Badge></div><p className="chart-provenance">{risk.window_start} – {risk.window_end} · {risk.observations} aligned returns / {risk.min_observations} minimum · Returns as of {risk.returns_as_of ?? "Unavailable"} · Valued {risk.valued_at}</p>
+    {risk.status === "unavailable" ? <div className="chart-state" role="status"><h3>Risk data unavailable</h3><p>{risk.unavailable_reason}</p></div> : <><p className="portfolio-warning">Portfolio volatility: {risk.portfolio_volatility_pct}% annualized</p><h4>Risk contribution</h4><RiskContribution risk={risk} /><h4>Correlation heatmap</h4><CorrelationHeatmap risk={risk} /></>}
+    <p className="chart-provenance">Risk assumes today’s quantities were held throughout the window; it is not realized portfolio performance. √252 annualization. Missing aligned observations are not filled.</p>
+  </Panel>;
 }
