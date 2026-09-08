@@ -355,3 +355,9 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .allocation-legend button[aria-pressed="true"] { border-color: var(--color-control); background: var(--color-raised); }
 .allocation-legend button > span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
 .allocation-swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.risk-bars { display: block; width: 100%; min-width: 560px; }
+.risk-positive { fill: #59c9b5; }
+.risk-negative { fill: #a6a3ef; }
+.risk-bar:focus-visible { outline: 2px solid var(--color-ink); }
+.correlation-table td { min-width: 86px; height: 48px; text-align: center; color: var(--color-ink); }
+.correlation-table td:focus-visible { outline: 2px solid var(--color-ink); outline-offset: -3px; }
