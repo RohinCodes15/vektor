@@ -361,3 +361,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .risk-bar:focus-visible { outline: 2px solid var(--color-ink); }
 .correlation-table td { min-width: 86px; height: 48px; text-align: center; color: var(--color-ink); }
 .correlation-table td:focus-visible { outline: 2px solid var(--color-ink); outline-offset: -3px; }
+@media (max-width: 1000px) { .allocation-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .allocation-toolbar { align-items: stretch; flex-direction: column; } }
