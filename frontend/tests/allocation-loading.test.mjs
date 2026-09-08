@@ -36,3 +36,18 @@ test("portfolio switches hide stale responses immediately and cancel both pendin
   const tree = app.render({ id: other }); assert.equal(nodes(tree).find((node) => node.type === "allocation").props.allocation.portfolio_id, other);
   app.unmount(); assert.equal(requests.at(-1).signal.aborted, true);
 });
+
+test("new paper trades advance the allocation and risk refresh version", async () => {
+  const app = await mount("../src/components/portfolio-dashboard.tsx", {
+    "../lib/api": {}, "../lib/portfolio-values": {},
+    "./allocation-summary": {},
+    "./portfolio-allocation": { PortfolioAllocationSection: "allocation" },
+    "./portfolio-performance": { PortfolioPerformance: "performance" },
+    "./transaction-history": { TransactionHistory: "transactions" },
+    "./ui": { Badge: "badge", Button: "button", MetricCard: "metric", Panel: "panel" },
+  }, "PortfolioDetails", { id });
+  let tree = app.render();
+  assert.equal(nodes(tree).find((node) => node.type === "allocation").props.refreshVersion, 0);
+  nodes(tree).find((node) => node.type === "transactions").props.onTrades(); tree = app.render();
+  assert.equal(nodes(tree).find((node) => node.type === "allocation").props.refreshVersion, 1);
+});
