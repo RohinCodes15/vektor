@@ -333,3 +333,12 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .analytics-chart .history-ranges { margin-top: 20px; }
 .equity-chart .chart-price > span { max-width: 100%; overflow-wrap: anywhere; }
 .analytics-chart .chart-provenance { line-height: 1.7; }
+
+.portfolio-allocation { margin-block: 32px; min-width: 0; }
+.allocation-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.allocation-metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.allocation-panel { margin-block: 24px; min-width: 0; }
+.allocation-panel .panel-heading { flex-wrap: wrap; gap: 12px; }
+.allocation-panel h4 { margin-block: 24px 12px; font-size: 14px; }
+.allocation-panel .chart-provenance { line-height: 1.7; }
+.allocation-layout { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 24px; align-items: start; }
