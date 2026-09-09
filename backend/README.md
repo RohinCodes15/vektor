@@ -26,7 +26,7 @@ uv run pytest
 
 ## Configuration
 
-All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`).
+All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
 
 ## Historical market data (Phase 2A)
 
