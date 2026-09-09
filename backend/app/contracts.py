@@ -1,6 +1,6 @@
 """Shared API contracts (v1). Coordinated with frontend/ — see AGENTS.md before changing.
 
-Simulation models are contracts only; no endpoints serve them yet.
+Simulation models are contracts only; no endpoints serve them yet. Backtest models back /api/v1/backtests.
 Market history models back the read-only GET /api/v1/market/history endpoint.
 Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots, analytics, allocation
 and risk live under the same prefix. Money is a Decimal, serialized as a JSON string: cash, cost and P&L have 2 decimal
@@ -480,3 +480,108 @@ class BacktestCreate(Contract):
         if self.end >= datetime.now(UTC).date():
             raise ValueError("end must be before today (UTC): only completed daily bars are simulated")
         return self
+
+
+class BacktestTrade(Contract):
+    """One simulated fill at the open of `fill_date`, from a signal at the close of `signal_date`.
+
+    Prices are split- and dividend-adjusted (see backend/README.md). `notional` is quantity * price in cents.
+    """
+
+    symbol: str
+    side: OrderSide
+    signal_date: date
+    fill_date: date
+    quantity: int
+    price: Decimal
+    notional: Decimal
+    fee: Decimal
+    # Sells only: notional - fee - the position's cost (buy notional + buy fee).
+    realized_pnl: Decimal | None
+
+
+class BacktestRejectedOrder(Contract):
+    """An order the simulation could not fill; nothing changed."""
+
+    symbol: str
+    side: OrderSide
+    signal_date: date
+    fill_date: date
+    reason: str
+
+
+class BacktestEquityPoint(Contract):
+    """Account value at the close of `date`."""
+
+    date: date
+    cash: Decimal
+    positions_value: Decimal
+    equity: Decimal
+    # Fall from the highest equity so far; zero or negative, 4 decimal places.
+    drawdown_pct: Decimal
+
+
+class BacktestPosition(Contract):
+    """A position still open after the last bar, marked at its last adjusted close."""
+
+    symbol: str
+    quantity: int
+    cost_basis: Decimal
+    last_price: Decimal
+    market_value: Decimal
+    unrealized_pnl: Decimal
+
+
+class BacktestMetrics(Contract):
+    """Performance of the equity curve. A metric is null when it is undefined; `Backtest.warnings` says why.
+
+    Percentages and the Sharpe ratio have 4 decimal places; see backend/README.md for every formula.
+    """
+
+    final_equity: Decimal
+    total_return_pct: Decimal
+    annualized_return_pct: Decimal | None
+    # Annualized: sample standard deviation of daily returns * sqrt(252).
+    volatility_pct: Decimal | None
+    max_drawdown_pct: Decimal
+    # Annualized, risk-free rate 0: mean daily return / standard deviation * sqrt(252).
+    sharpe_ratio: Decimal | None
+    # Share of closed trades (sells) with a positive realized P&L.
+    win_rate_pct: Decimal | None
+    trades: int
+    closed_trades: int
+    winning_trades: int
+    total_fees: Decimal
+
+
+class Backtest(Contract):
+    """A completed, deterministic backtest: the same request on the same data gives the same result."""
+
+    id: UUID
+    mode: TradingMode = "paper"
+    currency: PortfolioCurrency
+    config: BacktestCreate
+    created_at: AwareDatetime
+    source: MarketDataSource
+    # Trading days simulated: the dates in the range on which every symbol has a bar.
+    bars: int
+    first_date: date
+    last_date: date
+    metrics: BacktestMetrics
+    warnings: list[str]
+    equity_curve: list[BacktestEquityPoint]
+    trades: list[BacktestTrade]
+    rejected_orders: list[BacktestRejectedOrder]
+    open_positions: list[BacktestPosition]
+
+
+class BacktestSummary(Contract):
+    """A stored backtest without its equity curve and trade list."""
+
+    id: UUID
+    created_at: AwareDatetime
+    config: BacktestCreate
+    bars: int
+    first_date: date
+    last_date: date
+    metrics: BacktestMetrics
