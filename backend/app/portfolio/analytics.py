@@ -60,7 +60,7 @@ def compute_metrics(snapshots: Sequence[EquitySnapshot]) -> Metrics:
     returns = daily_returns(series)
     valid = [r for r in returns if r is not None]
     latest = snapshots[-1]
-    stdev = _sample_stdev(valid)
+    stdev = sample_stdev(valid)
     annualizer = Decimal(TRADING_DAYS_PER_YEAR).sqrt()
     return Metrics(
         daily_observations=len(series),
@@ -68,19 +68,19 @@ def compute_metrics(snapshots: Sequence[EquitySnapshot]) -> Metrics:
         latest_daily_return_pct=_pct(returns[-1]) if returns and returns[-1] is not None else None,
         volatility_pct=_pct(stdev * annualizer) if stdev is not None else None,
         max_drawdown_pct=_pct(_max_drawdown(valid)) if valid else None,
-        sharpe_ratio=_round(_mean(valid) / stdev * annualizer) if stdev else None,
+        sharpe_ratio=_round(mean(valid) / stdev * annualizer) if stdev else None,
     )
 
 
-def _mean(values: Sequence[Decimal]) -> Decimal:
+def mean(values: Sequence[Decimal]) -> Decimal:
     return sum(values, Decimal(0)) / len(values)
 
 
-def _sample_stdev(values: Sequence[Decimal]) -> Decimal | None:
+def sample_stdev(values: Sequence[Decimal]) -> Decimal | None:
     if len(values) < 2:
         return None
-    mean = _mean(values)
-    return (sum(((v - mean) ** 2 for v in values), Decimal(0)) / (len(values) - 1)).sqrt()
+    average = mean(values)
+    return (sum(((v - average) ** 2 for v in values), Decimal(0)) / (len(values) - 1)).sqrt()
 
 
 def _max_drawdown(returns: Sequence[Decimal]) -> Decimal:
