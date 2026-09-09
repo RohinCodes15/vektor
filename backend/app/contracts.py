@@ -388,3 +388,44 @@ class PortfolioRisk(Contract):
     portfolio_volatility_pct: Decimal | None
     assets: list[AssetRisk]
     correlations: list[AssetCorrelation]
+
+
+# Backtests (Phase 2G.1). Simulated on completed daily history only; nothing here reaches a broker.
+class BuyAndHoldStrategy(Contract):
+    """Buy every symbol once, on the first possible bar, and hold to the end."""
+
+    kind: Literal["buy_and_hold"]
+
+
+class SmaCrossoverStrategy(Contract):
+    """Buy when the fast simple moving average of closes crosses above the slow one; sell when it crosses below."""
+
+    kind: Literal["sma_crossover"]
+    fast_window: int = Field(default=20, ge=2, le=250)
+    slow_window: int = Field(default=50, ge=3, le=500)
+
+    @model_validator(mode="after")
+    def check_windows(self) -> Self:
+        if self.fast_window >= self.slow_window:
+            raise ValueError("fast_window must be smaller than slow_window")
+        return self
+
+
+class RsiStrategy(Contract):
+    """Wilder's RSI of closes: buy when it is below `oversold`, sell when it is above `overbought`."""
+
+    kind: Literal["rsi"]
+    period: int = Field(default=14, ge=2, le=100)
+    oversold: Decimal = Field(default=Decimal(30), gt=0, lt=100, max_digits=4, decimal_places=2)
+    overbought: Decimal = Field(default=Decimal(70), gt=0, lt=100, max_digits=4, decimal_places=2)
+
+    @model_validator(mode="after")
+    def check_thresholds(self) -> Self:
+        if self.oversold >= self.overbought:
+            raise ValueError("oversold must be below overbought")
+        return self
+
+
+BacktestStrategy = Annotated[BuyAndHoldStrategy | SmaCrossoverStrategy | RsiStrategy, Field(discriminator="kind")]
+# Basis points (1 bp = 0.01%) of the traded value, capped at 10%.
+BasisPoints = Annotated[Decimal, Field(ge=0, le=1000, max_digits=6, decimal_places=2)]
