@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.backtest.indicators import sma
+from app.backtest.indicators import rsi, sma
 
 D = Decimal
 
@@ -21,7 +21,28 @@ def test_sma_window_of_one_is_the_series_and_short_input_is_all_undefined() -> N
     assert sma([], 3) == ()
 
 
-@pytest.mark.parametrize("indicator", [sma])
+def test_rsi_matches_wilders_smoothing_by_hand() -> None:
+    # Changes: +2, -1, +1, -2. First averages over 2 changes: gain 1, loss 0.5 -> RSI 100 - 100/3.
+    # Next: gain (1*1 + 1)/2 = 1, loss (0.5*1 + 0)/2 = 0.25 -> RS 4 -> RSI 80.
+    # Next: gain (1 + 0)/2 = 0.5, loss (0.25 + 2)/2 = 1.125 -> RSI 100 - 100/(1 + 4/9) = 30.7692...
+    values = rsi(series(10, 12, 11, 12, 10), 2)
+    assert values[:2] == (None, None)
+    assert values[2] == D(100) - D(100) / D(3)
+    assert values[3] == D(80)
+    assert round(values[4], 4) == D("30.7692")  # type: ignore[arg-type]
+
+
+def test_rsi_is_100_without_losses_and_undefined_without_movement() -> None:
+    assert rsi(series(1, 2, 3, 4), 2)[2:] == (D(100), D(100))
+    assert rsi(series(5, 5, 5, 5), 2)[2:] == (None, None)
+    assert rsi(series(5, 5), 2) == (None, None)
+
+
+def test_rsi_is_zero_when_prices_only_fall() -> None:
+    assert rsi(series(9, 8, 7, 6), 2)[2:] == (D(0), D(0))
+
+
+@pytest.mark.parametrize("indicator", [sma, rsi])
 def test_indicators_are_causal(indicator: object) -> None:
     values = series(10, 11, 9, 12, 13, 12, 8, 9, 15, 14, 13, 16)
     full = indicator(values, 3)  # type: ignore[operator]
@@ -29,7 +50,7 @@ def test_indicators_are_causal(indicator: object) -> None:
         assert indicator(values[: end + 1], 3) == full[: end + 1]  # type: ignore[operator]
 
 
-@pytest.mark.parametrize("indicator", [sma])
+@pytest.mark.parametrize("indicator", [sma, rsi])
 def test_indicators_reject_a_non_positive_window(indicator: object) -> None:
     with pytest.raises(ValueError, match="at least 1"):
         indicator(series(1, 2), 0)  # type: ignore[operator]
