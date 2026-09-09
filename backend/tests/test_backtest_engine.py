@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.backtest.engine import Costs, Holding, Simulation, simulate
+from app.backtest.engine import Costs, Holding, Simulation, _affordable, simulate
 from app.backtest.prices import Bar
 from app.backtest.strategies import Signal
 
@@ -86,3 +86,61 @@ def test_fills_never_leave_the_bars_traded_range() -> None:
     buy, sell = run({"A": prices}, {"A": ["buy", "sell", None]}, costs=costs).account.fills
     assert buy.price == D("12.5")  # 13.2 capped at the high
     assert sell.price == D("13.5")  # 12.6 floored at the low
+
+
+def test_a_buy_that_cannot_afford_one_share_is_rejected_and_changes_nothing() -> None:
+    costs = Costs(fee_per_trade=D("5.00"), fee_rate=D(0), slippage=D(0))
+    result = run({"A": TREND}, {"A": ["buy", None, None]}, cash="10.00", costs=costs)
+    assert result.account.fills == ()
+    (rejection,) = result.account.rejections
+    assert (rejection.side, rejection.signal_date, rejection.fill_date) == ("buy", START, START + timedelta(days=1))
+    assert "Insufficient cash" in rejection.reason
+    assert [p.equity for p in result.equity_curve] == [D("10.00")] * 3
+
+
+def test_a_sell_whose_fee_exceeds_proceeds_plus_cash_is_rejected() -> None:
+    costs = Costs(fee_per_trade=D("5.00"), fee_rate=D(0), slippage=D(0))
+    prices = bars((10, 10, 10, 10), (10, 10, 10, 10), (0.4, 0.5, 0.3, 0.4))
+    result = run({"A": prices}, {"A": ["buy", "sell", None]}, cash="105.00", costs=costs)
+    (buy,) = result.account.fills
+    assert (buy.quantity, result.account.cash) == (10, D("0.00"))
+    (rejection,) = result.account.rejections
+    assert rejection.side == "sell" and "exceeds the sale proceeds" in rejection.reason
+    assert result.account.holdings == {"A": Holding(10, D("105.00"))}  # still held; cash never negative
+
+
+def test_buys_target_equal_slices_of_equity_within_available_cash() -> None:
+    result = run({"A": flat(10, 10, 10), "B": flat(30, 30, 30)}, {"A": ["buy", None, None], "B": ["buy", None, None]})
+    a, b = result.account.fills
+    assert (a.symbol, a.quantity, b.symbol, b.quantity) == ("A", 50, "B", 16)  # 500 each: 50 x 10, 16 x 30
+    assert result.account.cash == D("20.00")
+
+
+def test_position_size_limits_the_amount_invested() -> None:
+    (fill,) = run({"A": flat(10, 10, 10)}, {"A": ["buy", None, None]}, fraction="0.25").account.fills
+    assert fill.quantity == 25
+
+
+def test_sells_fill_before_buys_so_their_proceeds_can_be_spent() -> None:
+    series = {"A": flat(10, 10, 30, 30), "B": flat(10, 10, 10, 10)}
+    signals: dict[str, Sequence[Signal | None]] = {"A": ["buy", None, "sell", None], "B": [None, None, "buy", None]}
+    result = run(series, signals)
+    sides = [(f.symbol, f.side, f.quantity) for f in result.account.fills]
+    # Bar 3: equity at bar 2 is 2000, so B targets 1000. Without A's proceeds only 500 cash would be on hand.
+    assert sides == [("A", "buy", 50), ("A", "sell", 50), ("B", "buy", 100)]
+
+
+def test_redundant_signals_are_ignored() -> None:
+    result = run({"A": flat(10, 10, 10, 10, 10)}, {"A": ["sell", "buy", "buy", "sell", "sell"]})
+    assert [(f.side, f.fill_date) for f in result.account.fills] == [
+        ("buy", START + timedelta(days=2)), ("sell", START + timedelta(days=4)),
+    ]
+    assert result.account.rejections == ()
+
+
+def test_affordable_steps_back_when_the_rounded_fee_overshoots() -> None:
+    costs = Costs(fee_per_trade=D("0.00"), fee_rate=D("0.0046"), slippage=D(0))
+    # 10 shares cost exactly 10.046, but the fee rounds up to 0.05, so only 9 fit.
+    assert _affordable(D(1), D("10.046"), costs) == 9
+    assert _affordable(D(1), D("10.05"), costs) == 10
+    assert _affordable(D(1), D("0.00"), costs) == 0
