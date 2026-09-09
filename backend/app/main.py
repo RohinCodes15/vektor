@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api_errors import register_error_handlers
+from app.backtest.service import BacktestService
+from app.backtest.store import BacktestStore
 from app.config import Settings, get_settings
 from app.contracts import HealthResponse
 from app.logging_config import configure_logging
@@ -14,7 +16,7 @@ from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
-from app.routers import market, portfolios
+from app.routers import backtests, market, portfolios
 
 try:
     VERSION = version("vektor-backend")
@@ -37,6 +39,7 @@ def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
 
 v1.include_router(market.router)
 v1.include_router(portfolios.router)
+v1.include_router(backtests.router)
 
 
 def create_app(settings: Settings | None = None, *, market_data_provider: HistoryProvider | None = None) -> FastAPI:
@@ -57,6 +60,7 @@ def create_app(settings: Settings | None = None, *, market_data_provider: Histor
     )
     app.state.market_data_service = market_data_service
     app.state.portfolio_service = PortfolioService(PortfolioStore(settings.portfolio_db_path), market_data_service)
+    app.state.backtest_service = BacktestService(BacktestStore(settings.backtest_db_path), market_data_service)
     app.include_router(v1)
     app.dependency_overrides[get_settings] = lambda: settings
     logging.getLogger("vektor").info(
