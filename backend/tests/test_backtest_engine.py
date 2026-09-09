@@ -1,10 +1,14 @@
+import random
 from collections.abc import Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 
+import pytest
+
 from app.backtest.engine import Costs, Holding, Simulation, _affordable, simulate
 from app.backtest.prices import Bar
-from app.backtest.strategies import Signal
+from app.backtest.strategies import Signal, signal_series
+from app.contracts import RsiStrategy, SmaCrossoverStrategy
 
 D = Decimal
 FREE = Costs(fee_per_trade=D("0.00"), fee_rate=D(0), slippage=D(0))
@@ -144,3 +148,54 @@ def test_affordable_steps_back_when_the_rounded_fee_overshoots() -> None:
     assert _affordable(D(1), D("10.046"), costs) == 9
     assert _affordable(D(1), D("10.05"), costs) == 10
     assert _affordable(D(1), D("0.00"), costs) == 0
+
+
+def random_market(seed: int, n: int = 120) -> list[Bar]:
+    rng = random.Random(seed)
+    price = 50.0
+    rows = []
+    for _ in range(n):
+        open_ = price * rng.uniform(0.97, 1.03)
+        close = open_ * rng.uniform(0.95, 1.05)
+        rows.append((round(open_, 2), round(max(open_, close) * 1.01, 2), round(min(open_, close) * 0.99, 2),
+                     round(close, 2)))
+        price = close
+    return bars(*rows)
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_invariants_hold_on_random_markets(seed: int) -> None:
+    rng = random.Random(seed)
+    series = {"A": random_market(seed), "B": random_market(seed + 100)}
+    signals = {s: [rng.choice(["buy", "sell", None]) for _ in range(120)] for s in series}
+    costs = Costs(fee_per_trade=D("1.00"), fee_rate=D("0.0005"), slippage=D("0.002"))
+    result = run(series, signals, cash="5000.00", costs=costs)  # type: ignore[arg-type]
+    by_day = {s: {b.date: b for b in bs} for s, bs in series.items()}
+    assert result.account.fills
+    for fill in result.account.fills:
+        bar = by_day[fill.symbol][fill.fill_date]
+        assert bar.low <= fill.price <= bar.high
+        assert fill.fill_date > fill.signal_date
+        assert fill.quantity > 0
+    assert all(p.cash >= 0 and p.equity == p.cash + p.positions_value for p in result.equity_curve)
+    assert run(series, signals, cash="5000.00", costs=costs) == result  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "strategy",
+    [SmaCrossoverStrategy(kind="sma_crossover", fast_window=3, slow_window=8), RsiStrategy(kind="rsi", period=5)],
+)
+def test_results_up_to_a_bar_never_depend_on_later_bars(strategy: SmaCrossoverStrategy | RsiStrategy) -> None:
+    market = random_market(7)
+    costs = Costs(fee_per_trade=D("1.00"), fee_rate=D("0.001"), slippage=D("0.001"))
+
+    def backtest(prefix: list[Bar]) -> Simulation:
+        signals = {"A": signal_series(strategy, [b.close for b in prefix])}
+        return run({"A": prefix}, signals, costs=costs)
+
+    full = backtest(market)
+    assert full.account.fills
+    for end in range(10, len(market), 7):
+        partial = backtest(market[: end + 1])
+        assert partial.equity_curve == full.equity_curve[: end + 1]
+        assert partial.account.fills == tuple(f for f in full.account.fills if f.fill_date <= market[end].date)
