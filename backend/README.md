@@ -287,3 +287,16 @@ curl -X POST localhost:8000/api/v1/backtests -H 'content-type: application/json'
 ```
 
 Errors are `{"detail": "..."}`: 422 for an invalid request, unknown symbol, non-USD prices, or too little history; 404 for an unknown backtest id; 502/503 when the provider returns invalid data or cannot be reached. Contracts: `BacktestCreate`, the strategy models, `Backtest`, `BacktestSummary`, `BacktestMetrics`, `BacktestTrade`, `BacktestRejectedOrder`, `BacktestEquityPoint`, `BacktestPosition` in `app/contracts.py`. Money is a `Decimal` serialized as a string, in cents; prices have 4 decimal places; percentages and the Sharpe ratio have 4.
+
+### Request
+
+| Field | Meaning |
+|-------|---------|
+| `symbols` | 1 to 10 distinct tradable tickers (no indices, futures, or currency pairs) |
+| `start`, `end` | Inclusive calendar dates, `start` before `end`, `end` before today (UTC): only completed bars are simulated |
+| `starting_cash` | Virtual USD, more than 0, at most 2 decimal places |
+| `strategy` | One of the strategies below, chosen by `kind` |
+| `position_size_pct` | Share of equity each entry targets, split equally across the symbols. Default 100 |
+| `fee_per_trade` | Fixed dollars per fill, 0 to 1000. Default 0 |
+| `fee_bps` | Commission in basis points of each fill's notional, 0 to 1000. Default 0 |
+| `slippage_bps` | Basis points every fill price moves against the trade, 0 to 1000. Default 0 |
