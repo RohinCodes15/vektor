@@ -326,3 +326,18 @@ Signals are computed at a bar's close from that close and earlier closes only.
 7. **End:** positions still held after the last day are not sold. They are reported in `open_positions`, marked at the last adjusted close, and counted in the final equity.
 
 The simulation is deterministic: the same request on the same market data gives the same result (only `id` and `created_at` differ). Results are stored whole and returned unchanged by `GET`; they are never recomputed.
+
+### Metrics
+
+`E₀ … Eₙ` is the equity at each day's close (`E₀` is the starting cash, since nothing fills on the first day).
+
+| Field | Formula | Undefined (`null`) when |
+|-------|---------|-------------------------|
+| `total_return_pct` | `Eₙ / starting cash − 1` | never |
+| `annualized_return_pct` | `(Eₙ / starting cash)^(252 / n) − 1`, n = number of daily returns; −100 if equity reaches 0 | fewer than 1 daily return |
+| `volatility_pct` | sample standard deviation of daily returns `Eₜ / Eₜ₋₁ − 1` × √252 | fewer than 2 daily returns |
+| `sharpe_ratio` | mean daily return / sample standard deviation × √252, risk-free rate 0 | fewer than 2 daily returns, or zero volatility (for example, nothing was bought) |
+| `max_drawdown_pct` | lowest `Eₜ / max(E₀ … Eₜ) − 1`; each `equity_curve` point has its own `drawdown_pct` | never |
+| `win_rate_pct` | sells with `realized_pnl > 0` / all sells | no trade was closed |
+
+`realized_pnl` of a sell is `notional − fee − (buy notional + buy fee)`, so fees on both legs count. `total_fees` adds every fee. Each `null` metric has an explanation in `warnings`. Percentages are fractions × 100, rounded to 4 places, `ROUND_HALF_EVEN`. All arithmetic uses `Decimal`.
