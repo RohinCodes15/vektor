@@ -429,3 +429,54 @@ class RsiStrategy(Contract):
 BacktestStrategy = Annotated[BuyAndHoldStrategy | SmaCrossoverStrategy | RsiStrategy, Field(discriminator="kind")]
 # Basis points (1 bp = 0.01%) of the traded value, capped at 10%.
 BasisPoints = Annotated[Decimal, Field(ge=0, le=1000, max_digits=6, decimal_places=2)]
+
+
+class BacktestCreate(Contract):
+    """A backtest over completed daily bars. `start` and `end` are inclusive calendar dates before today (UTC).
+
+    Long-only and whole shares. Each entry targets `position_size_pct` of equity split equally across `symbols`.
+    """
+
+    symbols: list[str] = Field(min_length=1, max_length=10)
+    start: date
+    end: date
+    starting_cash: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    strategy: BacktestStrategy
+    position_size_pct: Decimal = Field(default=Decimal(100), gt=0, le=100, max_digits=5, decimal_places=2)
+    # Fixed commission per fill, in dollars.
+    fee_per_trade: Decimal = Field(default=Decimal("0.00"), ge=0, le=1000, max_digits=6, decimal_places=2)
+    # Commission proportional to each fill's notional.
+    fee_bps: BasisPoints = Decimal(0)
+    # Price moved against every fill: buys pay more, sells receive less.
+    slippage_bps: BasisPoints = Decimal(0)
+
+    @field_validator("symbols", mode="before")
+    @classmethod
+    def normalize_symbols(cls, value: object) -> object:
+        if not isinstance(value, list):
+            return value
+        symbols = [item.strip().upper() if isinstance(item, str) else item for item in value]
+        for symbol in symbols:
+            if isinstance(symbol, str) and not _TRADABLE_SYMBOL.fullmatch(symbol):
+                raise ValueError("each symbol must be a ticker of 1-15 letters, digits, '.' or '-'")
+        if len(set(symbols)) != len(symbols):
+            raise ValueError("symbols must not repeat")
+        return symbols
+
+    @field_validator("starting_cash", "fee_per_trade")
+    @classmethod
+    def to_cents(cls, value: Decimal) -> Decimal:
+        return value.quantize(Decimal("0.01"))  # exact: at most 2 decimal places were accepted
+
+    @field_validator("position_size_pct", "fee_bps", "slippage_bps")
+    @classmethod
+    def canonical_number(cls, value: Decimal) -> Decimal:
+        return _canonical(value)
+
+    @model_validator(mode="after")
+    def check_date_range(self) -> Self:
+        if self.start >= self.end:
+            raise ValueError("start must be before end")
+        if self.end >= datetime.now(UTC).date():
+            raise ValueError("end must be before today (UTC): only completed daily bars are simulated")
+        return self
