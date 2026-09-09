@@ -341,3 +341,12 @@ The simulation is deterministic: the same request on the same market data gives 
 | `win_rate_pct` | sells with `realized_pnl > 0` / all sells | no trade was closed |
 
 `realized_pnl` of a sell is `notional − fee − (buy notional + buy fee)`, so fees on both legs count. `total_fees` adds every fee. Each `null` metric has an explanation in `warnings`. Percentages are fractions × 100, rounded to 4 places, `ROUND_HALF_EVEN`. All arithmetic uses `Decimal`.
+
+### Limitations
+
+- Daily bars only. Orders fill at the open; intraday paths, gaps inside a day, partial fills, market impact beyond `slippage_bps`, and volume limits are not modeled.
+- Long only: no short selling, margin, leverage, or interest on cash.
+- Adjusted prices make returns total-return, but adjusted quantities and prices are not the literal historical share counts and quotes. Yahoo's adjustment factors can change after new dividends, so a later run of the same request can differ slightly.
+- Indicators warm up inside the range, so a strategy cannot signal on the first `slow_window` (or `period`) days.
+- Backtests run synchronously in the request. Very long ranges with many symbols take longer to fetch the first time; later runs use the market data cache.
+- Past performance in a simulation does not predict future results.
