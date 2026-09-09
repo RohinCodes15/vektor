@@ -300,3 +300,17 @@ Errors are `{"detail": "..."}`: 422 for an invalid request, unknown symbol, non-
 | `fee_per_trade` | Fixed dollars per fill, 0 to 1000. Default 0 |
 | `fee_bps` | Commission in basis points of each fill's notional, 0 to 1000. Default 0 |
 | `slippage_bps` | Basis points every fill price moves against the trade, 0 to 1000. Default 0 |
+
+### Strategies
+
+Signals are computed at a bar's close from that close and earlier closes only.
+
+| `kind` | Parameters | Rule |
+|--------|------------|------|
+| `buy_and_hold` | none | Buy every symbol at the first bar; never sell |
+| `sma_crossover` | `fast_window` (2 to 250, default 20) < `slow_window` (3 to 500, default 50) | Buy when the fast simple moving average crosses above the slow one (`fast − slow` goes from ≤ 0 to > 0); sell when it crosses below (from ≥ 0 to < 0) |
+| `rsi` | `period` (2 to 100, default 14), `oversold` (default 30) < `overbought` (default 70), both between 0 and 100 | Wilder's RSI: buy while RSI < `oversold`, sell while RSI > `overbought` |
+
+`SMA(n)` at bar i is the mean of the last n closes. Wilder's RSI uses changes `cₖ = closeₖ − closeₖ₋₁`: the first average gain and loss are simple means over the first n changes, then `average = (previous × (n − 1) + current) / n`; `RSI = 100 − 100 / (1 + average gain / average loss)`, 100 when there are no losses, and undefined (no signal) when prices did not move. A buy signal while holding the symbol and a sell signal while flat are ignored.
+
+**Minimum history:** the first possible signal must be able to fill, so a backtest needs at least 2 trading days for buy & hold, `slow_window + 2` for SMA crossover, and `period + 2` for RSI. Indicators warm up inside the requested range; no data before `start` is used.
