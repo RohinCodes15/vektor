@@ -267,3 +267,23 @@ Risk metrics are `available` only when **all** of these hold. Otherwise `unavail
 - Covariance from 20 to 80 observations is noisy, and √252 annualization assumes one return per trading day.
 - Weights use the split-adjusted `close`, while returns use `adjusted_close`. A recent corporate action can make the two disagree until stored quantities are adjusted (see the Phase 2C limitation).
 - Each held symbol's history is fetched once per day and then served from the market data cache.
+
+## Strategy backtests (Phase 2G.1)
+
+Paper-only simulations of a trading strategy on real completed daily history from the market data service. Nothing is sent to a broker, and no price is invented: a backtest with an unknown symbol, non-USD prices, or too little history is rejected and nothing is stored.
+
+| Method and path (under `/api/v1`) | Does | Success |
+|-----------------------------------|------|---------|
+| `POST /backtests` | Run a backtest and store the result | 201 `Backtest` |
+| `GET /backtests` | List stored backtests, oldest first, without curves and trades | 200 `BacktestSummary[]` |
+| `GET /backtests/{id}` | One stored backtest | 200 `Backtest` |
+
+```bash
+curl -X POST localhost:8000/api/v1/backtests -H 'content-type: application/json' -d '{
+  "symbols": ["AAPL", "MSFT"], "start": "2023-01-01", "end": "2024-12-31", "starting_cash": "10000",
+  "strategy": {"kind": "sma_crossover", "fast_window": 20, "slow_window": 50},
+  "position_size_pct": "100", "fee_per_trade": "1.00", "fee_bps": "0", "slippage_bps": "5"
+}'
+```
+
+Errors are `{"detail": "..."}`: 422 for an invalid request, unknown symbol, non-USD prices, or too little history; 404 for an unknown backtest id; 502/503 when the provider returns invalid data or cannot be reached. Contracts: `BacktestCreate`, the strategy models, `Backtest`, `BacktestSummary`, `BacktestMetrics`, `BacktestTrade`, `BacktestRejectedOrder`, `BacktestEquityPoint`, `BacktestPosition` in `app/contracts.py`. Money is a `Decimal` serialized as a string, in cents; prices have 4 decimal places; percentages and the Sharpe ratio have 4.
