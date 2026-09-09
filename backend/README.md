@@ -314,3 +314,15 @@ Signals are computed at a bar's close from that close and earlier closes only.
 `SMA(n)` at bar i is the mean of the last n closes. Wilder's RSI uses changes `cₖ = closeₖ − closeₖ₋₁`: the first average gain and loss are simple means over the first n changes, then `average = (previous × (n − 1) + current) / n`; `RSI = 100 − 100 / (1 + average gain / average loss)`, 100 when there are no losses, and undefined (no signal) when prices did not move. A buy signal while holding the symbol and a sell signal while flat are ignored.
 
 **Minimum history:** the first possible signal must be able to fill, so a backtest needs at least 2 trading days for buy & hold, `slow_window + 2` for SMA crossover, and `period + 2` for RSI. Indicators warm up inside the requested range; no data before `start` is used.
+
+### Simulation
+
+1. **Prices:** every bar is converted to split- and dividend-adjusted prices: open, high, low, and close are multiplied by `adjusted_close / close` and rounded to 4 places. Fills, positions, and the equity curve use these prices, so a split or dividend never shows up as a gain or loss. Trade prices are therefore adjusted prices, not the literal historical quotes.
+2. **Calendar:** only dates on which every symbol has a bar are simulated (`bars`). A date missing for one symbol is dropped for all of them, never filled.
+3. **No look-ahead:** a signal at the close of day t fills at the **open of the next simulated day**. A signal on the last day never fills. Each day: fill yesterday's orders at the open (sells first, then buys, each in symbol order), mark positions at the close, then compute signals.
+4. **Fill price:** buys pay `open × (1 + slippage)`, rounded up to 4 places and capped at the day's high; sells receive `open × (1 − slippage)`, rounded down and floored at the day's low. A fill never happens outside the day's traded range.
+5. **Fees:** `fee_per_trade + notional × fee_bps / 10000`, rounded to cents, on every fill. `notional = quantity × price`, rounded to cents.
+6. **Sizing and cash:** long only, whole shares. A buy targets `equity at the previous close × position_size_pct / 100 / number of symbols`, limited to the cash on hand, and buys the largest whole quantity whose notional plus fee fits. A sell closes the whole position. An order that cannot fill (less than one share affordable, or a sell whose fee would exceed its proceeds plus cash) appears in `rejected_orders` with a reason and changes nothing. Cash never goes negative.
+7. **End:** positions still held after the last day are not sold. They are reported in `open_positions`, marked at the last adjusted close, and counted in the final equity.
+
+The simulation is deterministic: the same request on the same market data gives the same result (only `id` and `created_at` differ). Results are stored whole and returned unchanged by `GET`; they are never recomputed.
