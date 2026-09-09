@@ -75,6 +75,15 @@ def test_portfolio_database_defaults_to_its_own_local_file(monkeypatch: pytest.M
     assert settings.portfolio_db_path != settings.market_data_cache_path
 
 
+def test_backtest_database_defaults_to_its_own_local_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VEKTOR_BACKTEST_DB_PATH", raising=False)
+    monkeypatch.delenv("VEKTOR_PORTFOLIO_DB_PATH", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.backtest_db_path.name == "backtests.sqlite3"
+    assert settings.backtest_db_path.parent == settings.portfolio_db_path.parent
+    assert settings.backtest_db_path != settings.portfolio_db_path
+
+
 @pytest.mark.parametrize("hours", [0, -1, 24 * 365 + 1])
 def test_market_data_cache_ttl_is_bounded(hours: int) -> None:
     with pytest.raises(ValidationError):

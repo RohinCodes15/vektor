@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     market_data_cache_ttl_hours: int = Field(default=24, ge=1, le=24 * 365)
     # Paper portfolios, positions, and transactions. Kept apart from the disposable market data cache.
     portfolio_db_path: Path = BACKEND_DIR / "data" / "portfolios.sqlite3"
+    # Completed backtest results, stored whole so they can be retrieved later.
+    backtest_db_path: Path = BACKEND_DIR / "data" / "backtests.sqlite3"
 
 
 @lru_cache
