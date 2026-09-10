@@ -503,3 +503,19 @@ function normalizeBacktestCreate(config: BacktestCreate): BacktestCreate {
   } else if (strategy.kind !== "buy_and_hold") throw new Error("Choose a supported backtest strategy.");
   return { ...config, symbols };
 }
+
+function isBacktestConfig(value: unknown): value is BacktestConfig {
+  if (!hasFields(value, ["symbols", "start", "end", "starting_cash", "strategy", "position_size_pct", "fee_per_trade", "fee_bps", "slippage_bps"])
+    || !Array.isArray(value.symbols) || value.symbols.length < 1 || value.symbols.length > 10 || !value.symbols.every(isTicker)
+    || new Set(value.symbols).size !== value.symbols.length || !isCalendarDate(value.start) || !isCalendarDate(value.end)
+    || value.start >= value.end || !isMoney(value.starting_cash, true) || !isBoundedDecimal(value.position_size_pct, Number.MIN_VALUE, 100)
+    || !isMoney(value.fee_per_trade, true) || !isBoundedDecimal(value.fee_bps, 0, 1000) || !isBoundedDecimal(value.slippage_bps, 0, 1000)
+    || typeof value.strategy !== "object" || value.strategy === null || Array.isArray(value.strategy)) return false;
+  const strategy = value.strategy as Record<string, unknown>;
+  return strategy.kind === "buy_and_hold" ? hasFields(strategy, ["kind"])
+    : strategy.kind === "sma_crossover" ? hasFields(strategy, ["kind", "fast_window", "slow_window"])
+      && Number.isInteger(strategy.fast_window) && Number.isInteger(strategy.slow_window)
+    : strategy.kind === "rsi" && hasFields(strategy, ["kind", "period", "oversold", "overbought"])
+      && Number.isInteger(strategy.period) && isBoundedDecimal(strategy.oversold, Number.MIN_VALUE, 99.99)
+      && isBoundedDecimal(strategy.overbought, Number.MIN_VALUE, 99.99);
+}
