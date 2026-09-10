@@ -445,3 +445,8 @@ export type BacktestConfig = Readonly<{
     | Readonly<{ kind: "rsi"; period: number; oversold: string; overbought: string }>;
   position_size_pct: string; fee_per_trade: string; fee_bps: string; slippage_bps: string;
 }>;
+export type BacktestMetrics = Readonly<{
+  final_equity: string; total_return_pct: string; annualized_return_pct: string | null;
+  volatility_pct: string | null; max_drawdown_pct: string; sharpe_ratio: string | null;
+  win_rate_pct: string | null; trades: number; closed_trades: number; winning_trades: number; total_fees: string;
+}>;
