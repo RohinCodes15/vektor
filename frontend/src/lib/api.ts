@@ -438,3 +438,10 @@ export type BacktestCreate = Readonly<{
   symbols: readonly string[]; start: string; end: string; starting_cash: string; strategy: BacktestStrategy;
   position_size_pct?: string; fee_per_trade?: string; fee_bps?: string; slippage_bps?: string;
 }>;
+export type BacktestConfig = Readonly<{
+  symbols: readonly string[]; start: string; end: string; starting_cash: string;
+  strategy: Readonly<{ kind: "buy_and_hold" }>
+    | Readonly<{ kind: "sma_crossover"; fast_window: number; slow_window: number }>
+    | Readonly<{ kind: "rsi"; period: number; oversold: string; overbought: string }>;
+  position_size_pct: string; fee_per_trade: string; fee_bps: string; slippage_bps: string;
+}>;
