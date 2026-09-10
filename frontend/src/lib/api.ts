@@ -47,10 +47,11 @@ async function requestJson(path: string, name: "health" | "market history" | "po
   let response: Response;
   try {
     response = await fetch(url, {
-      method: "GET",
+      method: body === undefined ? "GET" : "POST",
       cache: "no-store",
       credentials: "omit",
       redirect: "error",
+      ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
   } catch (error) {
