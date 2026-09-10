@@ -547,3 +547,9 @@ function isBacktest(value: unknown): value is Backtest {
       && isTicker(position.symbol) && Number.isSafeInteger(position.quantity) && (position.quantity as number) > 0 && isMoney(position.cost_basis, true)
       && isDecimal(position.last_price, true) && isMoney(position.market_value, true) && isMoney(position.unrealized_pnl));
 }
+
+export async function runBacktest(config: BacktestCreate, signal?: AbortSignal): Promise<Backtest> {
+  const data = await requestJson("/api/v1/backtests", "backtest", signal, undefined, normalizeBacktestCreate(config));
+  if (!isBacktest(data)) throw new Error("Backend returned an incompatible backtest result. No simulation data was accepted.");
+  return data;
+}
