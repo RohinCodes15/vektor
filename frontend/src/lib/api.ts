@@ -476,3 +476,30 @@ function isBoundedDecimal(value: unknown, minimum: number, maximum: number, plac
   const number = Number(value);
   return (!fraction || fraction.length <= places) && Number.isFinite(number) && number >= minimum && number <= maximum;
 }
+
+function normalizeBacktestCreate(config: BacktestCreate): BacktestCreate {
+  if (!Array.isArray(config.symbols) || config.symbols.length < 1 || config.symbols.length > 10) throw new Error("Choose 1 to 10 symbols.");
+  const symbols = config.symbols.map((symbol) => typeof symbol === "string" ? symbol.trim().toUpperCase() : "");
+  if (!symbols.every(isTicker) || new Set(symbols).size !== symbols.length) throw new Error("Use 1 to 10 distinct tradable symbols.");
+  const today = new Date().toISOString().slice(0, 10);
+  if (!isCalendarDate(config.start) || !isCalendarDate(config.end) || config.start >= config.end || config.end >= today)
+    throw new Error("Choose valid dates with start before end and end before today (UTC).");
+  if (!isBoundedDecimal(config.starting_cash, Number.MIN_VALUE, 999999999999.99)) throw new Error("Starting cash must be positive with at most 2 decimal places.");
+  if (config.position_size_pct !== undefined && !isBoundedDecimal(config.position_size_pct, Number.MIN_VALUE, 100)) throw new Error("Position size must be greater than 0 and at most 100%.");
+  if (config.fee_per_trade !== undefined && !isBoundedDecimal(config.fee_per_trade, 0, 1000)) throw new Error("Fee per trade must be between 0 and 1000.");
+  for (const value of [config.fee_bps, config.slippage_bps]) {
+    if (value !== undefined && !isBoundedDecimal(value, 0, 1000)) throw new Error("Fee and slippage basis points must be between 0 and 1000.");
+  }
+  const strategy = config.strategy;
+  if (strategy.kind === "sma_crossover") {
+    const fast = strategy.fast_window ?? 20, slow = strategy.slow_window ?? 50;
+    if (!Number.isInteger(fast) || fast < 2 || fast > 250 || !Number.isInteger(slow) || slow < 3 || slow > 500 || fast >= slow)
+      throw new Error("SMA windows must be valid and fast must be smaller than slow.");
+  } else if (strategy.kind === "rsi") {
+    const period = strategy.period ?? 14, oversold = strategy.oversold ?? "30", overbought = strategy.overbought ?? "70";
+    if (!Number.isInteger(period) || period < 2 || period > 100 || !isBoundedDecimal(oversold, Number.MIN_VALUE, 99.99)
+      || !isBoundedDecimal(overbought, Number.MIN_VALUE, 99.99) || Number(oversold) >= Number(overbought))
+      throw new Error("RSI settings must be valid and oversold must be below overbought.");
+  } else if (strategy.kind !== "buy_and_hold") throw new Error("Choose a supported backtest strategy.");
+  return { ...config, symbols };
+}
