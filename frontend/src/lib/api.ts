@@ -463,3 +463,9 @@ export type BacktestEquityPoint = Readonly<{
 export type BacktestPosition = Readonly<{
   symbol: string; quantity: number; cost_basis: string; last_price: string; market_value: string; unrealized_pnl: string;
 }>;
+export type Backtest = Readonly<{
+  id: string; mode: "paper"; currency: "USD"; config: BacktestConfig; created_at: string;
+  source: "yahoo_finance"; bars: number; first_date: string; last_date: string; metrics: BacktestMetrics;
+  warnings: readonly string[]; equity_curve: readonly BacktestEquityPoint[]; trades: readonly BacktestTrade[];
+  rejected_orders: readonly BacktestRejectedOrder[]; open_positions: readonly BacktestPosition[];
+}>;
