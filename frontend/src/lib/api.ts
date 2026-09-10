@@ -428,3 +428,13 @@ export async function getPortfolioRisk(id: string, signal?: AbortSignal): Promis
     throw new Error("Backend returned incompatible portfolio risk. No risk metrics were accepted.");
   return data as PortfolioRisk;
 }
+
+/** Mirrors Phase 2G.1. Decimal values stay as exact JSON strings. */
+export type BacktestStrategy =
+  | Readonly<{ kind: "buy_and_hold" }>
+  | Readonly<{ kind: "sma_crossover"; fast_window?: number; slow_window?: number }>
+  | Readonly<{ kind: "rsi"; period?: number; oversold?: string; overbought?: string }>;
+export type BacktestCreate = Readonly<{
+  symbols: readonly string[]; start: string; end: string; starting_cash: string; strategy: BacktestStrategy;
+  position_size_pct?: string; fee_per_trade?: string; fee_bps?: string; slippage_bps?: string;
+}>;
