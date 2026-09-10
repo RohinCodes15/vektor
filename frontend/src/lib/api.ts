@@ -457,3 +457,9 @@ export type BacktestTrade = Readonly<{
 export type BacktestRejectedOrder = Readonly<{
   symbol: string; side: "buy" | "sell"; signal_date: string; fill_date: string; reason: string;
 }>;
+export type BacktestEquityPoint = Readonly<{
+  date: string; cash: string; positions_value: string; equity: string; drawdown_pct: string;
+}>;
+export type BacktestPosition = Readonly<{
+  symbol: string; quantity: number; cost_basis: string; last_price: string; market_value: string; unrealized_pnl: string;
+}>;
