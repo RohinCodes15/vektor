@@ -469,3 +469,10 @@ export type Backtest = Readonly<{
   warnings: readonly string[]; equity_curve: readonly BacktestEquityPoint[]; trades: readonly BacktestTrade[];
   rejected_orders: readonly BacktestRejectedOrder[]; open_positions: readonly BacktestPosition[];
 }>;
+
+function isBoundedDecimal(value: unknown, minimum: number, maximum: number, places = 2): value is string {
+  if (typeof value !== "string" || !/^\d+(?:\.\d+)?$/.test(value)) return false;
+  const fraction = value.split(".")[1];
+  const number = Number(value);
+  return (!fraction || fraction.length <= places) && Number.isFinite(number) && number >= minimum && number <= maximum;
+}
