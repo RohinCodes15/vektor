@@ -450,3 +450,10 @@ export type BacktestMetrics = Readonly<{
   volatility_pct: string | null; max_drawdown_pct: string; sharpe_ratio: string | null;
   win_rate_pct: string | null; trades: number; closed_trades: number; winning_trades: number; total_fees: string;
 }>;
+export type BacktestTrade = Readonly<{
+  symbol: string; side: "buy" | "sell"; signal_date: string; fill_date: string; quantity: number;
+  price: string; notional: string; fee: string; realized_pnl: string | null;
+}>;
+export type BacktestRejectedOrder = Readonly<{
+  symbol: string; side: "buy" | "sell"; signal_date: string; fill_date: string; reason: string;
+}>;
