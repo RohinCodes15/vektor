@@ -527,3 +527,23 @@ function isBacktestMetrics(value: unknown): value is BacktestMetrics {
     && nullable.every((item) => item === null || isSignedDecimal(item)) && [value.trades, value.closed_trades, value.winning_trades].every((item) => Number.isSafeInteger(item) && (item as number) >= 0)
     && (value.closed_trades as number) <= (value.trades as number) && (value.winning_trades as number) <= (value.closed_trades as number) && isMoney(value.total_fees, true);
 }
+
+function isBacktest(value: unknown): value is Backtest {
+  if (!hasFields(value, ["id", "mode", "currency", "config", "created_at", "source", "bars", "first_date", "last_date", "metrics", "warnings", "equity_curve", "trades", "rejected_orders", "open_positions"])
+    || !isUuid(value.id) || value.mode !== "paper" || value.currency !== "USD" || !isBacktestConfig(value.config)
+    || !isAwareTimestamp(value.created_at) || value.source !== "yahoo_finance" || !Number.isSafeInteger(value.bars) || (value.bars as number) < 1
+    || !isCalendarDate(value.first_date) || !isCalendarDate(value.last_date) || value.first_date > value.last_date || !isBacktestMetrics(value.metrics)
+    || !Array.isArray(value.warnings) || !value.warnings.every((warning) => typeof warning === "string") || !Array.isArray(value.equity_curve)
+    || !Array.isArray(value.trades) || !Array.isArray(value.rejected_orders) || !Array.isArray(value.open_positions)) return false;
+  return value.equity_curve.every((point) => hasFields(point, ["date", "cash", "positions_value", "equity", "drawdown_pct"])
+      && isCalendarDate(point.date) && isMoney(point.cash, true) && isMoney(point.positions_value, true) && isMoney(point.equity, true) && isSignedDecimal(point.drawdown_pct))
+    && value.trades.every((trade) => hasFields(trade, ["symbol", "side", "signal_date", "fill_date", "quantity", "price", "notional", "fee", "realized_pnl"])
+      && isTicker(trade.symbol) && (trade.side === "buy" || trade.side === "sell") && isCalendarDate(trade.signal_date) && isCalendarDate(trade.fill_date)
+      && Number.isSafeInteger(trade.quantity) && (trade.quantity as number) > 0 && isDecimal(trade.price, true) && isMoney(trade.notional, true) && isMoney(trade.fee, true)
+      && (trade.side === "buy" ? trade.realized_pnl === null : isMoney(trade.realized_pnl)))
+    && value.rejected_orders.every((order) => hasFields(order, ["symbol", "side", "signal_date", "fill_date", "reason"])
+      && isTicker(order.symbol) && (order.side === "buy" || order.side === "sell") && isCalendarDate(order.signal_date) && isCalendarDate(order.fill_date) && typeof order.reason === "string")
+    && value.open_positions.every((position) => hasFields(position, ["symbol", "quantity", "cost_basis", "last_price", "market_value", "unrealized_pnl"])
+      && isTicker(position.symbol) && Number.isSafeInteger(position.quantity) && (position.quantity as number) > 0 && isMoney(position.cost_basis, true)
+      && isDecimal(position.last_price, true) && isMoney(position.market_value, true) && isMoney(position.unrealized_pnl));
+}
