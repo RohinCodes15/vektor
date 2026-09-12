@@ -242,6 +242,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .backtest-panel { padding: 20px; }
   .strategy-fields, .cost-fields { grid-template-columns: minmax(0, 1fr); }
   .backtest-actions { align-items: stretch; flex-direction: column; }
+  .backtest-actions .button { width: 100%; }
 }
 @media (max-width: 400px) {
   .mobile-break { display: initial; }
