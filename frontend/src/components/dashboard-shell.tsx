@@ -55,7 +55,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="sidebar-divider" />
           <span className="sidebar-caption sidebar-copy">RESEARCH TOOLS</span>
           <button type="button" className="nav-link future-link" disabled aria-label="Strategies — coming soon"><span className="nav-icon" aria-hidden="true">⧉</span><span className="sidebar-copy">Strategies <small>Soon</small></span></button>
-          <button type="button" className="nav-link future-link" disabled aria-label="Backtests — coming soon"><span className="nav-icon" aria-hidden="true">⏱</span><span className="sidebar-copy">Backtests <small>Soon</small></span></button>
           <div className="sidebar-note"><span className="local-mark" aria-hidden="true">⌘</span><div className="sidebar-copy"><strong>On your machine.</strong><p>No account. No brokerage.<br />Your research stays local.</p></div></div>
         </motion.div>
         <button type="button" className="collapse-toggle" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed} aria-controls="sidebar-navigation" onClick={() => setCollapsed(!collapsed)} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
