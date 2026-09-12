@@ -7,6 +7,7 @@ import { Badge } from "./ui";
 
 const sections = [
   { id: "overview", label: "Overview", icon: "◫" },
+  { id: "backtest", label: "Backtest", icon: "⏱" },
   { id: "market", label: "Market workspace", icon: "⌁" },
   { id: "activity", label: "Activity", icon: "↳" },
 ] as const;
