@@ -253,6 +253,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .help-link { display: none; }
   .symbol-row { gap: 8px; }
   .quote-unavailable { font-size: 8px; }
+  .backtest-fields { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
