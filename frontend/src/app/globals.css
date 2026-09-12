@@ -240,6 +240,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .activity-panel .button { margin-left: 52px; }
   .shell-footer { flex-direction: column; margin-inline: 20px; }
   .backtest-panel { padding: 20px; }
+  .strategy-fields, .cost-fields { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 400px) {
   .mobile-break { display: initial; }
