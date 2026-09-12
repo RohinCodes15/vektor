@@ -59,6 +59,7 @@ h3 { font-size: 14px; font-weight: 550; letter-spacing: -.015em; }
 .strategy-picker label:has(input:checked) { color: var(--color-teal); border-color: #4c8173; background: #86d5c10a; }
 .strategy-picker input { accent-color: var(--color-teal); }
 .cost-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 20px; border-top: 1px solid var(--color-line); }
+.cost-fields legend { float: left; }
 .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-teal); flex-shrink: 0; }
 .eyebrow { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--color-muted); display: flex; gap: 9px; align-items: center; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid var(--color-control); border-radius: 5px; background: transparent; color: var(--color-ink); font-size: 18px; }
