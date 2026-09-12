@@ -19,7 +19,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 96px; }
 body { margin: 0; background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 ::selection { background: #86d5c140; color: white; }
 a { text-decoration: none; color: inherit; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--color-teal); outline-offset: 4px; }
 button:disabled { cursor: not-allowed; color: #98a5a3; border-color: var(--color-line); background: var(--color-surface); }
