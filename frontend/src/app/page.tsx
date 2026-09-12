@@ -2,6 +2,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { MarketWorkspace } from "@/components/market-workspace";
 import { Reveal } from "@/components/reveal";
 import { PortfolioDashboard } from "@/components/portfolio-dashboard";
+import { BacktestForm } from "@/components/backtest-form";
 import { Badge, Button, Panel } from "@/components/ui";
 
 export default function Home() {
@@ -23,6 +24,7 @@ export default function Home() {
             </Panel>
           </div>
         </section>
+        <BacktestForm />
         <MarketWorkspace />
 
       </Reveal>
