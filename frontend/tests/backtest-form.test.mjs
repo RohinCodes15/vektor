@@ -49,3 +49,11 @@ test("backtest form submits API configuration and reports loading and success", 
   assert.equal(find(tree, (node) => node.type === "strong").props.children, "Backtest complete.");
   assert.equal(find(tree, (node) => node.props?.type === "submit").props.disabled, false);
 });
+
+test("backtest form exposes API errors without stale success", async () => {
+  const component = await mount("../src/components/backtest-form.tsx", { "../lib/api": { async runBacktest() { throw new Error("Backtest configuration was rejected."); } }, "./ui": ui }, "BacktestForm");
+  const tree = component.render();
+  await find(tree, (node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  const error = find(component.render(), (node) => node.props?.role === "alert");
+  assert.equal(error.props.children, "Backtest configuration was rejected.");
+});
