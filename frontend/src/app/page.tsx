@@ -20,7 +20,7 @@ export default function Home() {
             <Panel className="session-panel" aria-labelledby="session-title">
               <div className="panel-heading"><h3 id="session-title">Research session</h3><span className="mono muted text-xs">01</span></div>
               <div className="session-emblem" aria-hidden="true">∨</div><h3>Built for independent thinking.</h3><p className="muted text-sm">A focused workspace on your machine. Every strategy stays in simulation.</p>
-              <dl className="session-facts"><div><dt>Execution</dt><dd className="text-teal">Paper only</dd></div><div><dt>Live quote feed</dt><dd>Not connected</dd></div><div><dt>Simulation tools</dt><dd>Coming soon</dd></div></dl>
+              <dl className="session-facts"><div><dt>Execution</dt><dd className="text-teal">Paper only</dd></div><div><dt>Live quote feed</dt><dd>Not connected</dd></div><div><dt>Simulation tools</dt><dd>Ready</dd></div></dl>
             </Panel>
           </div>
         </section>
