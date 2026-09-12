@@ -239,6 +239,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .activity-panel > div { flex: 1; min-width: 180px; }
   .activity-panel .button { margin-left: 52px; }
   .shell-footer { flex-direction: column; margin-inline: 20px; }
+  .backtest-panel { padding: 20px; }
 }
 @media (max-width: 400px) {
   .mobile-break { display: initial; }
