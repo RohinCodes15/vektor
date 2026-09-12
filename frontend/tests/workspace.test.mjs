@@ -7,7 +7,7 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
   const html = await readFile(".next/server/app/index.html", "utf8");
     assert.match(html, /lang="en"/);
     assert.match(html, /Skip to content/);
-    for (const id of ["main", "overview", "market", "activity"]) {
+    for (const id of ["main", "overview", "backtest", "market", "activity"]) {
       assert.ok(html.includes(`id="${id}"`));
       assert.ok(html.includes(`href="#${id}"`));
     }
