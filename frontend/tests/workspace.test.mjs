@@ -31,6 +31,7 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     assert.match(html, /href="#backtest"[^>]*>New simulation<\/a>/);
     assert.match(html, /<label for="backtest-symbol">Ticker<\/label>/);
     assert.match(html, /Buy &amp; Hold/);
+    assert.match(html, /SMA Crossover/);
     assert.match(html, /<label for="symbol-search">Find a symbol<\/label>/);
     assert.match(html, /aria-describedby="symbol-search-hint"/);
     assert.match(html, /id="symbol-search-hint"/);
