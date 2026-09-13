@@ -12,7 +12,9 @@ from app.logging_config import configure_logging
 from app.market_data.cache import HistoryCache
 from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
-from app.routers import market
+from app.portfolio.service import PortfolioService
+from app.portfolio.store import PortfolioStore
+from app.routers import market, portfolios
 
 try:
     VERSION = version("vektor-backend")
@@ -34,6 +36,7 @@ def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
 
 
 v1.include_router(market.router)
+v1.include_router(portfolios.router)
 
 
 def create_app(settings: Settings | None = None, *, market_data_provider: HistoryProvider | None = None) -> FastAPI:
@@ -47,11 +50,13 @@ def create_app(settings: Settings | None = None, *, market_data_provider: Histor
         allow_headers=["*"],
     )
     register_error_handlers(app)
-    app.state.market_data_service = MarketDataService(
+    market_data_service = MarketDataService(
         provider=market_data_provider or YFinanceProvider(),
         cache=HistoryCache(settings.market_data_cache_path),
         cache_ttl=timedelta(hours=settings.market_data_cache_ttl_hours),
     )
+    app.state.market_data_service = market_data_service
+    app.state.portfolio_service = PortfolioService(PortfolioStore(settings.portfolio_db_path), market_data_service)
     app.include_router(v1)
     app.dependency_overrides[get_settings] = lambda: settings
     logging.getLogger("vektor").info(
