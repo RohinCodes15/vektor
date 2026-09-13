@@ -2,6 +2,8 @@
 
 Simulation models are contracts only; no endpoints serve them yet.
 Market history models back the read-only GET /api/v1/market/history endpoint.
+Portfolio models back the paper portfolio endpoints under /api/v1/portfolios. Money is a Decimal, serialized as a
+JSON string: cash, cost and P&L have 2 decimal places, prices 4, percentages 2 (see app/portfolio/accounting.py).
 """
 
 import re
@@ -10,7 +12,15 @@ from decimal import Decimal
 from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 TradingMode = Literal["paper"]
 PriceInterval = Literal["1d"]
@@ -46,14 +56,6 @@ class Simulation(Contract):
     mode: TradingMode = "paper"
     config: SimulationCreate
     created_at: datetime
-
-
-class PaperOrder(Contract):
-    symbol: str = Field(min_length=1, max_length=10)
-    side: Literal["buy", "sell"]
-    quantity: Decimal = Field(gt=0)
-    type: Literal["market", "limit"] = "market"
-    limit_price: Decimal | None = Field(default=None, gt=0)
 
 
 class ErrorResponse(Contract):
@@ -133,3 +135,121 @@ class MarketHistoryResponse(Contract):
         if dates and (dates[0] < self.start or dates[-1] > self.end):
             raise ValueError("bars must fall within start and end")
         return self
+
+
+# Paper portfolios. Cash is virtual US dollars; nothing here reaches a broker.
+PortfolioCurrency = Literal["USD"]
+OrderSide = Literal["buy", "sell"]
+
+# Tradable tickers only: no index (^GSPC), future (GC=F) or currency pair (EURUSD=X), which have no share price.
+_TRADABLE_SYMBOL = re.compile(r"[A-Z0-9][A-Z0-9.-]{0,14}")
+PortfolioName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+def _canonical(value: Decimal) -> Decimal:
+    """Same value without trailing zeros or exponent: 1.50 -> 1.5, 1E+1 -> 10."""
+    return Decimal(format(value.normalize(), "f"))
+
+
+class PortfolioCreate(Contract):
+    name: PortfolioName
+    starting_cash: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+
+    @field_validator("starting_cash")
+    @classmethod
+    def to_cents(cls, value: Decimal) -> Decimal:
+        return value.quantize(Decimal("0.01"))  # exact: at most 2 decimal places were accepted
+
+
+class PortfolioUpdate(Contract):
+    """Only the name can change. Cash moves only through orders, so balances are never edited by hand."""
+
+    name: PortfolioName
+
+
+class Portfolio(Contract):
+    id: UUID
+    name: str
+    mode: TradingMode = "paper"
+    currency: PortfolioCurrency
+    starting_cash: Decimal
+    cash: Decimal
+    # Sum of the realized P&L of every sell.
+    realized_pnl: Decimal
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class PaperOrder(Contract):
+    """A market order, filled in full at the latest completed daily close or rejected; never partially filled.
+
+    `client_order_id` makes submission idempotent: resending it returns the original transaction.
+    """
+
+    client_order_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
+    symbol: str
+    side: OrderSide
+    quantity: Decimal = Field(gt=0, max_digits=16, decimal_places=6)
+
+    @field_validator("symbol", mode="before")
+    @classmethod
+    def normalize_symbol(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        symbol = value.strip().upper()
+        if not _TRADABLE_SYMBOL.fullmatch(symbol):
+            raise ValueError("symbol must be a ticker of 1-15 letters, digits, '.' or '-'")
+        return symbol
+
+    @field_validator("quantity")
+    @classmethod
+    def canonical_quantity(cls, value: Decimal) -> Decimal:
+        return _canonical(value)
+
+
+class Transaction(Contract):
+    """One executed paper order. Prices are the provider's daily close for `price_date`."""
+
+    id: UUID
+    portfolio_id: UUID
+    client_order_id: str
+    symbol: str
+    side: OrderSide
+    quantity: Decimal
+    price: Decimal
+    price_date: date
+    # quantity * price, rounded to cents. Cash moves by exactly this amount; there are no fees.
+    notional: Decimal
+    # Sells only: notional minus the average cost of the shares sold.
+    realized_pnl: Decimal | None
+    executed_at: AwareDatetime
+
+
+class Holding(Contract):
+    """One open position. Price fields are null when no recent market price exists (never estimated)."""
+
+    symbol: str
+    quantity: Decimal
+    # Total average cost of the shares still held.
+    cost_basis: Decimal
+    last_price: Decimal | None
+    price_date: date | None
+    market_value: Decimal | None
+    unrealized_pnl: Decimal | None
+    # Share of equity; null when equity is unknown or zero.
+    allocation_pct: Decimal | None
+
+
+class PortfolioHoldings(Contract):
+    """Portfolio valued at the latest completed daily closes. Totals are null when any holding has no price."""
+
+    portfolio_id: UUID
+    currency: PortfolioCurrency
+    cash: Decimal
+    positions_value: Decimal | None
+    equity: Decimal | None
+    unrealized_pnl: Decimal | None
+    realized_pnl: Decimal
+    cash_allocation_pct: Decimal | None
+    valued_at: AwareDatetime
+    holdings: list[Holding]
