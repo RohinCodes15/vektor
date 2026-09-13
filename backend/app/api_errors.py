@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.contracts import ErrorResponse
 from app.market_data.errors import MarketDataError
+from app.portfolio.errors import PortfolioError
 from app.validation import summarize_errors
 
 logger = logging.getLogger("vektor")
@@ -21,7 +22,7 @@ async def _request_validation_error(_: Request, exc: RequestValidationError) -> 
     return error_response(422, summarize_errors(exc.errors()))
 
 
-async def _market_data_error(_: Request, exc: MarketDataError) -> JSONResponse:
+async def _domain_error(_: Request, exc: MarketDataError | PortfolioError) -> JSONResponse:
     return error_response(exc.status_code, exc.message)
 
 
@@ -32,5 +33,6 @@ async def _unexpected_error(request: Request, exc: Exception) -> JSONResponse:
 
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _request_validation_error)  # type: ignore[arg-type]
-    app.add_exception_handler(MarketDataError, _market_data_error)  # type: ignore[arg-type]
+    app.add_exception_handler(MarketDataError, _domain_error)  # type: ignore[arg-type]
+    app.add_exception_handler(PortfolioError, _domain_error)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unexpected_error)
