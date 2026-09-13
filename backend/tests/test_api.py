@@ -52,7 +52,7 @@ def test_json_formatter_includes_extra_fields() -> None:
 
 def test_contracts_validate_input() -> None:
     with pytest.raises(ValidationError):
-        PaperOrder(symbol="AAPL", side="buy", quantity=0)
+        PaperOrder(client_order_id="o-1", symbol="AAPL", side="buy", quantity=0)
     with pytest.raises(ValidationError):
         SimulationCreate(symbols=[], starting_cash=1000, start="2025-01-01T00:00:00Z", end="2025-02-01T00:00:00Z", strategy="x")
 
@@ -64,6 +64,15 @@ def test_market_data_settings_default_to_a_local_cache(monkeypatch: pytest.Monke
     assert settings.market_data_cache_path.name == "market_data.sqlite3"
     assert settings.market_data_cache_path.parent.name == "data"
     assert settings.market_data_cache_ttl_hours == 24
+
+
+def test_portfolio_database_defaults_to_its_own_local_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VEKTOR_PORTFOLIO_DB_PATH", raising=False)
+    monkeypatch.delenv("VEKTOR_MARKET_DATA_CACHE_PATH", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.portfolio_db_path.name == "portfolios.sqlite3"
+    assert settings.portfolio_db_path.parent == settings.market_data_cache_path.parent
+    assert settings.portfolio_db_path != settings.market_data_cache_path
 
 
 @pytest.mark.parametrize("hours", [0, -1, 24 * 365 + 1])

@@ -1,2 +1,2 @@
-# Local market data cache (see VEKTOR_MARKET_DATA_CACHE_PATH)
+# Local market data cache and portfolio database (VEKTOR_MARKET_DATA_CACHE_PATH, VEKTOR_PORTFOLIO_DB_PATH)
 /data/

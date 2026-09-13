@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     market_data_cache_path: Path = BACKEND_DIR / "data" / "market_data.sqlite3"
     # How long a cached provider response is reused before it is fetched again.
     market_data_cache_ttl_hours: int = Field(default=24, ge=1, le=24 * 365)
+    # Paper portfolios, positions, and transactions. Kept apart from the disposable market data cache.
+    portfolio_db_path: Path = BACKEND_DIR / "data" / "portfolios.sqlite3"
 
 
 @lru_cache
