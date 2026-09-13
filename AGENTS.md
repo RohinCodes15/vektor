@@ -30,14 +30,19 @@ backend/                  Python 3.12+, FastAPI, managed with uv
   app/validation.py       Readable, input-free summaries of validation errors
   app/logging_config.py   JSON-lines logging (stdlib)
   app/routers/market.py   GET /api/v1/market/history (read-only)
+  app/routers/portfolios.py  /api/v1/portfolios: paper portfolio CRUD, holdings, orders, transactions
   app/market_data/        Historical OHLCV: yfinance provider, normalization, SQLite cache, service
+  app/portfolio/          Paper portfolios: Decimal accounting, SQLite store (atomic orders), service
   tests/                  pytest (provider mocked; no network)
 frontend/                 Owned by Codex (not yet created)
 ```
 
 - The API is versioned under `/api/v1`. Breaking changes go into a new version prefix, never into an existing one.
 - Contracts are Pydantic models with `extra="forbid"` and `frozen=True`. Validation happens at the boundary through field constraints.
-- `Simulation`, `SimulationCreate` and `PaperOrder` are contracts only. No endpoints serve them yet.
+- `Simulation` and `SimulationCreate` are contracts only. No endpoints serve them yet.
+- Paper portfolios (`backend/README.md`, Phase 2C) are simulated only: virtual USD cash, market orders filled at real
+  completed daily closes. Money is `Decimal`, serialized as JSON strings. Never invent a price or balance: an order
+  without a valid price is rejected, and an unpriced holding is reported as null.
 - Market data is read-only daily history from Yahoo Finance (free, no API key). It is never fabricated, filled, or repaired: invalid provider data is rejected with an error.
 
 ## Engineering standards
