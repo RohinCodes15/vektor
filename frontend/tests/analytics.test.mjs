@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getPortfolioAnalytics, getPortfolioEquityHistory } from "../src/lib/api.ts";
+import { historyRange } from "../src/lib/history-range.ts";
+import { mount, nodes } from "./component-runtime.mjs";
 
 const id = "00000000-0000-4000-8000-000000000001";
 const other = "00000000-0000-4000-8000-000000000002";
@@ -38,4 +40,26 @@ test("analytics accept missing/insufficient data and reject wrong IDs, numbers a
   await assert.rejects(getPortfolioAnalytics("bad"), /valid portfolio/);
   await assert.rejects(getPortfolioEquityHistory("bad"), /valid portfolio/);
   assert.equal(request.mock.callCount(), count);
+});
+
+const settle = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); };
+const text = (tree) => JSON.stringify(tree, (_key, value) => typeof value === "function" ? undefined : value);
+const ui = { Badge: "badge", Button: "button", MetricCard: "metric", Panel: "panel" };
+async function performance(api) {
+  return mount("../src/components/portfolio-performance.tsx", { "../lib/api": api, "../lib/history-range": { historyRange }, "./equity-chart": { EquityChart: "chart" }, "./ui": ui }, "PortfolioPerformance", { id });
+}
+
+test("cards display backend metrics without deriving null values; ranges filter only chart observations", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-11-06T00:00:00Z") });
+  let calls = 0;
+  const app = await performance({ getPortfolioAnalytics: async () => { calls++; return metrics; }, getPortfolioEquityHistory: async () => history });
+  let tree = app.render(); assert.match(text(tree), /Loading recorded equity/);
+  app.flush(); await settle(); tree = app.render();
+  const values = () => nodes(tree).filter((node) => node.type === "metric").map((node) => node.props.value);
+  assert.deepEqual(values(), ["1.0000%", "1.0000%", "Unavailable", "0.0000%", "Unavailable"]);
+  nodes(tree).find((node) => node.type === "button" && node.props.children === "1M").props.onClick(); tree = app.render(); app.flush();
+  assert.equal(nodes(tree).find((node) => node.type === "chart").props.snapshots.length, 1);
+  assert.deepEqual(values(), ["1.0000%", "1.0000%", "Unavailable", "0.0000%", "Unavailable"]);
+  assert.equal(calls, 1);
+  app.unmount();
 });
