@@ -63,3 +63,23 @@ test("cards display backend metrics without deriving null values; ranges filter 
   assert.equal(calls, 1);
   app.unmount();
 });
+
+test("empty history, empty ranges, and failed requests offer honest states and retries", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-11-06T00:00:00Z") });
+  let fail = true;
+  let snapshots = [];
+  const app = await performance({ getPortfolioAnalytics: async () => { if (fail) throw new Error("Offline"); return empty; }, getPortfolioEquityHistory: async () => snapshots });
+  let tree = app.render(); app.flush(); await settle(); tree = app.render();
+  assert.match(text(tree), /Offline/);
+  fail = false;
+  nodes(tree).find((node) => node.type === "button").props.onClick(); tree = app.render();
+  assert.match(text(tree), /Loading recorded equity/);
+  app.flush(); await settle(); tree = app.render(); assert.match(text(tree), /No equity snapshots recorded/);
+  assert.ok(nodes(tree).filter((node) => node.type === "metric").every((node) => node.props.value === "Unavailable"));
+  snapshots = [history[0]];
+  nodes(tree).find((node) => node.type === "button" && node.props.children === "Refresh performance").props.onClick(); app.render(); app.flush(); await settle(); tree = app.render();
+  nodes(tree).find((node) => node.type === "button" && node.props.children === "1M").props.onClick(); tree = app.render();
+  assert.match(text(tree), /No snapshots in this range/);
+  assert.equal(nodes(tree).some((node) => node.type === "chart"), false);
+  app.unmount();
+});
