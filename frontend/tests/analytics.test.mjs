@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getPortfolioAnalytics, getPortfolioEquityHistory } from "../src/lib/api.ts";
+import { formatMoney } from "../src/lib/portfolio-values.ts";
 import { historyRange } from "../src/lib/history-range.ts";
+import * as geometry from "../src/lib/price-chart.ts";
 import { mount, nodes } from "./component-runtime.mjs";
 
 const id = "00000000-0000-4000-8000-000000000001";
@@ -100,4 +102,16 @@ test("portfolio changes hide old analytics immediately and cancel both stale req
   const tree = app.render({ id: other, refreshVersion: 1 });
   assert.match(text(tree), /Loading recorded equity/); assert.doesNotMatch(text(tree), /2.0000%/);
   app.flush(); await settle(); app.unmount(); assert.equal(requests.at(-1).signal.aborted, true);
+});
+
+test("equity chart keeps exact values in keyboard exploration and supports one or zero-equity observations", async () => {
+  for (const snapshots of [history, [snapshot("2026-11-06T00:00:00Z", "0.00")]]) {
+    const app = await mount("../src/components/equity-chart.tsx", { "../lib/portfolio-values": { formatMoney }, "../lib/price-chart": geometry }, "EquityChart", { snapshots });
+    let tree = app.render();
+    nodes(tree).find((node) => node.type === "input").props.onChange({ target: { value: "0" } }); tree = app.render();
+    assert.match(nodes(tree).find((node) => node.type === "input").props["aria-valuetext"], new RegExp(snapshots[0].taken_at));
+    assert.ok(text(tree).includes(formatMoney(snapshots[0].equity)));
+    assert.doesNotMatch(nodes(tree).find((node) => node.type === "path").props.d, /NaN|Infinity/);
+    if (snapshots.length === 1) assert.match(text(tree), /More observations are needed/);
+  }
 });
