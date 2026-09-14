@@ -309,3 +309,17 @@ export async function getPortfolioAnalytics(id: string, signal?: AbortSignal): P
     throw new Error("Backend returned incompatible portfolio analytics. No metrics were accepted.");
   return data as PortfolioAnalytics;
 }
+
+export async function getPortfolioEquityHistory(id: string, signal?: AbortSignal): Promise<readonly EquitySnapshot[]> {
+  if (!isUuid(id)) throw new Error("Choose a valid portfolio.");
+  const data = await requestJson(`/api/v1/portfolios/${id}/equity-history`, "portfolio", signal);
+  if (!Array.isArray(data) || !data.every((item) => hasFields(item, ["id", "portfolio_id", "taken_at", "cash", "positions_value", "equity", "net_deposits", "realized_pnl", "unrealized_pnl", "prices_as_of"])
+    && isUuid(item.id) && item.portfolio_id === id && isAwareTimestamp(item.taken_at)
+    && [item.cash, item.positions_value, item.equity, item.net_deposits].every((value) => isMoney(value, true))
+    && isMoney(item.realized_pnl) && isMoney(item.unrealized_pnl)
+    && (item.prices_as_of === null || isCalendarDate(item.prices_as_of)))
+    || new Set(data.map((item) => item.id)).size !== data.length
+    || data.some((item, index) => index > 0 && Date.parse(item.taken_at) < Date.parse(data[index - 1].taken_at)))
+    throw new Error("Backend returned incompatible recorded equity history. No observations were accepted.");
+  return data;
+}
