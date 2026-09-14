@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getPortfolios, getPortfolioHoldings, type Portfolio, type PortfolioHoldings } from "../lib/api";
 import { formatMoney, formatTotalPnl } from "../lib/portfolio-values";
+import { PortfolioPerformance } from "./portfolio-performance";
 import { TransactionHistory } from "./transaction-history";
 import { Badge, Button, MetricCard, Panel } from "./ui";
 
@@ -79,6 +80,7 @@ export function PortfolioDetails({ id }: { id: string }) {
             <div className="holdings-scroll" role="region" aria-label="Portfolio holdings" tabIndex={0}><table className="holdings-table"><caption className="muted">Paper positions · USD · Unpriced values are unavailable</caption><thead><tr><th scope="col">Symbol</th><th scope="col">Quantity</th><th scope="col">Cost basis</th><th scope="col">Market value</th><th scope="col">Unrealized P&L</th><th scope="col">Price date</th></tr></thead><tbody>{data.holdings.map((holding) => <tr key={holding.symbol}><th scope="row">{holding.symbol}</th><td>{holding.quantity}</td><td>{formatMoney(holding.cost_basis)}</td><td>{formatMoney(holding.market_value)}</td><td>{formatMoney(holding.unrealized_pnl)}</td><td>{holding.price_date ?? "Unavailable"}</td></tr>)}</tbody></table></div>}
         </>}
       </Panel>
+      <PortfolioPerformance id={id} refreshVersion={revision} />
       <TransactionHistory id={id} onTrades={refreshAfterTrades} />
     </div>
   );

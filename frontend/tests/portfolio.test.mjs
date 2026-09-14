@@ -70,7 +70,7 @@ test("portfolio list loads, selects existing portfolios, handles empty lists, er
   let fail = false;
   const app = await mount("../src/components/portfolio-dashboard.tsx", {
     "../lib/api": { getPortfolios: async () => { if (fail) throw new Error("Offline"); return response; } },
-    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./transaction-history": { TransactionHistory: "transactions" }, "./ui": ui,
+    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./portfolio-performance": { PortfolioPerformance: "performance" }, "./transaction-history": { TransactionHistory: "transactions" }, "./ui": ui,
   }, "PortfolioDashboard");
   let tree = app.render(); assert.match(text(tree), /Loading paper portfolios/);
   app.flush(); await settle(); tree = app.render();
@@ -92,7 +92,7 @@ test("portfolio details show real metrics, unpriced warnings, errors and empty h
   let fail = false;
   const imports = {
     "../lib/api": { getPortfolioHoldings: async () => { if (fail) throw new Error("Provider unavailable"); return response; } },
-    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./transaction-history": { TransactionHistory: "transactions" }, "./ui": ui,
+    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./portfolio-performance": { PortfolioPerformance: "performance" }, "./transaction-history": { TransactionHistory: "transactions" }, "./ui": ui,
   };
   for (const scenario of [valuation, unpriced, { ...valuation, holdings: [], equity: "900.00", unrealized_pnl: "0.00" }, null]) {
     response = scenario; fail = scenario === null;
@@ -122,7 +122,7 @@ test("leaving a portfolio aborts its valuation and ignores a late response", asy
   let signal;
   const app = await mount("../src/components/portfolio-dashboard.tsx", {
     "../lib/api": { getPortfolioHoldings: (_id, pending) => { signal = pending; return new Promise((done) => { resolve = done; }); } },
-    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./transaction-history": { TransactionHistory: "transactions" }, "./ui": ui,
+    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./portfolio-performance": { PortfolioPerformance: "performance" }, "./transaction-history": { TransactionHistory: "transactions" }, "./ui": ui,
   }, "PortfolioDetails", { id });
   app.render(); app.flush(); await settle();
   app.unmount();
