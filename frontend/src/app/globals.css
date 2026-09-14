@@ -331,3 +331,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .analytics-chart { margin-top: 24px; min-width: 0; }
 .analytics-chart .panel-heading { flex-wrap: wrap; gap: 12px; }
 .analytics-chart .history-ranges { margin-top: 20px; }
+.equity-chart .chart-price > span { max-width: 100%; overflow-wrap: anywhere; }
+.analytics-chart .chart-provenance { line-height: 1.7; }
