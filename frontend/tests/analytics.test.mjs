@@ -83,3 +83,21 @@ test("empty history, empty ranges, and failed requests offer honest states and r
   assert.equal(nodes(tree).some((node) => node.type === "chart"), false);
   app.unmount();
 });
+
+test("portfolio changes hide old analytics immediately and cancel both stale requests", async () => {
+  const requests = [];
+  const app = await performance({
+    getPortfolioAnalytics: (id, signal) => new Promise((resolve) => requests.push({ id, signal, resolve, metrics: true })),
+    getPortfolioEquityHistory: (id, signal) => new Promise((resolve) => requests.push({ id, signal, resolve })),
+  });
+  app.render(); app.flush(); await settle();
+  app.render({ id: other }); app.flush(); await settle();
+  assert.equal(requests[0].signal.aborted, true); assert.equal(requests[1].signal.aborted, true);
+  requests[2].resolve({ ...metrics, portfolio_id: other, total_return_pct: "2.0000" }); requests[3].resolve([]); await settle();
+  assert.match(text(app.render({ id: other })), /2.0000%/);
+  requests[0].resolve(metrics); requests[1].resolve(history); await settle();
+  assert.match(text(app.render({ id: other })), /2.0000%/);
+  const tree = app.render({ id: other, refreshVersion: 1 });
+  assert.match(text(tree), /Loading recorded equity/); assert.doesNotMatch(text(tree), /2.0000%/);
+  app.flush(); await settle(); app.unmount(); assert.equal(requests.at(-1).signal.aborted, true);
+});
