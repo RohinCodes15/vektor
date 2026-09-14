@@ -16,11 +16,6 @@ export default function Home() {
           <div className="data-notice"><span className="notice-symbol" aria-hidden="true">i</span><p><strong>Paper portfolio workspace</strong><span>Virtual balances valued at completed daily closes. No live quotes or real-money execution.</span></p><Badge>NO LIVE DATA</Badge></div>
           <PortfolioDashboard />
           <div className="portfolio-grid">
-            <Panel className="performance-panel" aria-labelledby="performance-title">
-              <div className="panel-heading"><div><h3 id="performance-title">Portfolio performance</h3><p className="muted text-xs">The bigger picture, one decision at a time.</p></div><Badge>History unavailable</Badge></div>
-              <div className="performance-empty"><div className="empty-axis" aria-hidden="true"><span /><span /><span /><span /></div><div className="empty-copy"><span className="empty-icon" aria-hidden="true">↗</span><h3>Historical equity unavailable.</h3><p>The portfolio API provides current valuation only.<br />A performance chart requires a historical equity series.</p><a href="#market" className="text-link">Explore the market workspace <span aria-hidden="true">→</span></a></div></div>
-              <div className="chart-footer"><span className="mono">EQUITY / USD</span><span>No synthetic returns. No live prices.</span></div>
-            </Panel>
             <Panel className="session-panel" aria-labelledby="session-title">
               <div className="panel-heading"><h3 id="session-title">Research session</h3><span className="mono muted text-xs">01</span></div>
               <div className="session-emblem" aria-hidden="true">∨</div><h3>Built for independent thinking.</h3><p className="muted text-sm">A focused workspace on your machine. Every strategy stays in simulation.</p>
