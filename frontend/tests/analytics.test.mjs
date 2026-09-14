@@ -115,3 +115,13 @@ test("equity chart keeps exact values in keyboard exploration and supports one o
     if (snapshots.length === 1) assert.match(text(tree), /More observations are needed/);
   }
 });
+
+test("range boundaries use UTC dates even when snapshot timestamps carry offsets", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-11-06T00:00:00Z") });
+  const boundary = snapshot("2026-10-05T23:30:00-02:00");
+  const app = await performance({ getPortfolioAnalytics: async () => metrics, getPortfolioEquityHistory: async () => [boundary] });
+  app.render(); app.flush(); await settle(); let tree = app.render();
+  nodes(tree).find((node) => node.type === "button" && node.props.children === "1M").props.onClick(); tree = app.render();
+  assert.equal(nodes(tree).find((node) => node.type === "chart").props.snapshots[0], boundary);
+  app.unmount();
+});
