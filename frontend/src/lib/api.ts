@@ -286,3 +286,26 @@ export type PortfolioAnalytics = Readonly<{
   total_return_pct: string | null; latest_daily_return_pct: string | null; volatility_pct: string | null;
   max_drawdown_pct: string | null; sharpe_ratio: string | null;
 }>;
+
+function isSignedDecimal(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 128
+    && /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value) && Number.isFinite(Number(value));
+}
+
+export async function getPortfolioAnalytics(id: string, signal?: AbortSignal): Promise<PortfolioAnalytics> {
+  if (!isUuid(id)) throw new Error("Choose a valid portfolio.");
+  const data = await requestJson(`/api/v1/portfolios/${id}/analytics`, "portfolio", signal);
+  if (!hasFields(data, ["portfolio_id", "currency", "as_of", "snapshots", "daily_observations", "equity", "net_deposits", "realized_pnl", "unrealized_pnl", "total_return_pct", "latest_daily_return_pct", "volatility_pct", "max_drawdown_pct", "sharpe_ratio"])
+    || data.portfolio_id !== id || data.currency !== "USD"
+    || typeof data.snapshots !== "number" || !Number.isSafeInteger(data.snapshots) || data.snapshots < 0
+    || typeof data.daily_observations !== "number" || !Number.isSafeInteger(data.daily_observations)
+    || data.daily_observations < 0 || data.daily_observations > data.snapshots
+    || !(data.as_of === null || isAwareTimestamp(data.as_of))
+    || (data.snapshots === 0) !== (data.as_of === null)
+    || !["equity", "net_deposits", "realized_pnl", "unrealized_pnl"].every((key) => data[key] === null || isMoney(data[key], key === "equity" || key === "net_deposits"))
+    || !["total_return_pct", "latest_daily_return_pct", "volatility_pct", "max_drawdown_pct", "sharpe_ratio"].every((key) => data[key] === null || isSignedDecimal(data[key]))
+    || (data.volatility_pct !== null && Number(data.volatility_pct) < 0)
+    || (data.max_drawdown_pct !== null && Number(data.max_drawdown_pct) > 0))
+    throw new Error("Backend returned incompatible portfolio analytics. No metrics were accepted.");
+  return data as PortfolioAnalytics;
+}
