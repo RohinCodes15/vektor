@@ -275,3 +275,14 @@ export async function getPortfolioTransactions(id: string, signal?: AbortSignal)
     throw new Error("Backend returned incompatible paper transactions. No trade history was accepted.");
   return data;
 }
+
+export type EquitySnapshot = Readonly<{
+  id: string; portfolio_id: string; taken_at: string; cash: string; positions_value: string;
+  equity: string; net_deposits: string; realized_pnl: string; unrealized_pnl: string; prices_as_of: string | null;
+}>;
+export type PortfolioAnalytics = Readonly<{
+  portfolio_id: string; currency: "USD"; as_of: string | null; snapshots: number; daily_observations: number;
+  equity: string | null; net_deposits: string | null; realized_pnl: string | null; unrealized_pnl: string | null;
+  total_return_pct: string | null; latest_daily_return_pct: string | null; volatility_pct: string | null;
+  max_drawdown_pct: string | null; sharpe_ratio: string | null;
+}>;
