@@ -9,7 +9,7 @@ export function priceChartGeometry(bars: readonly Pick<PriceBar, "date" | "close
   let low = bars[0].close;
   let high = low;
   for (const bar of bars) { low = Math.min(low, bar.close); high = Math.max(high, bar.close); }
-  const padding = Math.max((high - low) * 0.08, high * 0.01, Number.MIN_VALUE);
+  const padding = Math.max((high - low) * 0.08, high === 0 ? 1 : high * 0.01, Number.MIN_VALUE);
   const minimum = Math.max(0, low - padding);
   const maximum = Math.min(Number.MAX_VALUE, high + padding);
   const first = Date.parse(bars[0].date);
