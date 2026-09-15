@@ -182,3 +182,23 @@ def test_create_records_an_all_cash_initial_snapshot(store: PortfolioStore) -> N
     assert (initial.realized_pnl, initial.unrealized_pnl, initial.prices_as_of) == (
         Decimal("0.00"), Decimal("0.00"), None,
     )
+
+
+def test_snapshots_persist_in_recording_order_and_cascade_on_delete(store: PortfolioStore, tmp_path: Path) -> None:
+    portfolio = store.create("P", Decimal("1000.00"), NOW)
+    (initial,) = store.snapshots(portfolio.id)
+    later = initial.model_copy(update={"id": uuid4(), "equity": Decimal("1010.00"), "prices_as_of": date(2024, 1, 9)})
+    assert store.add_snapshot(later) is True
+    assert PortfolioStore(tmp_path / "portfolios.sqlite3").snapshots(portfolio.id) == [initial, later]
+    store.delete(portfolio.id)
+    assert store.snapshots(portfolio.id) == []
+    with sqlite3.connect(tmp_path / "portfolios.sqlite3") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM equity_snapshots").fetchone() == (0,)
+
+
+def test_adding_a_snapshot_to_a_missing_portfolio_stores_nothing(store: PortfolioStore) -> None:
+    portfolio = store.create("P", Decimal("1000.00"), NOW)
+    (initial,) = store.snapshots(portfolio.id)
+    orphan = initial.model_copy(update={"id": uuid4(), "portfolio_id": uuid4()})
+    assert store.add_snapshot(orphan) is False
+    assert store.snapshots(orphan.portfolio_id) == []
