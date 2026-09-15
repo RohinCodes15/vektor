@@ -202,3 +202,14 @@ def test_adding_a_snapshot_to_a_missing_portfolio_stores_nothing(store: Portfoli
     orphan = initial.model_copy(update={"id": uuid4(), "portfolio_id": uuid4()})
     assert store.add_snapshot(orphan) is False
     assert store.snapshots(orphan.portfolio_id) == []
+
+
+def test_state_reads_cash_and_positions_together(store: PortfolioStore) -> None:
+    portfolio = store.create("P", Decimal("1000.00"), NOW)
+    execute(store, portfolio.id, order(quantity="2"))
+    state = store.state(portfolio.id)
+    assert state is not None
+    current, positions = state
+    assert current.cash == Decimal("800.00")
+    assert positions == [Position("AAPL", Decimal(2), Decimal("200.00"))]
+    assert store.state(uuid4()) is None
