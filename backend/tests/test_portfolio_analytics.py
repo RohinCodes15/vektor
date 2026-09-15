@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from app.contracts import EquitySnapshot
-from app.portfolio.analytics import compute_metrics, daily_returns
+from app.portfolio.analytics import compute_metrics, daily_returns, daily_series
 
 D = Decimal
 PORTFOLIO = uuid4()
@@ -68,3 +68,32 @@ def test_deposits_are_not_counted_as_returns() -> None:
     assert metrics.volatility_pct == D("56.1249")
     assert metrics.sharpe_ratio == D("33.6749")
     assert metrics.max_drawdown_pct == D("0.0000")
+
+
+def test_the_last_snapshot_of_each_day_is_used() -> None:
+    snapshots = [snap(0, "1000.00", hour=14), snap(0, "1010.00", hour=20), snap(1, "1111.00", hour=15)]
+    series = daily_series(snapshots)
+    assert [s.equity for s in series] == [D("1010.00"), D("1111.00")]
+    metrics = compute_metrics(snapshots)
+    assert metrics.daily_observations == 2
+    assert metrics.latest_daily_return_pct == D("10.0000")
+
+
+def test_days_without_snapshots_are_not_filled() -> None:
+    series = daily_series([snap(0, "1000.00"), snap(5, "1100.00")])
+    assert len(series) == 2
+    assert daily_returns(series) == [D("0.1")]
+
+
+def test_a_return_after_zero_equity_is_undefined_and_skipped() -> None:
+    snapshots = [snap(0, "0.00", "1000.00"), snap(1, "10.00", "1000.00")]
+    assert daily_returns(snapshots) == [None]
+    metrics = compute_metrics(snapshots)
+    assert metrics.latest_daily_return_pct is None and metrics.max_drawdown_pct is None
+    assert metrics.total_return_pct == D("-99.0000")
+
+
+def test_a_total_loss_is_a_full_drawdown() -> None:
+    metrics = compute_metrics([snap(0, "1000.00"), snap(1, "1200.00"), snap(2, "0.00")])
+    assert metrics.max_drawdown_pct == D("-100.0000")
+    assert metrics.total_return_pct == D("-100.0000")
