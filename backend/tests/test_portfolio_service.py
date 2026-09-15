@@ -299,3 +299,34 @@ def test_snapshot_fails_and_stores_nothing_when_the_provider_is_down(
     with pytest.raises(MarketDataUnavailable):
         service.snapshot(portfolio_id)  # type: ignore[arg-type]
     assert len(service.equity_history(portfolio_id)) == 1  # type: ignore[arg-type]
+
+
+def test_analytics_of_a_new_portfolio(service: PortfolioService, provider: FakeProvider, portfolio_id: object) -> None:
+    analytics = service.analytics(portfolio_id)  # type: ignore[arg-type]
+    assert (analytics.snapshots, analytics.daily_observations, analytics.as_of) == (1, 1, NOW)
+    assert (analytics.equity, analytics.net_deposits, analytics.total_return_pct) == (
+        Decimal("1000.00"), Decimal("1000.00"), Decimal("0.0000"),
+    )
+    assert (analytics.latest_daily_return_pct, analytics.volatility_pct, analytics.sharpe_ratio,
+            analytics.max_drawdown_pct) == (None, None, None, None)
+    assert provider.calls == []
+
+
+def test_analytics_over_several_days(
+    service: PortfolioService, provider: FakeProvider, portfolio_id: object, clock: Clock
+) -> None:
+    service.submit_order(portfolio_id, order(quantity="4"))  # type: ignore[arg-type]  # 4 shares at 100.25
+    for day, close in (("2024-01-10", 110.0), ("2024-01-11", 99.0), ("2024-01-12", 104.0)):
+        clock.next_day()
+        provider.bars.append(make_bar(day, close))
+        service.snapshot(portfolio_id)  # type: ignore[arg-type]
+    analytics = service.analytics(portfolio_id)  # type: ignore[arg-type]
+    # Daily equity: 1000.00 (creation), 1039.00, 995.00, 1015.00.
+    assert (analytics.snapshots, analytics.daily_observations) == (4, 4)
+    assert analytics.equity == Decimal("1015.00")
+    assert analytics.unrealized_pnl == Decimal("15.00") and analytics.realized_pnl == Decimal("0.00")
+    assert analytics.total_return_pct == Decimal("1.5000")
+    assert analytics.latest_daily_return_pct == Decimal("2.0101")  # 1015 / 995 - 1
+    assert analytics.max_drawdown_pct == Decimal("-4.2348")  # 995 / 1039 - 1
+    assert analytics.volatility_pct is not None and analytics.sharpe_ratio is not None
+    assert analytics.as_of == NOW + timedelta(days=3)
