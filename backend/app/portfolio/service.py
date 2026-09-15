@@ -15,6 +15,7 @@ from app.contracts import (
     MarketHistoryQuery,
     PaperOrder,
     Portfolio,
+    PortfolioAnalytics,
     PortfolioCreate,
     PortfolioHoldings,
     PortfolioUpdate,
@@ -23,6 +24,7 @@ from app.contracts import (
 from app.market_data.errors import MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
 from app.portfolio.accounting import Quote, Valuation, fill_order, to_price, value_portfolio
+from app.portfolio.analytics import compute_metrics
 from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound, SnapshotRejected
 from app.portfolio.store import PortfolioStore
 
@@ -151,6 +153,29 @@ class PortfolioService:
     def equity_history(self, portfolio_id: UUID) -> list[EquitySnapshot]:
         self.get(portfolio_id)
         return self._store.snapshots(portfolio_id)
+
+    def analytics(self, portfolio_id: UUID) -> PortfolioAnalytics:
+        """Metrics from recorded snapshots only; makes no market data requests."""
+        portfolio = self.get(portfolio_id)
+        snapshots = self._store.snapshots(portfolio_id)
+        metrics = compute_metrics(snapshots)
+        latest = snapshots[-1] if snapshots else None
+        return PortfolioAnalytics(
+            portfolio_id=portfolio.id,
+            currency=portfolio.currency,
+            as_of=latest.taken_at if latest else None,
+            snapshots=len(snapshots),
+            daily_observations=metrics.daily_observations,
+            equity=latest.equity if latest else None,
+            net_deposits=latest.net_deposits if latest else None,
+            realized_pnl=latest.realized_pnl if latest else None,
+            unrealized_pnl=latest.unrealized_pnl if latest else None,
+            total_return_pct=metrics.total_return_pct,
+            latest_daily_return_pct=metrics.latest_daily_return_pct,
+            volatility_pct=metrics.volatility_pct,
+            max_drawdown_pct=metrics.max_drawdown_pct,
+            sharpe_ratio=metrics.sharpe_ratio,
+        )
 
     def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
         """Value one consistent read of cash and positions at the latest completed closes."""
