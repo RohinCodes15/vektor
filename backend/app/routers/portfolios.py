@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.contracts import (
+    EquitySnapshot,
     ErrorResponse,
     PaperOrder,
     Portfolio,
@@ -94,3 +95,18 @@ def submit_order(portfolio_id: UUID, body: PaperOrder, response: Response, servi
 def list_transactions(portfolio_id: UUID, service: Service) -> list[Transaction]:
     """Every executed order, oldest first."""
     return service.transactions(portfolio_id)
+
+
+@router.post(
+    "/{portfolio_id}/snapshots",
+    response_model=EquitySnapshot,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        **NOT_FOUND,
+        **MARKET_DATA,
+        422: {"model": ErrorResponse, "description": "Invalid id, or a holding has no recent price (nothing stored)"},
+    },
+)
+def record_snapshot(portfolio_id: UUID, service: Service) -> EquitySnapshot:
+    """Record the portfolio's equity now, valued at the latest completed daily closes. Never estimated."""
+    return service.snapshot(portfolio_id)
