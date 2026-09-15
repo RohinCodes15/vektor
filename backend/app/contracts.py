@@ -2,7 +2,8 @@
 
 Simulation models are contracts only; no endpoints serve them yet.
 Market history models back the read-only GET /api/v1/market/history endpoint.
-Portfolio models back the paper portfolio endpoints under /api/v1/portfolios. Money is a Decimal, serialized as a
+Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots and analytics live
+under the same prefix. Money is a Decimal, serialized as a
 JSON string: cash, cost and P&L have 2 decimal places, prices 4, percentages 2 (see app/portfolio/accounting.py).
 """
 
@@ -253,3 +254,20 @@ class PortfolioHoldings(Contract):
     cash_allocation_pct: Decimal | None
     valued_at: AwareDatetime
     holdings: list[Holding]
+
+
+class EquitySnapshot(Contract):
+    """Recorded portfolio value at `taken_at`, from actual cash, holdings, and completed daily closes."""
+
+    id: UUID
+    portfolio_id: UUID
+    taken_at: AwareDatetime
+    cash: Decimal
+    positions_value: Decimal
+    equity: Decimal
+    # External cash put in so far (today: the starting cash). Returns exclude it, so a deposit is not a gain.
+    net_deposits: Decimal
+    realized_pnl: Decimal
+    unrealized_pnl: Decimal
+    # Oldest close date used to value the holdings; null when the portfolio held only cash.
+    prices_as_of: date | None
