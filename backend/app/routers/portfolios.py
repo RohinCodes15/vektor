@@ -110,3 +110,9 @@ def list_transactions(portfolio_id: UUID, service: Service) -> list[Transaction]
 def record_snapshot(portfolio_id: UUID, service: Service) -> EquitySnapshot:
     """Record the portfolio's equity now, valued at the latest completed daily closes. Never estimated."""
     return service.snapshot(portfolio_id)
+
+
+@router.get("/{portfolio_id}/equity-history", response_model=list[EquitySnapshot], responses={**NOT_FOUND, **INVALID})
+def equity_history(portfolio_id: UUID, service: Service) -> list[EquitySnapshot]:
+    """Every recorded equity snapshot, oldest first. Only recorded values; nothing is backfilled."""
+    return service.equity_history(portfolio_id)
