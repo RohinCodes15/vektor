@@ -33,3 +33,9 @@ class DuplicateOrder(PortfolioError):
         super().__init__(
             f"client_order_id {client_order_id!r} was already used for a different order in this portfolio."
         )
+
+
+class SnapshotRejected(PortfolioError):
+    """An equity snapshot cannot be recorded because a holding has no price. Nothing was stored."""
+
+    status_code = 422
