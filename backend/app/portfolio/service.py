@@ -148,6 +148,10 @@ class PortfolioService:
         logger.info("equity snapshot recorded", extra={"portfolio_id": str(portfolio_id), "equity": str(snapshot.equity)})
         return snapshot
 
+    def equity_history(self, portfolio_id: UUID) -> list[EquitySnapshot]:
+        self.get(portfolio_id)
+        return self._store.snapshots(portfolio_id)
+
     def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
         """Value one consistent read of cash and positions at the latest completed closes."""
         state = self._store.state(portfolio_id)
