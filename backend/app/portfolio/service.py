@@ -21,7 +21,7 @@ from app.contracts import (
 )
 from app.market_data.errors import MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
-from app.portfolio.accounting import Quote, fill_order, to_price, value_portfolio
+from app.portfolio.accounting import Quote, Valuation, fill_order, to_price, value_portfolio
 from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound
 from app.portfolio.store import PortfolioStore
 
@@ -106,10 +106,7 @@ class PortfolioService:
 
     def holdings(self, portfolio_id: UUID) -> PortfolioHoldings:
         """Value every position at its latest completed close. Unpriced holdings are null, never guessed."""
-        portfolio = self.get(portfolio_id)
-        positions = self._store.positions(portfolio_id)
-        quotes = {position.symbol: self._quote_or_none(position.symbol) for position in positions}
-        valuation = value_portfolio(portfolio.cash, positions, quotes)
+        portfolio, valuation, _ = self._value(portfolio_id)
         return PortfolioHoldings(
             portfolio_id=portfolio.id,
             currency=portfolio.currency,
@@ -122,6 +119,15 @@ class PortfolioService:
             valued_at=self._clock(),
             holdings=list(valuation.holdings),
         )
+
+    def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
+        """Value one consistent read of cash and positions at the latest completed closes."""
+        state = self._store.state(portfolio_id)
+        if state is None:
+            raise PortfolioNotFound(portfolio_id)
+        portfolio, positions = state
+        quotes = {position.symbol: self._quote_or_none(position.symbol) for position in positions}
+        return portfolio, value_portfolio(portfolio.cash, positions, quotes), quotes
 
     def _quote_or_none(self, symbol: str) -> Quote | None:
         try:
