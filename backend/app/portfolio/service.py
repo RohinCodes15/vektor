@@ -8,9 +8,10 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.contracts import (
+    EquitySnapshot,
     MarketHistoryQuery,
     PaperOrder,
     Portfolio,
@@ -22,7 +23,7 @@ from app.contracts import (
 from app.market_data.errors import MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
 from app.portfolio.accounting import Quote, Valuation, fill_order, to_price, value_portfolio
-from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound
+from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound, SnapshotRejected
 from app.portfolio.store import PortfolioStore
 
 logger = logging.getLogger("vektor.portfolio")
@@ -119,6 +120,33 @@ class PortfolioService:
             valued_at=self._clock(),
             holdings=list(valuation.holdings),
         )
+
+    def snapshot(self, portfolio_id: UUID) -> EquitySnapshot:
+        """Record the portfolio's equity now, at the latest completed closes.
+
+        Raises SnapshotRejected (422, nothing stored) when any holding has no price: snapshots are never estimated.
+        """
+        portfolio, valuation, quotes = self._value(portfolio_id)
+        if valuation.equity is None or valuation.positions_value is None or valuation.unrealized_pnl is None:
+            missing = ", ".join(symbol for symbol, quote in quotes.items() if quote is None)
+            raise SnapshotRejected(f"No recent price for {missing}; the equity snapshot was not recorded.")
+        price_dates = [quote.price_date for quote in quotes.values() if quote is not None]
+        snapshot = EquitySnapshot(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            taken_at=self._clock(),
+            cash=portfolio.cash,
+            positions_value=valuation.positions_value,
+            equity=valuation.equity,
+            net_deposits=portfolio.starting_cash,  # the only external cash flow; there are no deposit endpoints
+            realized_pnl=portfolio.realized_pnl,
+            unrealized_pnl=valuation.unrealized_pnl,
+            prices_as_of=min(price_dates) if price_dates else None,
+        )
+        if not self._store.add_snapshot(snapshot):
+            raise PortfolioNotFound(portfolio_id)
+        logger.info("equity snapshot recorded", extra={"portfolio_id": str(portfolio_id), "equity": str(snapshot.equity)})
+        return snapshot
 
     def _value(self, portfolio_id: UUID) -> tuple[Portfolio, Valuation, dict[str, Quote | None]]:
         """Value one consistent read of cash and positions at the latest completed closes."""
