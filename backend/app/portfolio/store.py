@@ -1,4 +1,4 @@
-"""SQLite persistence for paper portfolios, positions, and transactions.
+"""SQLite persistence for paper portfolios, positions, transactions, and equity snapshots.
 
 Amounts are stored as decimal TEXT so they round-trip exactly. Each order executes inside one
 BEGIN IMMEDIATE transaction: the duplicate check, the cash and quantity checks, and every write happen
@@ -13,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from app.contracts import PaperOrder, Portfolio, Transaction
+from app.contracts import EquitySnapshot, PaperOrder, Portfolio, Transaction
 from app.portfolio.accounting import Fill, Position, Quote
 
 SCHEMA = """
@@ -49,12 +49,30 @@ CREATE TABLE IF NOT EXISTS transactions (
     executed_at TEXT NOT NULL,
     UNIQUE (portfolio_id, client_order_id)
 );
+CREATE TABLE IF NOT EXISTS equity_snapshots (
+    seq INTEGER PRIMARY KEY,
+    id TEXT NOT NULL UNIQUE,
+    portfolio_id TEXT NOT NULL REFERENCES portfolios (id) ON DELETE CASCADE,
+    taken_at TEXT NOT NULL,
+    cash TEXT NOT NULL,
+    positions_value TEXT NOT NULL,
+    equity TEXT NOT NULL,
+    net_deposits TEXT NOT NULL,
+    realized_pnl TEXT NOT NULL,
+    unrealized_pnl TEXT NOT NULL,
+    prices_as_of TEXT
+);
+CREATE INDEX IF NOT EXISTS equity_snapshots_by_portfolio ON equity_snapshots (portfolio_id, seq);
 """
 
 PORTFOLIO_COLUMNS = ("id", "name", "currency", "starting_cash", "cash", "realized_pnl", "created_at", "updated_at")
 TRANSACTION_COLUMNS = (
     "id", "portfolio_id", "client_order_id", "symbol", "side", "quantity", "price", "price_date", "notional",
     "realized_pnl", "executed_at",
+)
+SNAPSHOT_COLUMNS = (
+    "id", "portfolio_id", "taken_at", "cash", "positions_value", "equity", "net_deposits", "realized_pnl",
+    "unrealized_pnl", "prices_as_of",
 )
 CONNECT_TIMEOUT_SECONDS = 5
 
@@ -90,13 +108,30 @@ class PortfolioStore:
             return _get_portfolio(conn, portfolio_id)
 
     def delete(self, portfolio_id: UUID) -> bool:
-        """Delete the portfolio with its positions and transactions. False if it did not exist."""
+        """Delete the portfolio with its positions, transactions, and snapshots. False if it did not exist."""
         with self._write() as conn:
             return conn.execute("DELETE FROM portfolios WHERE id = ?", (str(portfolio_id),)).rowcount == 1
 
     def positions(self, portfolio_id: UUID) -> list[Position]:
         with self._read() as conn:
             return _positions(conn, portfolio_id)
+
+    def add_snapshot(self, snapshot: EquitySnapshot) -> bool:
+        """Record a snapshot. False if the portfolio no longer exists."""
+        with self._write() as conn:
+            if _get_portfolio(conn, snapshot.portfolio_id) is None:
+                return False
+            _insert_snapshot(conn, snapshot)
+        return True
+
+    def snapshots(self, portfolio_id: UUID) -> list[EquitySnapshot]:
+        """Every snapshot of the portfolio, in the order recorded."""
+        with self._read() as conn:
+            rows = conn.execute(
+                f"SELECT {', '.join(SNAPSHOT_COLUMNS)} FROM equity_snapshots WHERE portfolio_id = ? ORDER BY seq",
+                (str(portfolio_id),),
+            )
+            return [EquitySnapshot(**dict(zip(SNAPSHOT_COLUMNS, row, strict=True))) for row in rows]
 
     def transactions(self, portfolio_id: UUID) -> list[Transaction]:
         with self._read() as conn:
@@ -209,6 +244,17 @@ def _save_position(conn: sqlite3.Connection, portfolio_id: UUID, symbol: str, po
         ON CONFLICT (portfolio_id, symbol) DO UPDATE SET quantity = excluded.quantity, cost_basis = excluded.cost_basis
         """,
         (str(portfolio_id), symbol, str(position.quantity), str(position.cost_basis)),
+    )
+
+
+def _insert_snapshot(conn: sqlite3.Connection, snapshot: EquitySnapshot) -> None:
+    conn.execute(
+        f"INSERT INTO equity_snapshots ({', '.join(SNAPSHOT_COLUMNS)}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            str(snapshot.id), str(snapshot.portfolio_id), _timestamp(snapshot.taken_at), str(snapshot.cash),
+            str(snapshot.positions_value), str(snapshot.equity), str(snapshot.net_deposits), str(snapshot.realized_pnl),
+            str(snapshot.unrealized_pnl), snapshot.prices_as_of.isoformat() if snapshot.prices_as_of else None,
+        ),
     )
 
 
