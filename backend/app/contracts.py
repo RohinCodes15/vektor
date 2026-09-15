@@ -271,3 +271,30 @@ class EquitySnapshot(Contract):
     unrealized_pnl: Decimal
     # Oldest close date used to value the holdings; null when the portfolio held only cash.
     prices_as_of: date | None
+
+
+class PortfolioAnalytics(Contract):
+    """Metrics from recorded equity snapshots only. A metric is null when there is too little history for it.
+
+    Percentages have 4 decimal places; see backend/README.md for every formula and assumption.
+    """
+
+    portfolio_id: UUID
+    currency: PortfolioCurrency
+    # taken_at of the latest snapshot; every value below is as of that moment.
+    as_of: AwareDatetime | None
+    snapshots: int
+    # Days with at least one snapshot (the last snapshot of each UTC day is used).
+    daily_observations: int
+    equity: Decimal | None
+    net_deposits: Decimal | None
+    realized_pnl: Decimal | None
+    unrealized_pnl: Decimal | None
+    total_return_pct: Decimal | None
+    latest_daily_return_pct: Decimal | None
+    # Annualized: sample standard deviation of daily returns * sqrt(252).
+    volatility_pct: Decimal | None
+    # Largest peak-to-trough fall of the deposit-adjusted equity index; zero or negative.
+    max_drawdown_pct: Decimal | None
+    # Annualized, risk-free rate 0: mean daily return / standard deviation * sqrt(252).
+    sharpe_ratio: Decimal | None
