@@ -171,3 +171,14 @@ def test_data_persists_across_store_instances(tmp_path: Path) -> None:
     reopened = PortfolioStore(path)
     assert reopened.get(portfolio.id).cash == Decimal("900.00")  # type: ignore[union-attr]
     assert len(reopened.transactions(portfolio.id)) == 1
+
+
+def test_create_records_an_all_cash_initial_snapshot(store: PortfolioStore) -> None:
+    portfolio = store.create("P", Decimal("1000.00"), NOW)
+    (initial,) = store.snapshots(portfolio.id)
+    assert (initial.taken_at, initial.cash, initial.positions_value, initial.equity, initial.net_deposits) == (
+        NOW, Decimal("1000.00"), Decimal("0.00"), Decimal("1000.00"), Decimal("1000.00"),
+    )
+    assert (initial.realized_pnl, initial.unrealized_pnl, initial.prices_as_of) == (
+        Decimal("0.00"), Decimal("0.00"), None,
+    )
