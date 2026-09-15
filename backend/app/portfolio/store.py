@@ -85,11 +85,19 @@ class PortfolioStore:
         self._path = path
 
     def create(self, name: str, starting_cash: Decimal, now: datetime) -> Portfolio:
+        """Create the portfolio and its first equity snapshot (all cash, so no price is needed)."""
         stamp = _timestamp(now)
         values = (str(uuid4()), name, "USD", str(starting_cash), str(starting_cash), "0.00", stamp, stamp)
+        portfolio = _portfolio(values)
+        initial = EquitySnapshot(
+            id=uuid4(), portfolio_id=portfolio.id, taken_at=now, cash=starting_cash, positions_value=Decimal("0.00"),
+            equity=starting_cash, net_deposits=starting_cash, realized_pnl=Decimal("0.00"),
+            unrealized_pnl=Decimal("0.00"), prices_as_of=None,
+        )
         with self._write() as conn:
             conn.execute(f"INSERT INTO portfolios ({', '.join(PORTFOLIO_COLUMNS)}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
-        return _portfolio(values)
+            _insert_snapshot(conn, initial)
+        return portfolio
 
     def list_portfolios(self) -> list[Portfolio]:
         with self._read() as conn:
