@@ -9,7 +9,7 @@ from app.contracts import PaperOrder, PortfolioCreate, PortfolioUpdate
 from app.market_data.cache import HistoryCache
 from app.market_data.errors import InvalidMarketData, MarketDataUnavailable
 from app.market_data.service import MarketDataService
-from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound
+from app.portfolio.errors import DuplicateOrder, OrderRejected, PortfolioNotFound, SnapshotRejected
 from app.portfolio.service import PortfolioService
 from app.portfolio.store import PortfolioStore
 from tests.fakes import FakeProvider, make_bar
@@ -250,3 +250,52 @@ def test_holdings_of_a_cash_only_portfolio_need_no_market_data(
         Decimal("1000.00"), Decimal("100.00"), [],
     )
     assert provider.calls == []
+
+
+def test_snapshot_records_equity_at_the_latest_close(
+    service: PortfolioService, provider: FakeProvider, portfolio_id: object, clock: Clock
+) -> None:
+    service.submit_order(portfolio_id, order(quantity="4"))  # type: ignore[arg-type]  # 401.00 at 100.25
+    clock.next_day()
+    provider.bars.append(make_bar("2024-01-10", 110.0))
+    snapshot = service.snapshot(portfolio_id)  # type: ignore[arg-type]
+    assert (snapshot.cash, snapshot.positions_value, snapshot.equity, snapshot.net_deposits) == (
+        Decimal("599.00"), Decimal("440.00"), Decimal("1039.00"), Decimal("1000.00"),
+    )
+    assert (snapshot.realized_pnl, snapshot.unrealized_pnl, snapshot.prices_as_of) == (
+        Decimal("0.00"), Decimal("39.00"), date(2024, 1, 10),
+    )
+    assert snapshot.taken_at == NOW + timedelta(days=1)
+    assert service.equity_history(portfolio_id)[-1] == snapshot  # type: ignore[arg-type]
+
+
+def test_snapshot_of_a_cash_only_portfolio_needs_no_market_data(
+    service: PortfolioService, provider: FakeProvider, portfolio_id: object
+) -> None:
+    snapshot = service.snapshot(portfolio_id)  # type: ignore[arg-type]
+    assert (snapshot.equity, snapshot.positions_value, snapshot.prices_as_of) == (
+        Decimal("1000.00"), Decimal("0.00"), None,
+    )
+    assert provider.calls == []
+
+
+def test_snapshot_with_a_missing_price_is_refused_and_nothing_is_stored(
+    service: PortfolioService, portfolio_id: object, clock: Clock
+) -> None:
+    service.submit_order(portfolio_id, order())  # type: ignore[arg-type]
+    clock.next_day(30)
+    with pytest.raises(SnapshotRejected) as error:
+        service.snapshot(portfolio_id)  # type: ignore[arg-type]
+    assert error.value.message == "No recent price for AAPL; the equity snapshot was not recorded."
+    assert len(service.equity_history(portfolio_id)) == 1  # type: ignore[arg-type]  # only the initial snapshot
+
+
+def test_snapshot_fails_and_stores_nothing_when_the_provider_is_down(
+    service: PortfolioService, provider: FakeProvider, portfolio_id: object, clock: Clock
+) -> None:
+    service.submit_order(portfolio_id, order())  # type: ignore[arg-type]
+    clock.next_day()
+    provider.error = MarketDataUnavailable("down")
+    with pytest.raises(MarketDataUnavailable):
+        service.snapshot(portfolio_id)  # type: ignore[arg-type]
+    assert len(service.equity_history(portfolio_id)) == 1  # type: ignore[arg-type]
