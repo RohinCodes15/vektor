@@ -124,6 +124,13 @@ class PortfolioStore:
         with self._read() as conn:
             return _positions(conn, portfolio_id)
 
+    def state(self, portfolio_id: UUID) -> tuple[Portfolio, list[Position]] | None:
+        """Portfolio and positions read in one transaction, so an order cannot land between the two reads."""
+        with self._read() as conn:
+            conn.execute("BEGIN")
+            portfolio = _get_portfolio(conn, portfolio_id)
+            return (portfolio, _positions(conn, portfolio_id)) if portfolio else None
+
     def add_snapshot(self, snapshot: EquitySnapshot) -> bool:
         """Record a snapshot. False if the portfolio no longer exists."""
         with self._write() as conn:
