@@ -8,6 +8,7 @@ from app.contracts import (
     ErrorResponse,
     PaperOrder,
     Portfolio,
+    PortfolioAnalytics,
     PortfolioCreate,
     PortfolioHoldings,
     PortfolioUpdate,
@@ -116,3 +117,9 @@ def record_snapshot(portfolio_id: UUID, service: Service) -> EquitySnapshot:
 def equity_history(portfolio_id: UUID, service: Service) -> list[EquitySnapshot]:
     """Every recorded equity snapshot, oldest first. Only recorded values; nothing is backfilled."""
     return service.equity_history(portfolio_id)
+
+
+@router.get("/{portfolio_id}/analytics", response_model=PortfolioAnalytics, responses={**NOT_FOUND, **INVALID})
+def portfolio_analytics(portfolio_id: UUID, service: Service) -> PortfolioAnalytics:
+    """Total return, P&L, daily return, volatility, max drawdown, and Sharpe ratio from recorded snapshots."""
+    return service.analytics(portfolio_id)
