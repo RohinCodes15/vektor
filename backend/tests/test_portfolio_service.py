@@ -330,3 +330,10 @@ def test_analytics_over_several_days(
     assert analytics.max_drawdown_pct == Decimal("-4.2348")  # 995 / 1039 - 1
     assert analytics.volatility_pct is not None and analytics.sharpe_ratio is not None
     assert analytics.as_of == NOW + timedelta(days=3)
+
+
+@pytest.mark.parametrize("call", [lambda s, i: s.snapshot(i), lambda s, i: s.equity_history(i),
+                                  lambda s, i: s.analytics(i)])
+def test_analytics_for_unknown_portfolios_raise_not_found(service: PortfolioService, call: object) -> None:
+    with pytest.raises(PortfolioNotFound):
+        call(service, uuid4())  # type: ignore[operator]
