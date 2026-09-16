@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { getPortfolioTransactions } from "../src/lib/api.ts";
 import { formatMoney } from "../src/lib/portfolio-values.ts";
 import { mount, nodes } from "./component-runtime.mjs";
+import { readFile } from "node:fs/promises";
 
 const id = "00000000-0000-4000-8000-000000000001";
 const trade = { id: "00000000-0000-4000-8000-000000000002", portfolio_id: id, client_order_id: "test-1", symbol: "AAPL", side: "buy", quantity: "0.123456", price: "100.1234", price_date: "2026-11-05", notional: "12.36", realized_pnl: null, executed_at: "2026-11-06T12:30:00Z" };
@@ -99,4 +100,11 @@ test("history aborts on portfolio switch and ignores late results", async (t) =>
   assert.equal(signal.aborted, true);
   finish([trade]); await settle();
   assert.doesNotMatch(text(app.render()), /AAPL/);
+});
+
+test("performance state explains that historical equity is unavailable without drawing a curve", async () => {
+  const source = await readFile(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /Historical equity unavailable/);
+  assert.match(source, /current valuation only/);
+  assert.doesNotMatch(source, /Run a paper simulation to see your equity curve/);
 });
