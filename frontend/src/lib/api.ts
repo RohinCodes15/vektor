@@ -259,3 +259,19 @@ export type Transaction = Readonly<{
   side: "buy" | "sell"; quantity: string; price: string; price_date: string;
   notional: string; realized_pnl: string | null; executed_at: string;
 }>;
+
+export async function getPortfolioTransactions(id: string, signal?: AbortSignal): Promise<readonly Transaction[]> {
+  if (!isUuid(id)) throw new Error("Choose a valid portfolio.");
+  const data = await requestJson(`/api/v1/portfolios/${id}/transactions`, "portfolio", signal);
+  if (!Array.isArray(data) || !data.every((item) =>
+    hasFields(item, ["id", "portfolio_id", "client_order_id", "symbol", "side", "quantity", "price", "price_date", "notional", "realized_pnl", "executed_at"])
+    && isUuid(item.id) && item.portfolio_id === id
+    && typeof item.client_order_id === "string" && /^[A-Za-z0-9_.:-]{1,64}$/.test(item.client_order_id)
+    && typeof item.symbol === "string" && /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(item.symbol)
+    && (item.side === "buy" || item.side === "sell") && isDecimal(item.quantity, true)
+    && isDecimal(item.price, true) && isCalendarDate(item.price_date) && isMoney(item.notional, true)
+    && (item.side === "buy" ? item.realized_pnl === null : isMoney(item.realized_pnl))
+    && isAwareTimestamp(item.executed_at)) || new Set(data.map((item) => item.id)).size !== data.length)
+    throw new Error("Backend returned incompatible paper transactions. No trade history was accepted.");
+  return data;
+}
