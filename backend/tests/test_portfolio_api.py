@@ -271,3 +271,41 @@ def test_existing_endpoints_are_unchanged(client: TestClient) -> None:
     assert client.get("/api/v1/health").json()["trading_mode"] == "paper"
     history = client.get("/api/v1/market/history", params={"symbol": "AAPL", "start": YESTERDAY, "end": YESTERDAY})
     assert history.status_code == 200 and history.json()["bars"][0]["close"] == 100.25
+
+
+def test_new_portfolio_has_an_initial_snapshot_and_analytics(client: TestClient, portfolio: dict[str, Any]) -> None:
+    pid = portfolio["id"]
+    (initial,) = client.get(f"{URL}/{pid}/equity-history").json()
+    assert initial.keys() == {
+        "id", "portfolio_id", "taken_at", "cash", "positions_value", "equity", "net_deposits", "realized_pnl",
+        "unrealized_pnl", "prices_as_of",
+    }
+    assert (initial["equity"], initial["positions_value"], initial["net_deposits"], initial["prices_as_of"]) == (
+        "1000.00", "0.00", "1000.00", None,
+    )
+    analytics = client.get(f"{URL}/{pid}/analytics").json()
+    assert analytics.keys() == {
+        "portfolio_id", "currency", "as_of", "snapshots", "daily_observations", "equity", "net_deposits",
+        "realized_pnl", "unrealized_pnl", "total_return_pct", "latest_daily_return_pct", "volatility_pct",
+        "max_drawdown_pct", "sharpe_ratio",
+    }
+    assert (analytics["snapshots"], analytics["equity"], analytics["total_return_pct"]) == (1, "1000.00", "0.0000")
+    assert analytics["as_of"] == initial["taken_at"]
+    assert (analytics["volatility_pct"], analytics["sharpe_ratio"], analytics["max_drawdown_pct"]) == (None, None, None)
+
+
+def test_recording_a_snapshot(client: TestClient, provider: FakeProvider, portfolio: dict[str, Any], tmp_path: Path) -> None:
+    pid = portfolio["id"]
+    submit(client, pid, quantity="4")
+    reprice(provider, tmp_path, [make_bar(YESTERDAY, 110.0)])
+    res = client.post(f"{URL}/{pid}/snapshots")
+    assert res.status_code == 201
+    snapshot = res.json()
+    assert (snapshot["cash"], snapshot["positions_value"], snapshot["equity"], snapshot["unrealized_pnl"]) == (
+        "599.00", "440.00", "1039.00", "39.00",
+    )
+    assert snapshot["prices_as_of"] == YESTERDAY
+    history = client.get(f"{URL}/{pid}/equity-history").json()
+    assert [s["equity"] for s in history] == ["1000.00", "1039.00"]
+    analytics = client.get(f"{URL}/{pid}/analytics").json()
+    assert (analytics["snapshots"], analytics["equity"], analytics["total_return_pct"]) == (2, "1039.00", "3.9000")
