@@ -185,3 +185,29 @@ Equity history and performance metrics for paper portfolios. Every value comes f
 - If any holding has no recent price, the snapshot is refused with 422 and nothing is stored. A provider failure returns 502/503 and nothing is stored. A cash-only portfolio needs no market data.
 - Snapshots are taken on request; Vektor does not record them on a schedule. Record one per day (for example after the US close) to build a daily history.
 - Deleting a portfolio deletes its snapshots.
+
+### Metrics and assumptions
+
+Analytics are computed from snapshots only, as of the latest snapshot (`as_of`). A metric is `null` when there is not enough history for it.
+
+| Metric | Definition | Needs |
+|--------|------------|-------|
+| `equity`, `net_deposits`, `realized_pnl`, `unrealized_pnl` | From the latest snapshot | 1 snapshot |
+| `total_return_pct` | `equity / net_deposits − 1` | 1 snapshot |
+| `latest_daily_return_pct` | Return from the previous daily observation to the latest | 2 daily observations |
+| `volatility_pct` | Sample standard deviation of daily returns × √252 (annualized) | 2 daily returns |
+| `sharpe_ratio` | Mean daily return ÷ sample standard deviation × √252; risk-free rate 0 | 2 daily returns, non-zero volatility |
+| `max_drawdown_pct` | Largest fall from a running peak of the deposit-adjusted equity index; `0` or negative | 1 daily return |
+
+- **Daily observations:** the last snapshot of each UTC calendar day. Days without a snapshot are absent, not filled, so a return can span several days; √252 annualization assumes one observation per trading day.
+- **Daily return:** `(equity − deposits added since the previous observation) / previous equity − 1`. An observation that follows zero equity has no return and is skipped.
+- **Deposits:** `net_deposits` is the external cash put into the portfolio. Today that is only the starting cash (there are no deposit or withdrawal endpoints), so returns already exclude it; the formula keeps later deposits from counting as gains.
+- **Zero volatility:** `volatility_pct` is `0.0000` and `sharpe_ratio` is `null` (undefined).
+- **Empty portfolios:** a cash-only portfolio has flat equity: 0% returns, 0% volatility, no Sharpe ratio, 0% drawdown.
+- **Rounding:** percentages and the Sharpe ratio have 4 decimal places, `ROUND_HALF_EVEN`. All arithmetic is `Decimal`.
+
+### Limitations
+
+- History starts at portfolio creation and grows only as snapshots are recorded; past values are never reconstructed.
+- Snapshot equity uses completed daily closes, so it lags the market by up to a day and inherits the corporate-action limitation above.
+- Volatility and Sharpe ratio from a handful of observations are statistically weak. The response reports `daily_observations` so clients can judge.
