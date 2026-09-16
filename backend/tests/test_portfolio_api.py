@@ -330,3 +330,19 @@ def test_snapshot_fails_with_the_provider_status(
     provider.error = MarketDataUnavailable("Yahoo down")
     res = client.post(f"{URL}/{portfolio['id']}/snapshots")
     assert res.status_code == 503 and res.json() == {"detail": "Yahoo down"}
+
+
+@pytest.mark.parametrize(("method", "path"), [("post", "/snapshots"), ("get", "/equity-history"), ("get", "/analytics")])
+def test_analytics_endpoints_return_404_for_unknown_portfolios(client: TestClient, method: str, path: str) -> None:
+    missing = uuid4()
+    res = client.request(method, f"{URL}/{missing}{path}")
+    assert res.status_code == 404 and res.json() == {"detail": f"Portfolio {missing} not found."}
+
+
+def test_openapi_documents_the_analytics_endpoints(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    snapshots = paths[f"{URL}/{{portfolio_id}}/snapshots"]
+    assert set(snapshots) == {"post"}
+    assert {"201", "404", "422", "502", "503"} <= snapshots["post"]["responses"].keys()
+    assert set(paths[f"{URL}/{{portfolio_id}}/equity-history"]) == {"get"}
+    assert set(paths[f"{URL}/{{portfolio_id}}/analytics"]) == {"get"}
