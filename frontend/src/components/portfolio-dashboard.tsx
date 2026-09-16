@@ -29,7 +29,7 @@ export function PortfolioDashboard() {
   const portfolio = list.status === "success" ? list.data.find((item) => item.id === selected) ?? list.data[0] : undefined;
 
   return (
-    <div className="portfolio-dashboard" aria-busy={list.status === "loading"}>
+    <div id="activity" className="portfolio-dashboard" aria-busy={list.status === "loading"}>
       <div className="section-heading"><div><span className="eyebrow">01 / YOUR CAPITAL, SIMULATED</span><h2>Portfolio overview</h2></div><Badge>Virtual USD · Paper only</Badge></div>
       {list.status === "loading" && <Panel className="chart-state"><p role="status">Loading paper portfolios…</p></Panel>}
       {list.status === "error" && <Panel className="chart-state"><h3>Portfolios unavailable</h3><p role="alert">{list.message}</p><Button variant="secondary" onClick={refresh}>Retry portfolios</Button></Panel>}
