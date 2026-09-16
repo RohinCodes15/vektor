@@ -71,3 +71,21 @@ test("history renders loading, empty, error, retry and exact paper trade columns
   assert.match(text(tree), /AAPL/);
   app.unmount();
 });
+
+test("new trades refresh balances after polling, focus and manual refresh; hidden tabs do not poll", async (t) => {
+  const view = browser(t);
+  let result = [];
+  let calls = 0;
+  let updates = 0;
+  const app = await history(async () => { calls++; return result; }, () => updates++);
+  app.render(); app.flush(); await settle();
+  result = [trade]; view.tick(); await settle(); assert.equal(updates, 1);
+  view.focus(); await settle(); assert.equal(updates, 1);
+  globalThis.document.visibilityState = "hidden";
+  const before = calls; view.tick(); await settle(); assert.equal(calls, before);
+  globalThis.document.visibilityState = "visible";
+  result = [...result, { ...trade, id: "new-trade" }];
+  const tree = app.render(); nodes(tree).find((node) => node.type === "button").props.onClick();
+  app.render(); app.flush(); await settle(); assert.equal(updates, 2);
+  app.unmount(); view.focus(); await settle(); assert.equal(updates, 2);
+});
