@@ -89,3 +89,14 @@ test("new trades refresh balances after polling, focus and manual refresh; hidde
   app.render(); app.flush(); await settle(); assert.equal(updates, 2);
   app.unmount(); view.focus(); await settle(); assert.equal(updates, 2);
 });
+
+test("history aborts on portfolio switch and ignores late results", async (t) => {
+  browser(t);
+  let finish;
+  let signal;
+  const app = await history((_id, pending) => { signal = pending; return new Promise((resolve) => { finish = resolve; }); });
+  app.render(); app.flush(); await settle(); app.unmount();
+  assert.equal(signal.aborted, true);
+  finish([trade]); await settle();
+  assert.doesNotMatch(text(app.render()), /AAPL/);
+});
