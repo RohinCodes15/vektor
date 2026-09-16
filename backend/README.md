@@ -167,3 +167,21 @@ Portfolios, positions and transactions are stored in SQLite at `VEKTOR_PORTFOLIO
 - If a held symbol is delisted, it cannot be valued or sold (there is no price), so the portfolio's totals stay `null` until a price is available again.
 - One currency (USD); no FX conversion.
 - Valuation fetches each held symbol separately (cached for the day). List endpoints are not paginated, which is fine for local, single-user use.
+
+## Portfolio analytics (Phase 2E.1)
+
+Equity history and performance metrics for paper portfolios. Every value comes from a recorded snapshot of actual simulated cash, holdings, and completed daily closes. Nothing is backfilled, interpolated, or estimated.
+
+| Method and path (under `/api/v1`) | Does | Success |
+|-----------------------------------|------|---------|
+| `POST /portfolios/{id}/snapshots` | Record equity now, valued at the latest completed closes | 201 `EquitySnapshot` |
+| `GET /portfolios/{id}/equity-history` | Every recorded snapshot, oldest first | 200 `EquitySnapshot[]` |
+| `GET /portfolios/{id}/analytics` | Metrics from the recorded snapshots (no market data requests) | 200 `PortfolioAnalytics` |
+
+### Snapshots
+
+- Creating a portfolio records its first snapshot: all cash, so its equity is exactly the starting cash and needs no price. Portfolios created before Phase 2E.1 have no snapshots until one is recorded.
+- `POST /snapshots` reads cash and positions together in one database transaction, then values each holding exactly like `GET /holdings` (latest completed close in the 14 days before today, USD only). It stores `cash`, `positions_value`, `equity`, `net_deposits`, `realized_pnl`, `unrealized_pnl`, and `prices_as_of`, the oldest close date used (`null` for a cash-only portfolio).
+- If any holding has no recent price, the snapshot is refused with 422 and nothing is stored. A provider failure returns 502/503 and nothing is stored. A cash-only portfolio needs no market data.
+- Snapshots are taken on request; Vektor does not record them on a schedule. Record one per day (for example after the US close) to build a daily history.
+- Deleting a portfolio deletes its snapshots.
