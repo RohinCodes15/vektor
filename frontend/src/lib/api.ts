@@ -253,3 +253,9 @@ export async function getPortfolioHoldings(id: string, signal?: AbortSignal): Pr
     throw new Error("Backend returned inconsistent portfolio pricing. No balances were accepted.");
   return data as PortfolioHoldings;
 }
+
+export type Transaction = Readonly<{
+  id: string; portfolio_id: string; client_order_id: string; symbol: string;
+  side: "buy" | "sell"; quantity: string; price: string; price_date: string;
+  notional: string; realized_pnl: string | null; executed_at: string;
+}>;
