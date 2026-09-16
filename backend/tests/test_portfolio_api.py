@@ -309,3 +309,24 @@ def test_recording_a_snapshot(client: TestClient, provider: FakeProvider, portfo
     assert [s["equity"] for s in history] == ["1000.00", "1039.00"]
     analytics = client.get(f"{URL}/{pid}/analytics").json()
     assert (analytics["snapshots"], analytics["equity"], analytics["total_return_pct"]) == (2, "1039.00", "3.9000")
+
+
+def test_snapshot_with_missing_market_data_is_refused(
+    client: TestClient, provider: FakeProvider, portfolio: dict[str, Any], tmp_path: Path
+) -> None:
+    submit(client, portfolio["id"])
+    reprice(provider, tmp_path, [])
+    res = client.post(f"{URL}/{portfolio['id']}/snapshots")
+    assert res.status_code == 422
+    assert res.json() == {"detail": "No recent price for AAPL; the equity snapshot was not recorded."}
+    assert len(client.get(f"{URL}/{portfolio['id']}/equity-history").json()) == 1
+
+
+def test_snapshot_fails_with_the_provider_status(
+    client: TestClient, provider: FakeProvider, portfolio: dict[str, Any], tmp_path: Path
+) -> None:
+    submit(client, portfolio["id"])
+    reprice(provider, tmp_path, [make_bar(YESTERDAY, 110.0)])
+    provider.error = MarketDataUnavailable("Yahoo down")
+    res = client.post(f"{URL}/{portfolio['id']}/snapshots")
+    assert res.status_code == 503 and res.json() == {"detail": "Yahoo down"}
