@@ -17,8 +17,8 @@ export default function Home() {
           <PortfolioDashboard />
           <div className="portfolio-grid">
             <Panel className="performance-panel" aria-labelledby="performance-title">
-              <div className="panel-heading"><div><h3 id="performance-title">Portfolio performance</h3><p className="muted text-xs">The bigger picture, one decision at a time.</p></div><Badge>Awaiting results</Badge></div>
-              <div className="performance-empty"><div className="empty-axis" aria-hidden="true"><span /><span /><span /><span /></div><div className="empty-copy"><span className="empty-icon" aria-hidden="true">↗</span><h3>Your first chapter is unwritten.</h3><p>Run a paper simulation to see your equity curve here.<br />No performance history has been generated.</p><a href="#market" className="text-link">Explore the market workspace <span aria-hidden="true">→</span></a></div></div>
+              <div className="panel-heading"><div><h3 id="performance-title">Portfolio performance</h3><p className="muted text-xs">The bigger picture, one decision at a time.</p></div><Badge>History unavailable</Badge></div>
+              <div className="performance-empty"><div className="empty-axis" aria-hidden="true"><span /><span /><span /><span /></div><div className="empty-copy"><span className="empty-icon" aria-hidden="true">↗</span><h3>Historical equity unavailable.</h3><p>The portfolio API provides current valuation only.<br />A performance chart requires a historical equity series.</p><a href="#market" className="text-link">Explore the market workspace <span aria-hidden="true">→</span></a></div></div>
               <div className="chart-footer"><span className="mono">EQUITY / USD</span><span>No synthetic returns. No live prices.</span></div>
             </Panel>
             <Panel className="session-panel" aria-labelledby="session-title">
