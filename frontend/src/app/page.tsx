@@ -1,7 +1,8 @@
 import { DashboardShell } from "@/components/dashboard-shell";
 import { MarketWorkspace } from "@/components/market-workspace";
 import { Reveal } from "@/components/reveal";
-import { Badge, Button, MetricCard, Panel } from "@/components/ui";
+import { PortfolioDashboard } from "@/components/portfolio-dashboard";
+import { Badge, Button, Panel } from "@/components/ui";
 
 export default function Home() {
   return (
@@ -13,13 +14,7 @@ export default function Home() {
             <Button disabled>New simulation · Coming soon</Button>
           </div>
           <div className="data-notice"><span className="notice-symbol" aria-hidden="true">i</span><p><strong>Workspace preview</strong><span>Portfolio data is not connected. Load market history below; no live quotes or real-money execution.</span></p><Badge>NO LIVE DATA</Badge></div>
-          <div className="section-heading"><div><span className="eyebrow">01 / YOUR CAPITAL, SIMULATED</span><h2>Portfolio overview</h2></div><span className="mono muted text-xs">BASE CURRENCY / USD</span></div>
-          <div className="metrics-grid">
-            <MetricCard label="Portfolio value" value="—" detail="No simulation loaded" />
-            <MetricCard label="Total return" value="—" detail="Awaiting simulation results" />
-            <MetricCard label="Available cash" value="—" detail="No paper balance configured" />
-            <MetricCard label="Open positions" value="—" detail="Position data unavailable" />
-          </div>
+          <PortfolioDashboard />
           <div className="portfolio-grid">
             <Panel className="performance-panel" aria-labelledby="performance-title">
               <div className="panel-heading"><div><h3 id="performance-title">Portfolio performance</h3><p className="muted text-xs">The bigger picture, one decision at a time.</p></div><Badge>Awaiting results</Badge></div>

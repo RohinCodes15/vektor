@@ -19,7 +19,7 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     assert.doesNotMatch(html, />Connected</);
     assert.match(html, /<main id="main" tabindex="-1">/);
     assert.match(html, /NO LIVE DATA/);
-    assert.match(html, /No simulation loaded/);
+    assert.match(html, /Loading paper portfolios/);
     assert.match(html, /Historical daily closes load on demand/);
     assert.match(html, /label for="history-start-AAPL"/);
     assert.match(html, /label for="history-end-AAPL"/);
