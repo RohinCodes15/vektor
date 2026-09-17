@@ -324,3 +324,4 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .holdings-table th:first-child { text-align: left; }
 .portfolio-warning { margin-top: 16px; font-size: 12px; color: var(--color-ink); }
 .portfolio-dashboard .metric-value { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .portfolio-controls { align-items: stretch; flex-direction: column; } }
