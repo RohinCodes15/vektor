@@ -1,3 +1,5 @@
+import { moneyInCents } from "./portfolio-values.ts";
+
 /** Mirrors backend/app/contracts.py HealthResponse; no contract changes. */
 export type HealthResponse = Readonly<{
   status: "ok";
@@ -190,3 +192,28 @@ export type PortfolioHoldings = Readonly<{
   equity: string | null; unrealized_pnl: string | null; realized_pnl: string;
   cash_allocation_pct: string | null; valued_at: string; holdings: readonly Holding[];
 }>;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isMoney(value: unknown, nonnegative = false): value is string {
+  if (typeof value !== "string") return false;
+  try { const cents = moneyInCents(value); return !nonnegative || cents >= BigInt(0); }
+  catch { return false; }
+}
+
+function isPortfolio(value: unknown): value is Portfolio {
+  return hasFields(value, ["id", "name", "mode", "currency", "starting_cash", "cash", "realized_pnl", "created_at", "updated_at"])
+    && isUuid(value.id) && typeof value.name === "string" && value.name.trim().length > 0
+    && value.mode === "paper" && value.currency === "USD" && isMoney(value.starting_cash, true)
+    && isMoney(value.cash, true) && isMoney(value.realized_pnl)
+    && isAwareTimestamp(value.created_at) && isAwareTimestamp(value.updated_at);
+}
+
+export async function getPortfolios(signal?: AbortSignal): Promise<readonly Portfolio[]> {
+  const data = await requestJson("/api/v1/portfolios", "portfolio", signal);
+  if (!Array.isArray(data) || !data.every(isPortfolio) || new Set(data.map((item) => item.id)).size !== data.length)
+    throw new Error("Backend returned an incompatible paper portfolio list. No balances were accepted.");
+  return data;
+}
