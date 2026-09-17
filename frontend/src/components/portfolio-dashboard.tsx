@@ -1,11 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPortfolioHoldings, type PortfolioHoldings } from "../lib/api";
+import { getPortfolios, getPortfolioHoldings, type Portfolio, type PortfolioHoldings } from "../lib/api";
 import { formatMoney, formatTotalPnl } from "../lib/portfolio-values";
 import { Badge, Button, MetricCard, Panel } from "./ui";
 
 type Remote<T> = { status: "loading" } | { status: "error"; message: string } | { status: "success"; data: T };
+
+export function PortfolioDashboard() {
+  const [list, setList] = useState<Remote<readonly Portfolio[]>>({ status: "loading" });
+  const [selected, setSelected] = useState("");
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.resolve().then(async () => {
+      if (controller.signal.aborted) return;
+      try {
+        const data = await getPortfolios(controller.signal);
+        if (!controller.signal.aborted) setList({ status: "success", data });
+      } catch (error) {
+        if (!controller.signal.aborted) setList({ status: "error", message: error instanceof Error ? error.message : "Portfolio list unavailable." });
+      }
+    });
+    return () => controller.abort();
+  }, [revision]);
+  function refresh(): void { setList({ status: "loading" }); setRevision((value) => value + 1); }
+  const portfolio = list.status === "success" ? list.data.find((item) => item.id === selected) ?? list.data[0] : undefined;
+
+  return (
+    <div className="portfolio-dashboard" aria-busy={list.status === "loading"}>
+      <div className="section-heading"><div><span className="eyebrow">01 / YOUR CAPITAL, SIMULATED</span><h2>Portfolio overview</h2></div><Badge>Virtual USD · Paper only</Badge></div>
+      {list.status === "loading" && <Panel className="chart-state"><p role="status">Loading paper portfolios…</p></Panel>}
+      {list.status === "error" && <Panel className="chart-state"><h3>Portfolios unavailable</h3><p role="alert">{list.message}</p><Button variant="secondary" onClick={refresh}>Retry portfolios</Button></Panel>}
+      {list.status === "success" && !portfolio && <Panel className="chart-state"><h3>No paper portfolios yet.</h3><p>Create a portfolio through the local portfolio API to see its virtual cash and holdings here.</p><Button variant="secondary" onClick={refresh}>Refresh portfolios</Button></Panel>}
+      {portfolio && <>
+        <div className="portfolio-controls"><div className="field"><label htmlFor="portfolio-select">Paper portfolio</label><select id="portfolio-select" value={portfolio.id} onChange={(event) => setSelected(event.target.value)}>{list.status === "success" && list.data.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><Button variant="secondary" onClick={refresh}>Refresh portfolios</Button></div>
+        <PortfolioDetails key={`${portfolio.id}:${revision}`} id={portfolio.id} />
+      </>}
+    </div>
+  );
+}
 
 export function PortfolioDetails({ id }: { id: string }) {
   const [state, setState] = useState<Remote<PortfolioHoldings>>({ status: "loading" });
