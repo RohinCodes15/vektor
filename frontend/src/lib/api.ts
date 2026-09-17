@@ -203,6 +203,12 @@ function isMoney(value: unknown, nonnegative = false): value is string {
   catch { return false; }
 }
 
+function isDecimal(value: unknown, positive = false): value is string {
+  return typeof value === "string" && value.length <= 128
+    && /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)
+    && Number.isFinite(Number(value)) && (positive ? Number(value) > 0 : Number(value) >= 0);
+}
+
 function isPortfolio(value: unknown): value is Portfolio {
   return hasFields(value, ["id", "name", "mode", "currency", "starting_cash", "cash", "realized_pnl", "created_at", "updated_at"])
     && isUuid(value.id) && typeof value.name === "string" && value.name.trim().length > 0
@@ -211,9 +217,39 @@ function isPortfolio(value: unknown): value is Portfolio {
     && isAwareTimestamp(value.created_at) && isAwareTimestamp(value.updated_at);
 }
 
+function isHolding(value: unknown): value is Holding {
+  if (!hasFields(value, ["symbol", "quantity", "cost_basis", "last_price", "price_date", "market_value", "unrealized_pnl", "allocation_pct"])) return false;
+  if (typeof value.symbol !== "string" || !/^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(value.symbol)
+    || !isDecimal(value.quantity, true) || !isMoney(value.cost_basis, true)
+    || !(value.allocation_pct === null || isDecimal(value.allocation_pct))) return false;
+  if (value.last_price === null) return value.price_date === null && value.market_value === null && value.unrealized_pnl === null && value.allocation_pct === null;
+  return isDecimal(value.last_price, true) && isCalendarDate(value.price_date)
+    && isMoney(value.market_value, true) && isMoney(value.unrealized_pnl);
+}
+
 export async function getPortfolios(signal?: AbortSignal): Promise<readonly Portfolio[]> {
   const data = await requestJson("/api/v1/portfolios", "portfolio", signal);
   if (!Array.isArray(data) || !data.every(isPortfolio) || new Set(data.map((item) => item.id)).size !== data.length)
     throw new Error("Backend returned an incompatible paper portfolio list. No balances were accepted.");
   return data;
+}
+
+export async function getPortfolioHoldings(id: string, signal?: AbortSignal): Promise<PortfolioHoldings> {
+  if (!isUuid(id)) throw new Error("Choose a valid portfolio.");
+  const data = await requestJson(`/api/v1/portfolios/${id}/holdings`, "portfolio", signal);
+  if (!hasFields(data, ["portfolio_id", "currency", "cash", "positions_value", "equity", "unrealized_pnl", "realized_pnl", "cash_allocation_pct", "valued_at", "holdings"])
+    || data.portfolio_id !== id || data.currency !== "USD" || !isMoney(data.cash, true) || !isMoney(data.realized_pnl)
+    || !isAwareTimestamp(data.valued_at) || !Array.isArray(data.holdings) || !data.holdings.every(isHolding)
+    || new Set(data.holdings.map((item) => item.symbol)).size !== data.holdings.length
+    || !(data.cash_allocation_pct === null || isDecimal(data.cash_allocation_pct))
+    || !(data.positions_value === null || isMoney(data.positions_value, true))
+    || !(data.equity === null || isMoney(data.equity, true))
+    || !(data.unrealized_pnl === null || isMoney(data.unrealized_pnl)))
+    throw new Error("Backend returned an incompatible portfolio valuation. No balances were accepted.");
+  const unpriced = data.holdings.some((holding) => holding.last_price === null);
+  if (unpriced ? data.equity !== null || data.positions_value !== null || data.unrealized_pnl !== null
+    || data.cash_allocation_pct !== null || data.holdings.some((holding) => holding.allocation_pct !== null)
+    : data.equity === null || data.positions_value === null || data.unrealized_pnl === null)
+    throw new Error("Backend returned inconsistent portfolio pricing. No balances were accepted.");
+  return data as PortfolioHoldings;
 }
