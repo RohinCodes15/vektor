@@ -65,6 +65,28 @@ const ui = { Badge: "badge", Button: "button", MetricCard: "metric", Panel: "pan
 const text = (tree) => JSON.stringify(tree, (_key, value) => typeof value === "function" ? undefined : value);
 const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
+test("portfolio list loads, selects existing portfolios, handles empty lists, errors, and retries", async () => {
+  let response = [portfolio, { ...portfolio, id: other, name: "Second" }];
+  let fail = false;
+  const app = await mount("../src/components/portfolio-dashboard.tsx", {
+    "../lib/api": { getPortfolios: async () => { if (fail) throw new Error("Offline"); return response; } },
+    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./ui": ui,
+  }, "PortfolioDashboard");
+  let tree = app.render(); assert.match(text(tree), /Loading paper portfolios/);
+  app.flush(); await settle(); tree = app.render();
+  const selector = nodes(tree).find((node) => node.type === "select");
+  assert.equal(selector.props.value, id);
+  selector.props.onChange({ target: { value: other } }); tree = app.render();
+  assert.equal(nodes(tree).find((node) => node.type === "select").props.value, other);
+  const refresh = () => nodes(tree).find((node) => node.type === "button").props.onClick();
+  fail = true; refresh(); tree = app.render(); app.flush(); await settle(); tree = app.render();
+  assert.match(text(tree), /Offline/);
+  fail = false; response = []; refresh(); tree = app.render(); app.flush(); await settle(); tree = app.render();
+  assert.match(text(tree), /No paper portfolios yet/);
+  assert.equal(nodes(tree).some((node) => node.type === "metric"), false);
+  app.unmount();
+});
+
 test("portfolio details show real metrics, unpriced warnings, errors and empty holdings", async () => {
   let response = valuation;
   let fail = false;
