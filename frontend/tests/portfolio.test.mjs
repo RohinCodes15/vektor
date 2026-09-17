@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getPortfolios, getPortfolioHoldings } from "../src/lib/api.ts";
+import { formatMoney, formatTotalPnl, moneyInCents } from "../src/lib/portfolio-values.ts";
 
 const id = "00000000-0000-4000-8000-000000000001";
 const other = "00000000-0000-4000-8000-000000000002";
@@ -46,4 +47,15 @@ test("portfolio errors use safe messages and cash-only responses are accepted", 
   const cashOnly = { ...valuation, positions_value: "0.00", equity: "900.00", unrealized_pnl: "0.00", cash_allocation_pct: "100.00", holdings: [] };
   request.mock.mockImplementation(async () => Response.json(cashOnly));
   assert.deepEqual(await getPortfolioHoldings(id), cashOnly);
+});
+
+test("money display and total P&L stay exact, including large values and nulls", () => {
+  assert.equal(formatMoney("9007199254740993.01"), "$9,007,199,254,740,993.01");
+  assert.equal(formatMoney("-0.01"), "−$0.01");
+  assert.equal(formatMoney("0E-2"), "$0.00");
+  assert.equal(formatTotalPnl("0.10", "0.20"), "$0.30");
+  assert.equal(formatTotalPnl("10.10", "-20.20"), "−$10.10");
+  assert.equal(formatTotalPnl("10.00", null), "Unavailable");
+  assert.equal(formatMoney(null), "Unavailable");
+  assert.throws(() => moneyInCents("1.001"));
 });
