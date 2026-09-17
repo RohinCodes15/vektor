@@ -29,8 +29,8 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(path: string, name: "health" | "market history", signal?: AbortSignal, params?: URLSearchParams): Promise<unknown> {
-  const operation = name === "health" ? "health check" : "market history request";
+async function requestJson(path: string, name: "health" | "market history" | "portfolio", signal?: AbortSignal, params?: URLSearchParams): Promise<unknown> {
+  const operation = name === "health" ? "health check" : `${name} request`;
   let url: URL;
   try {
     url = new URL(process.env.NEXT_PUBLIC_API_ORIGIN || "http://localhost:8000");
@@ -57,6 +57,14 @@ async function requestJson(path: string, name: "health" | "market history", sign
     throw new Error("Backend could not be reached. Check that it is running and allows this frontend origin.");
   }
   if (!response.ok) {
+    if (name === "portfolio") {
+      const messages: Record<number, string> = {
+        404: "This portfolio no longer exists. Refresh the portfolio list.",
+        502: "The market data provider returned invalid prices. Portfolio valuation is unavailable.",
+        503: "The market data provider is unavailable. Try again later.",
+      };
+      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
+    }
     if (name === "market history") {
       const messages: Record<number, string> = {
         404: "No historical data found for this symbol and date range.",
