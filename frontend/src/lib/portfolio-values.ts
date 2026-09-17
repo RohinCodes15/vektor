@@ -21,3 +21,7 @@ function formatCents(cents: bigint): string {
   const absolute = negative ? -cents : cents;
   return `${negative ? "−" : ""}$${(absolute / BigInt(100)).toLocaleString("en-US")}.${String(absolute % BigInt(100)).padStart(2, "0")}`;
 }
+
+export function formatTotalPnl(realized: string, unrealized: string | null): string {
+  return unrealized === null ? "Unavailable" : formatCents(moneyInCents(realized) + moneyInCents(unrealized));
+}
