@@ -314,3 +314,11 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .portfolio-controls { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .portfolio-controls .field { flex: 1; min-width: 0; }
 .portfolio-controls select { width: 100%; min-width: 0; min-height: 44px; background: var(--color-raised); color: var(--color-ink); border: 1px solid var(--color-control); border-radius: 6px; padding: 10px; font: inherit; }
+.holdings-panel { min-width: 0; margin-block: 24px; }
+.holdings-panel .panel-heading { flex-wrap: wrap; gap: 12px; }
+.holdings-panel time { overflow-wrap: anywhere; }
+.holdings-scroll { overflow-x: auto; margin-top: 20px; }
+.holdings-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.holdings-table caption { text-align: left; padding-bottom: 12px; }
+.holdings-table th, .holdings-table td { padding: 14px 12px; border-bottom: 1px solid var(--color-line); white-space: nowrap; }
+.holdings-table th:first-child { text-align: left; }
