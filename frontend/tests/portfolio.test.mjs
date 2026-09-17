@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getPortfolios, getPortfolioHoldings } from "../src/lib/api.ts";
 import { formatMoney, formatTotalPnl, moneyInCents } from "../src/lib/portfolio-values.ts";
+import { mount, nodes } from "./component-runtime.mjs";
 
 const id = "00000000-0000-4000-8000-000000000001";
 const other = "00000000-0000-4000-8000-000000000002";
@@ -58,4 +59,52 @@ test("money display and total P&L stay exact, including large values and nulls",
   assert.equal(formatTotalPnl("10.00", null), "Unavailable");
   assert.equal(formatMoney(null), "Unavailable");
   assert.throws(() => moneyInCents("1.001"));
+});
+
+const ui = { Badge: "badge", Button: "button", MetricCard: "metric", Panel: "panel" };
+const text = (tree) => JSON.stringify(tree, (_key, value) => typeof value === "function" ? undefined : value);
+const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
+
+test("portfolio details show real metrics, unpriced warnings, errors and empty holdings", async () => {
+  let response = valuation;
+  let fail = false;
+  const imports = {
+    "../lib/api": { getPortfolioHoldings: async () => { if (fail) throw new Error("Provider unavailable"); return response; } },
+    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./ui": ui,
+  };
+  for (const scenario of [valuation, unpriced, { ...valuation, holdings: [], equity: "900.00", unrealized_pnl: "0.00" }, null]) {
+    response = scenario; fail = scenario === null;
+    const app = await mount("../src/components/portfolio-dashboard.tsx", imports, "PortfolioDetails", { id });
+    let tree = app.render();
+    assert.match(text(tree), /Loading portfolio valuation/);
+    assert.ok(nodes(tree).filter((node) => node.type === "metric").every((node) => node.props.value === "—"));
+    app.flush(); await settle(); tree = app.render();
+    if (scenario === valuation) {
+      assert.equal(nodes(tree).find((node) => node.type === "metric" && node.props.label === "Portfolio value").props.value, "$1,010.00");
+      assert.match(text(tree), /AAPL/);
+    } else if (scenario === unpriced) assert.match(text(tree), /Some holdings have no recent price/);
+    else if (scenario) assert.match(text(tree), /No open holdings/);
+    else {
+      assert.match(text(tree), /Provider unavailable/);
+      fail = false; response = valuation;
+      nodes(tree).find((node) => node.type === "button").props.onClick();
+      app.render(); app.flush(); await settle(); tree = app.render();
+      assert.match(text(tree), /AAPL/);
+    }
+    app.unmount();
+  }
+});
+
+test("leaving a portfolio aborts its valuation and ignores a late response", async () => {
+  let resolve;
+  let signal;
+  const app = await mount("../src/components/portfolio-dashboard.tsx", {
+    "../lib/api": { getPortfolioHoldings: (_id, pending) => { signal = pending; return new Promise((done) => { resolve = done; }); } },
+    "../lib/portfolio-values": { formatMoney, formatTotalPnl }, "./ui": ui,
+  }, "PortfolioDetails", { id });
+  app.render(); app.flush(); await settle();
+  app.unmount();
+  assert.equal(signal.aborted, true);
+  resolve(valuation); await settle();
+  assert.match(text(app.render()), /Loading portfolio valuation/);
 });
