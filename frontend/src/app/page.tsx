@@ -13,7 +13,7 @@ export default function Home() {
             <div><div className="eyebrow"><span className="status-dot" /> YOUR RESEARCH DESK</div><h1 id="overview-title">A clearer view.<br className="mobile-break" /> A measured approach.</h1><p className="lead">Test ideas. Study the outcome. Keep your capital out of it.</p></div>
             <Button disabled>New simulation · Coming soon</Button>
           </div>
-          <div className="data-notice"><span className="notice-symbol" aria-hidden="true">i</span><p><strong>Workspace preview</strong><span>Portfolio data is not connected. Load market history below; no live quotes or real-money execution.</span></p><Badge>NO LIVE DATA</Badge></div>
+          <div className="data-notice"><span className="notice-symbol" aria-hidden="true">i</span><p><strong>Paper portfolio workspace</strong><span>Virtual balances valued at completed daily closes. No live quotes or real-money execution.</span></p><Badge>NO LIVE DATA</Badge></div>
           <PortfolioDashboard />
           <div className="portfolio-grid">
             <Panel className="performance-panel" aria-labelledby="performance-title">
