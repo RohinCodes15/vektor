@@ -31,7 +31,7 @@ export default function Home() {
         <MarketWorkspace />
         <section id="activity" aria-labelledby="activity-title">
           <div className="section-heading"><div><span className="eyebrow">03 / THE RESEARCH LOG</span><h2 id="activity-title">Recent activity</h2></div><Badge>Paper workspace</Badge></div>
-          <Panel className="activity-panel"><span className="activity-mark" aria-hidden="true">↳</span><div><h3>A clean slate.</h3><p className="muted text-sm">Simulation activity will appear here. Nothing has been executed.</p></div><Button variant="secondary" disabled>View history · Coming soon</Button></Panel>
+          <Panel className="activity-panel"><span className="activity-mark" aria-hidden="true">↳</span><div><h3>A clean slate.</h3><p className="muted text-sm">The activity view is not connected yet. Paper order history is available through the local portfolio API.</p></div><Button variant="secondary" disabled>View history · Coming soon</Button></Panel>
         </section>
       </Reveal>
     </DashboardShell>
