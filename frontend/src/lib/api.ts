@@ -166,3 +166,19 @@ export async function getMarketHistory(query: MarketHistoryQuery, signal?: Abort
   if (!isMarketHistoryResponse(data, normalized)) throw new Error("Backend returned an incompatible market history response. No data was accepted.");
   return data;
 }
+
+
+/** Mirrors the read-only Phase 2C contracts. Decimal values are JSON strings. */
+export type Portfolio = Readonly<{
+  id: string; name: string; mode: "paper"; currency: "USD";
+  starting_cash: string; cash: string; realized_pnl: string; created_at: string; updated_at: string;
+}>;
+export type Holding = Readonly<{
+  symbol: string; quantity: string; cost_basis: string; last_price: string | null;
+  price_date: string | null; market_value: string | null; unrealized_pnl: string | null; allocation_pct: string | null;
+}>;
+export type PortfolioHoldings = Readonly<{
+  portfolio_id: string; currency: "USD"; cash: string; positions_value: string | null;
+  equity: string | null; unrealized_pnl: string | null; realized_pnl: string;
+  cash_allocation_pct: string | null; valued_at: string; holdings: readonly Holding[];
+}>;
