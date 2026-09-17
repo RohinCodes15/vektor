@@ -11,3 +11,13 @@ export function moneyInCents(value: string): bigint {
   const cents = shift < 0 ? digits / factor : digits * factor;
   return match[1] ? -cents : cents;
 }
+
+export function formatMoney(value: string | null): string {
+  return value === null ? "Unavailable" : formatCents(moneyInCents(value));
+}
+
+function formatCents(cents: bigint): string {
+  const negative = cents < BigInt(0);
+  const absolute = negative ? -cents : cents;
+  return `${negative ? "−" : ""}$${(absolute / BigInt(100)).toLocaleString("en-US")}.${String(absolute % BigInt(100)).padStart(2, "0")}`;
+}
