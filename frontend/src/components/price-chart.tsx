@@ -16,14 +16,14 @@ export function PriceChart({ history }: { history: MarketHistoryResponse }) {
   useEffect(() => {
     const element = container.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(200, Math.round(entry.contentRect.width))));
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(160, Math.round(entry.contentRect.width))));
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
   if (!latest) return <p className="chart-state" role="status">No daily prices in this date range.</p>;
   const selected = active ?? latest;
-  const tooltipX = active ? Math.max(geometry.plot.left, Math.min(active.x - 68, width - 152)) : 0;
+  const tooltipX = active ? Math.max(4, Math.min(active.x - 70, width - 144)) : 0;
 
   return (
     <div className="price-chart" ref={container}>
