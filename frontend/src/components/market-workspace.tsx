@@ -35,13 +35,13 @@ export function MarketWorkspace() {
               setError("");
             } catch (error) { setError(error instanceof Error ? error.message : "Enter a valid ticker symbol."); }
           }}>
-          <Field id="symbol-search" label="Find a symbol" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Enter ticker, e.g. AAPL" aria-invalid={!!error} autoComplete="off" hint="Enter a ticker and press Search, or choose a reference symbol. No live quotes." />
+          <Field id="symbol-search" label="Find a symbol" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setError(""); }} placeholder="Enter ticker, e.g. AAPL" aria-invalid={!!error} autoComplete="off" hint="Enter a ticker and press Search, or choose a reference symbol. No live quotes." />
           <Button type="submit" variant="secondary">Search</Button>
           {error && <p role="alert">{error}</p>}
           </form>
           <div className="watchlist-heading" aria-hidden="true"><span>INSTRUMENT</span><span>LIVE QUOTE</span></div>
           <ul className="symbol-list" aria-label="Reference symbols">
-            {matches.map((item) => <li key={item.symbol}><button type="button" className={`symbol-row ${selected.symbol === item.symbol ? "symbol-selected" : ""}`} aria-pressed={selected.symbol === item.symbol} aria-controls="instrument-details" onClick={() => setSelected(item)}><span className="symbol-monogram" aria-hidden="true">{item.symbol.slice(0, 1)}</span><span className="symbol-name"><strong>{item.symbol}</strong><span>{item.name}</span></span><span className="quote-unavailable">Unavailable</span></button></li>)}
+            {matches.map((item) => <li key={item.symbol}><button type="button" className={`symbol-row ${selected.symbol === item.symbol ? "symbol-selected" : ""}`} aria-pressed={selected.symbol === item.symbol} aria-controls="instrument-details" onClick={() => { setSelected(item); setError(""); }}><span className="symbol-monogram" aria-hidden="true">{item.symbol.slice(0, 1)}</span><span className="symbol-name"><strong>{item.symbol}</strong><span>{item.name}</span></span><span className="quote-unavailable">Unavailable</span></button></li>)}
           </ul>
           <p role="status" className="search-result muted">{matches.length === 0 ? "No matching symbols. Try another name or ticker." : `${matches.length} reference ${matches.length === 1 ? "symbol" : "symbols"}`}</p>
         </Panel>
