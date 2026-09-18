@@ -305,3 +305,8 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .history-loaded-range, .history-hint { overflow-wrap: anywhere; }
 .price-plot { overflow: hidden; }
 .chart-explorer input { min-height: 44px; }
+@media (max-width: 480px) {
+  .instrument { padding-inline: 12px; }
+  .history-ranges { gap: 4px; }
+  .history-ranges .button { padding-inline: 8px; }
+}
