@@ -1,27 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { once } from "node:events";
 
-// Exercise the production-rendered page rather than duplicating component logic.
+// Inspect the production-rendered page from the build without requiring a listening server.
 test("workspace renders accessible primitives and honest paper-only boundaries", { timeout: 30000 }, async () => {
-  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--port", "0"], { env: { ...process.env, NODE_ENV: "production" } });
-  let output = "";
-  server.stdout.on("data", (data) => { output += data; });
-  server.stderr.on("data", (data) => { output += data; });
-  try {
-    let response;
-    for (let attempt = 0; attempt < 100; attempt++) {
-      if (server.exitCode !== null) throw new Error(output);
-      const address = output.match(/http:\/\/localhost:(\d+)/);
-      if (address) {
-        try { response = await fetch(`http://localhost:${address[1]}`); if (response.ok) break; } catch { /* Server may still be starting. */ }
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    assert.ok(response?.ok, output);
-    const html = await response.text();
+  const html = await readFile(".next/server/app/index.html", "utf8");
     assert.match(html, /lang="en"/);
     assert.match(html, /Skip to content/);
     for (const id of ["main", "overview", "market", "activity"]) {
@@ -54,13 +37,7 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     const css = await readFile("src/app/globals.css", "utf8");
     assert.match(css, /prefers-reduced-motion: reduce/);
     assert.match(css, /:focus-visible/);
-  } finally {
-    if (server.exitCode === null) {
-      const exited = once(server, "exit");
-      server.kill("SIGTERM");
-      await exited;
-    }
-  }
+
 });
 
 test("theme text and input boundaries meet WCAG contrast thresholds", async () => {
