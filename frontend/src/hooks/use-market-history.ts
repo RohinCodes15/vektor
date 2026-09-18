@@ -20,6 +20,9 @@ export function useMarketHistory(): { state: MarketHistoryState; load: (query: M
     pending.current = controller;
     setState({ status: "loading" });
     try {
+      // Let Strict Mode cleanup and same-turn symbol changes cancel before fetching.
+      await Promise.resolve();
+      if (controller.signal.aborted) return;
       const data = await getMarketHistory(query, controller.signal);
       if (!controller.signal.aborted) setState({ status: "success", data });
     } catch (error) {
