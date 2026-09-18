@@ -37,7 +37,7 @@ export function StockHistory({ symbol }: { symbol: string }) {
         {state.status === "idle" && <div className="chart-state"><span className="empty-icon" aria-hidden="true">⌁</span><h3>A closer look at the history.</h3><p>Choose inclusive start and end dates above.<br />Historical daily closes load on demand.</p></div>}
         {state.status === "loading" && <div className="chart-state"><p>Fetching daily closing prices.</p></div>}
         {state.status === "error" && !noData && <div className="chart-state" role="alert"><h3>History unavailable</h3><p>{state.message}</p><Button type="button" variant="secondary" onClick={() => void load({ symbol, ...dates })}>Retry history</Button></div>}
-        {noData && <div className="chart-state"><h3>No observations in this range.</h3><p>Try another date range or symbol.</p></div>}
+        {noData && <div className="chart-state"><h3>No observations in this range.</h3><p>Check the ticker or try another date range.</p></div>}
         {state.status === "success" && !noData && <><p className="history-loaded-range muted">Showing {state.data.symbol} · {state.data.start} – {state.data.end} · Daily close</p><PriceChart key={`${state.data.symbol}:${state.data.start}:${state.data.end}`} history={state.data} /></>}
       </div>
     </div>
