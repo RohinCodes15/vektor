@@ -302,3 +302,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 
 .watchlist form { display: grid; gap: 12px; }
 .history-ranges .button { flex: 1; min-height: 44px; }
+.history-loaded-range, .history-hint { overflow-wrap: anywhere; }
+.price-plot { overflow: hidden; }
