@@ -1,0 +1,88 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import ts from "typescript";
+import { ApiError } from "../src/lib/api.ts";
+
+const require = createRequire(import.meta.url);
+
+// Run the actual hook/component with a small hook lifecycle, without a browser dependency.
+async function mount(file, imports, name, initialProps = {}) {
+  let cursor = 0;
+  const slots = [];
+  const effects = [];
+  const cleanups = [];
+  const hooks = {
+    useId() { return `test-id-${cursor++}`; },
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
+      return [slots[index], (value) => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
+    },
+    useRef(value) { const index = cursor++; return slots[index] ??= { current: value }; },
+    useCallback(callback, deps) { return hooks.useMemo(() => callback, deps); },
+    useMemo(factory, deps) {
+      const index = cursor++;
+      if (!slots[index] || deps.some((value, i) => !Object.is(value, slots[index].deps[i]))) slots[index] = { deps, value: factory() };
+      return slots[index].value;
+    },
+    useEffect(effect, deps) {
+      const index = cursor++;
+      if (!slots[index] || deps.some((value, i) => !Object.is(value, slots[index][i]))) {
+        slots[index] = deps;
+        effects.push(() => { cleanups[index]?.(); cleanups[index] = effect(); });
+      }
+    },
+  };
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const exports = {};
+  new Function("require", "exports", compiled)((id) => id === "react" ? hooks : imports[id] ?? require(id), exports);
+  return {
+    render(props = initialProps) { cursor = 0; return exports[name](props); },
+    flush() { effects.splice(0).forEach((effect) => effect()); },
+    unmount() { cleanups.forEach((cleanup) => cleanup?.()); },
+  };
+}
+
+const query = { symbol: "AAPL", start: "2024-01-01", end: "2024-02-01" };
+
+test("history hook loads, ignores late responses, handles errors/empty data, and retries", async () => {
+  const requests = [];
+  const app = await mount("../src/hooks/use-market-history.ts", {
+    "../lib/api": { ApiError, getMarketHistory: (query, signal) => new Promise((resolve, reject) => requests.push({ query, signal, resolve, reject })) },
+  }, "useMarketHistory");
+  let hook = app.render(); app.flush();
+  assert.equal(hook.state.status, "idle");
+  const first = hook.load(query); await Promise.resolve();
+  assert.equal(app.render().state.status, "loading");
+  const second = hook.load({ ...query, symbol: "MSFT" }); await Promise.resolve();
+  assert.equal(requests[0].signal.aborted, true);
+  requests[1].resolve({ symbol: "MSFT", bars: [] }); await second;
+  assert.deepEqual(app.render().state, { status: "success", data: { symbol: "MSFT", bars: [] } });
+  requests[0].resolve({ symbol: "AAPL", bars: [1] }); await first;
+  assert.equal(app.render().state.data.symbol, "MSFT");
+  for (const status of [404, 503]) {
+    const attempt = hook.load(query); await Promise.resolve();
+    requests.at(-1).reject(new ApiError("Unavailable", status)); await attempt;
+    assert.equal(app.render().state.statusCode, status);
+  }
+  const retry = hook.load(query); await Promise.resolve();
+  requests.at(-1).resolve({ symbol: "AAPL", bars: [] }); await retry;
+  assert.equal(app.render().state.status, "success");
+  app.unmount();
+  assert.equal(requests.at(-1).signal.aborted, true);
+});
+
+test("same-turn rapid symbol changes and Strict Mode cleanup avoid obsolete requests", async () => {
+  const requests = [];
+  const app = await mount("../src/hooks/use-market-history.ts", {
+    "../lib/api": { ApiError, getMarketHistory: async (query) => { requests.push(query); return { symbol: query.symbol, bars: [] }; } },
+  }, "useMarketHistory");
+  const hook = app.render(); app.flush();
+  await Promise.all([hook.load(query), hook.load({ ...query, symbol: "MSFT" }), hook.load({ ...query, symbol: "NVDA" })]);
+  assert.deepEqual(requests.map(({ symbol }) => symbol), ["NVDA"]);
+  const pending = hook.load(query); app.unmount(); await pending;
+  assert.equal(requests.length, 1);
+});
