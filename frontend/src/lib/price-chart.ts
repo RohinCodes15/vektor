@@ -39,6 +39,9 @@ export function nearestChartPoint(points: readonly ChartPoint[], x: number): num
   return left > 0 && Math.abs(points[left - 1].x - x) <= Math.abs(points[left].x - x) ? left - 1 : left;
 }
 
+const standardPrice = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 6 });
+const scientificPrice = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 6, notation: "scientific" });
+
 export function formatChartPrice(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumSignificantDigits: 6, notation: value > 0 && (value < 0.0001 || value >= 1e9) ? "scientific" : "standard" }).format(value);
+  return (value > 0 && (value < 0.0001 || value >= 1e9) ? scientificPrice : standardPrice).format(value);
 }
