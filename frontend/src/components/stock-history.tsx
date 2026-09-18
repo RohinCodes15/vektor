@@ -24,7 +24,7 @@ export function StockHistory({ symbol }: { symbol: string }) {
           setRange(value); setStart(next.start); setEnd(next.end); setDates((current) => current.start === next.start && current.end === next.end ? current : next);
         }}>{value}</Button>)}
       </div>
-      <form className="history-form" onSubmit={(event) => { event.preventDefault(); setRange(null); setDates({ start, end }); }}>
+      <form className="history-form" onSubmit={(event) => { event.preventDefault(); setRange(null); setDates((current) => current.start === start && current.end === end ? current : { start, end }); }}>
         <Field id={`history-start-${symbol}`} label="Start date" type="date" value={start} disabled={state.status === "loading"} required onChange={(event) => setStart(event.target.value)} />
         <Field id={`history-end-${symbol}`} label="End date" type="date" value={end} disabled={state.status === "loading"} min={start || undefined} required onChange={(event) => setEnd(event.target.value)} />
         <Button type="submit" variant="secondary" disabled={state.status === "loading"}>{state.status === "loading" ? "Loading…" : "Load history"}</Button>
