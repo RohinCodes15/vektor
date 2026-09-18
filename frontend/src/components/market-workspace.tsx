@@ -43,7 +43,7 @@ export function MarketWorkspace() {
           <ul className="symbol-list" aria-label="Reference symbols">
             {matches.map((item) => <li key={item.symbol}><button type="button" className={`symbol-row ${selected.symbol === item.symbol ? "symbol-selected" : ""}`} aria-pressed={selected.symbol === item.symbol} aria-controls="instrument-details" onClick={() => { setSelected(item); setError(""); }}><span className="symbol-monogram" aria-hidden="true">{item.symbol.slice(0, 1)}</span><span className="symbol-name"><strong>{item.symbol}</strong><span>{item.name}</span></span><span className="quote-unavailable">Unavailable</span></button></li>)}
           </ul>
-          <p role="status" className="search-result muted">{matches.length === 0 ? "No matching symbols. Try another name or ticker." : `${matches.length} reference ${matches.length === 1 ? "symbol" : "symbols"}`}</p>
+          <p role="status" className="search-result muted">{matches.length === 0 ? "No matching reference symbols. Press Search to load this ticker." : `${matches.length} reference ${matches.length === 1 ? "symbol" : "symbols"}`}</p>
         </Panel>
         <Panel id="instrument-details" className="instrument" aria-labelledby="instrument-title">
           <div className="panel-heading"><div aria-live="polite" aria-atomic="true"><motion.div key={selected.symbol} className="instrument-heading" initial={false} animate={{ y: reduced ? 0 : [2, 0] }}><span className="instrument-mark" aria-hidden="true">{selected.symbol.slice(0, 1)}</span><div><h3 id="instrument-title">{selected.symbol}</h3><p className="muted text-xs">{selected.name}</p></div></motion.div></div><Badge>Daily close</Badge></div>
