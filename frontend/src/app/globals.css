@@ -299,3 +299,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 }
 
 .history-ranges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+.watchlist form { display: grid; gap: 12px; }
