@@ -34,7 +34,7 @@ export function PriceChart({ history }: { history: MarketHistoryResponse }) {
       }} onPointerDown={(event) => {
         const bounds = event.currentTarget.getBoundingClientRect();
         setActiveIndex(nearestChartPoint(geometry.points, ((event.clientX - bounds.left) / bounds.width) * width));
-      }} onPointerLeave={() => setActiveIndex(null)}>
+      }} onPointerLeave={() => setActiveIndex(null)} onPointerCancel={() => setActiveIndex(null)}>
         <desc>Unadjusted daily closing prices. Missing trading days are not filled. Use the trading-day slider below for keyboard access to every observation.</desc>
         {geometry.priceTicks.map((tick, index) => <g key={index}><line className="chart-grid-line" x1={geometry.plot.left} x2={geometry.plot.right} y1={tick.y} y2={tick.y} /><text className="chart-axis-label" x={geometry.plot.left - 10} y={tick.y + 4} textAnchor="end">{formatChartPrice(tick.value)}</text></g>)}
         {geometry.dateTicks.map((tick, index) => <text key={tick.date} className="chart-axis-label" x={tick.x} y={266} textAnchor={geometry.dateTicks.length === 1 ? "middle" : index === 0 ? "start" : index === geometry.dateTicks.length - 1 ? "end" : "middle"}>{tick.date}</text>)}
