@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import ts from "typescript";
 import { ApiError } from "../src/lib/api.ts";
+import { historyRange } from "../src/lib/history-range.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -85,4 +86,40 @@ test("same-turn rapid symbol changes and Strict Mode cleanup avoid obsolete requ
   assert.deepEqual(requests.map(({ symbol }) => symbol), ["NVDA"]);
   const pending = hook.load(query); app.unmount(); await pending;
   assert.equal(requests.length, 1);
+});
+
+function nodes(element) {
+  if (!element || typeof element !== "object") return [];
+  return [element, ...[element.props?.children].flat(Infinity).flatMap(nodes)];
+}
+
+test("range controls deduplicate requests, preserve range across symbols, and hide stale charts", async () => {
+  const requests = [];
+  let state = { status: "idle" };
+  const load = (query) => { requests.push(query); };
+  const app = await mount("../src/components/stock-history.tsx", {
+    "../hooks/use-market-history": { useMarketHistory: () => ({ state, load }) },
+    "../lib/history-range": { historyRange },
+    "./price-chart": { PriceChart: "chart" },
+    "./ui": { Button: "button", Field: "field" },
+  }, "StockHistory", { symbol: "AAPL" });
+  let tree = app.render(); app.flush();
+  const click = (label) => nodes(tree).find((node) => node.type === "button" && node.props.children === label).props.onClick();
+  click("1Y"); tree = app.render(); app.flush();
+  assert.equal(requests.length, 1);
+  click("1M"); tree = app.render(); app.flush();
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[1], { symbol: "AAPL", ...historyRange("1M") });
+  state = { status: "success", data: { ...requests[1], bars: [{}] } };
+  tree = app.render();
+  assert.equal(nodes(tree).filter((node) => node.type === "chart").length, 1);
+  tree = app.render({ symbol: "MSFT" });
+  assert.equal(nodes(tree).filter((node) => node.type === "chart").length, 0);
+  app.flush();
+  assert.deepEqual(requests.at(-1), { ...requests[1], symbol: "MSFT" });
+  for (const next of [{ status: "loading" }, { status: "error", statusCode: 404 }, { status: "success", data: { ...requests.at(-1), bars: [] } }, { status: "error", statusCode: 503, message: "Provider unavailable" }]) {
+    state = next; tree = app.render({ symbol: "MSFT" });
+    assert.equal(nodes(tree).filter((node) => node.type === "chart").length, 0);
+    assert.equal(nodes(tree).some((node) => node.props?.role === "alert"), next.statusCode === 503);
+  }
 });
