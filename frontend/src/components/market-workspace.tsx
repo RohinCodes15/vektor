@@ -35,9 +35,9 @@ export function MarketWorkspace() {
               setError("");
             } catch (error) { setError(error instanceof Error ? error.message : "Enter a valid ticker symbol."); }
           }}>
-          <Field id="symbol-search" label="Find a symbol" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setError(""); }} placeholder="Enter ticker, e.g. AAPL" aria-invalid={!!error} autoComplete="off" hint="Enter a ticker and press Search, or choose a reference symbol. No live quotes." />
+          <Field id="symbol-search" label="Find a symbol" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setError(""); }} placeholder="Enter ticker, e.g. AAPL" aria-invalid={!!error} aria-errormessage={error ? "symbol-search-error" : undefined} autoComplete="off" hint="Enter a ticker and press Search, or choose a reference symbol. No live quotes." />
           <Button type="submit" variant="secondary">Search</Button>
-          {error && <p role="alert">{error}</p>}
+          {error && <p id="symbol-search-error" role="alert">{error}</p>}
           </form>
           <div className="watchlist-heading" aria-hidden="true"><span>INSTRUMENT</span><span>LIVE QUOTE</span></div>
           <ul className="symbol-list" aria-label="Reference symbols">
