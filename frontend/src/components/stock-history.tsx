@@ -21,7 +21,7 @@ export function StockHistory({ symbol }: { symbol: string }) {
       <div className="history-ranges" role="group" aria-label="History time range">
         {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((value) => <Button key={value} type="button" variant={range === value ? "primary" : "secondary"} aria-pressed={range === value} onClick={() => {
           const next = historyRange(value);
-          setRange(value); setStart(next.start); setEnd(next.end); setDates(next);
+          setRange(value); setStart(next.start); setEnd(next.end); setDates((current) => current.start === next.start && current.end === next.end ? current : next);
         }}>{value}</Button>)}
       </div>
       <form className="history-form" onSubmit={(event) => { event.preventDefault(); setRange(null); setDates({ start, end }); }}>
