@@ -7,12 +7,14 @@ import { PriceChart } from "./price-chart";
 import { Button, Field } from "./ui";
 
 export function StockHistory({ symbol }: { symbol: string }) {
-  const { state, load } = useMarketHistory();
+  const { state: result, load } = useMarketHistory();
   const [range, setRange] = useState<HistoryRange | null>("1Y");
   const [start, setStart] = useState(() => historyRange("1Y").start);
   const [end, setEnd] = useState(() => historyRange("1Y").end);
   const [dates, setDates] = useState(() => historyRange("1Y"));
   useEffect(() => { void load({ symbol, ...dates }); }, [symbol, dates, load]);
+  const state = result.status === "success" && (result.data.symbol !== symbol || result.data.start !== dates.start || result.data.end !== dates.end)
+    ? { status: "loading" as const } : result;
 
   const noData = (state.status === "success" && state.data.bars.length === 0) || (state.status === "error" && state.statusCode === 404);
 
