@@ -41,6 +41,10 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     assert.match(html, /label for="history-start-AAPL"/);
     assert.match(html, /label for="history-end-AAPL"/);
     assert.match(html, /No live quotes/);
+    assert.match(html, /aria-label="History time range"/);
+    for (const range of ["1M", "3M", "6M", "1Y", "ALL"]) assert.ok(html.includes(`>${range}</button>`));
+    assert.match(html, /aria-pressed="true">1Y/);
+    assert.ok(html.includes('>Search</button>'));
     assert.match(html, /<button[^>]*disabled=""[^>]*>New simulation · Coming soon<\/button>/);
     assert.match(html, /<label for="symbol-search">Find a symbol<\/label>/);
     assert.match(html, /aria-describedby="symbol-search-hint"/);
