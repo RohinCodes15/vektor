@@ -297,3 +297,5 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .history-form .button { justify-self: stretch; }
   .chart-price p { font-size: 24px; }
 }
+
+.history-ranges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
