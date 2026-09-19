@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import ts from "typescript";
 import { ApiError } from "../src/lib/api.ts";
+import * as chartGeometry from "../src/lib/price-chart.ts";
 import { historyRange } from "../src/lib/history-range.ts";
 
 const require = createRequire(import.meta.url);
@@ -122,4 +123,34 @@ test("range controls deduplicate requests, preserve range across symbols, and hi
     assert.equal(nodes(tree).filter((node) => node.type === "chart").length, 0);
     assert.equal(nodes(tree).some((node) => node.props?.role === "alert"), next.statusCode === 503);
   }
+});
+
+
+test("chart tooltip stays inside narrow viewports and keyboard selection matches the observation", async (t) => {
+  let resize;
+  const previousObserver = globalThis.ResizeObserver;
+  t.after(() => { if (previousObserver) globalThis.ResizeObserver = previousObserver; else delete globalThis.ResizeObserver; });
+  globalThis.ResizeObserver = class {
+    constructor(callback) { resize = callback; }
+    observe() {}
+    disconnect() {}
+  };
+  const history = { symbol: "AAPL", currency: "USD", cached: false, fetched_at: "2024-01-03T00:00:00Z", bars: [{ date: "2024-01-01", close: 100 }, { date: "2024-01-02", close: 110 }] };
+  const app = await mount("../src/components/price-chart.tsx", { "../lib/price-chart": chartGeometry }, "PriceChart", { history });
+  let tree = app.render();
+  tree.props.ref.current = {};
+  app.flush();
+  resize([{ contentRect: { width: 160 } }]);
+  tree = app.render();
+  const slider = nodes(tree).find((node) => node.type === "input");
+  slider.props.onChange({ target: { value: "0" } });
+  tree = app.render();
+  assert.match(nodes(tree).find((node) => node.type === "input").props["aria-valuetext"], /2024-01-01, close 100 USD/);
+  const tooltip = nodes(tree).find((node) => node.type === "g" && node.props.transform);
+  const x = Number(tooltip.props.transform.match(/translate\(([^,]+)/)[1]);
+  assert.ok(x >= 0 && x + 140 <= 160);
+  nodes(tree).find((node) => node.type === "svg").props.onPointerCancel();
+  tree = app.render();
+  assert.equal(nodes(tree).some((node) => node.props?.className === "chart-crosshair"), false);
+  app.unmount();
 });
