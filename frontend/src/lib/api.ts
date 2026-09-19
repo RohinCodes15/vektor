@@ -148,9 +148,14 @@ function isMarketHistoryResponse(value: unknown, query: MarketHistoryQuery): val
   return true;
 }
 
-export async function getMarketHistory(query: MarketHistoryQuery, signal?: AbortSignal): Promise<MarketHistoryResponse> {
-  const symbol = typeof query.symbol === "string" ? query.symbol.trim().toUpperCase() : "";
+export function normalizeMarketSymbol(value: string): string {
+  const symbol = typeof value === "string" ? value.trim().toUpperCase() : "";
   if (!/^\^?[A-Z0-9][A-Z0-9.=-]{0,14}$/.test(symbol)) throw new Error("Enter a valid market symbol (1–15 characters, optionally prefixed with ^).");
+  return symbol;
+}
+
+export async function getMarketHistory(query: MarketHistoryQuery, signal?: AbortSignal): Promise<MarketHistoryResponse> {
+  const symbol = normalizeMarketSymbol(query.symbol);
   if (!isCalendarDate(query.start) || !isCalendarDate(query.end)) throw new Error("Enter valid start and end dates in YYYY-MM-DD format.");
   if (query.start > query.end) throw new Error("Start date must be on or before end date.");
   if (query.start > new Date().toISOString().slice(0, 10)) throw new Error("Start date cannot be in the future.");
