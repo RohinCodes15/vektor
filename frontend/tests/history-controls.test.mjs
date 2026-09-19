@@ -154,3 +154,24 @@ test("chart tooltip stays inside narrow viewports and keyboard selection matches
   assert.equal(nodes(tree).some((node) => node.props?.className === "chart-crosshair"), false);
   app.unmount();
 });
+
+test("ticker search validates, normalizes, and clears errors on edits", async () => {
+  const { normalizeMarketSymbol } = await import("../src/lib/api.ts");
+  const app = await mount("../src/components/market-workspace.tsx", {
+    "motion/react": { motion: { div: "div" }, useReducedMotion: () => true },
+    "../lib/api": { normalizeMarketSymbol },
+    "./stock-history": { StockHistory: "history" },
+    "./ui": { Badge: "badge", Button: "button", Field: "field", Panel: "panel" },
+  }, "MarketWorkspace");
+  let tree = app.render();
+  const field = () => nodes(tree).find((node) => node.type === "field");
+  const submit = () => nodes(tree).find((node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  field().props.onChange({ target: { value: "AAPL?" } }); tree = app.render();
+  submit(); tree = app.render();
+  assert.equal(field().props["aria-invalid"], true);
+  assert.equal(nodes(tree).find((node) => node.type === "history").props.symbol, "AAPL");
+  field().props.onChange({ target: { value: " brk-b " } }); tree = app.render();
+  assert.equal(field().props["aria-invalid"], false);
+  submit(); tree = app.render();
+  assert.equal(nodes(tree).find((node) => node.type === "history").props.symbol, "BRK-B");
+});
