@@ -1,4 +1,6 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import * as motion from "motion/react-client";
+import type { HTMLMotionProps } from "motion/react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" }) {
   return <button className={`button button-${variant} ${className}`} {...props} />;
@@ -8,8 +10,8 @@ export function Badge({ children, tone = "neutral" }: { children: ReactNode; ton
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
-export function Panel({ className = "", ...props }: HTMLAttributes<HTMLElement>) {
-  return <section className={`panel ${className}`} {...props} />;
+export function Panel({ className = "", ...props }: HTMLMotionProps<"section">) {
+  return <motion.section className={`panel ${className}`} initial={false} whileInView={{ y: [3, 0] }} viewport={{ once: true, amount: 0.15 }} {...props} />;
 }
 
 export function Field({ label, id, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; id: string; hint?: string }) {
