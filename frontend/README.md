@@ -18,8 +18,14 @@ Use Node.js 22.13+ and npm. Dependencies are pinned in package-lock.json.
 
 `src/app/globals.css` owns Tailwind theme tokens, charcoal surfaces, teal accent, typography, spacing, visible keyboard focus, responsive layouts, and reduced-motion styles. System fonts work offline. `src/components/ui.tsx` provides typed Button (three variants), Badge (three tones), Panel, and labeled Field primitives; they forward native attributes. Pass `aria-invalid` and an explanatory hint for invalid fields.
 
-`src/components/reveal.tsx` is the small Motion client boundary. It respects the OS reduced-motion preference. The rest of the page is server rendered. Navigation uses native section anchors; all content remains readable without JavaScript.
+## Phase 1C dashboard
 
-The home page doubles as a workspace foundation and component reference. Its chart is decorative and explicitly illustrative; no prices, returns, account balances, API health, or simulation results are claimed. The input is a labeled, unsaved component preview. Run simulation is disabled because simulation endpoints do not exist. No shared API contracts were changed.
+`src/components/dashboard-shell.tsx` owns the responsive shell: desktop collapse/expand, a mobile disclosure menu with Escape support, native anchor navigation, hash-aware active links, and the persistent PAPER ONLY indicator. The mobile menu expands in document flow, so it does not need a modal focus trap. Sidebar state is intentionally session-only; nothing is saved to local storage.
 
-Tests check the rendered page's paper-only boundaries, anchor targets, labels, and component semantics. Desktop (1440px) and mobile (375px) layouts were checked in-browser; assistive-technology testing remains manual.
+`MetricCard` in `src/components/ui.tsx` composes the existing Panel primitive. Portfolio metrics show unavailable values, not fabricated balances or zero positions. The performance view is an empty state, not a synthetic chart.
+
+`src/components/market-workspace.tsx` provides case-insensitive symbol/company search, a no-results state, and selectable reference instruments. Static symbol metadata is explicitly a reference list; there are no prices, timestamps, returns, market-open claims, or network requests. Selection updates the instrument details. Simulation, paper orders, backtests, strategies, and history are disabled and marked coming soon. No shared API contracts were changed.
+
+`src/components/reveal.tsx` retains the Motion entrance and OS reduced-motion support. UI colors, typography, native focus states, and reduced-motion CSS follow the existing design system. No new dependencies were added.
+
+Tests exercise the production-rendered shell, paper-only and data-unavailable boundaries, anchor targets, labeled search, initial disclosure states, and color contrast. Browser checks cover desktop collapse/expand, mobile open/close and Escape, symbol selection, filtering and no-results recovery, active navigation, and desktop/mobile overflow. Assistive-technology testing remains manual.
