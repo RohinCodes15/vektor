@@ -24,17 +24,20 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     const html = await response.text();
     assert.match(html, /lang="en"/);
     assert.match(html, /Skip to content/);
-    for (const id of ["main", "overview", "principles", "components"]) {
+    for (const id of ["main", "overview", "market", "activity"]) {
       assert.ok(html.includes(`id="${id}"`));
       assert.ok(html.includes(`href="#${id}"`));
     }
-    assert.match(html, /Paper only/);
-    assert.match(html, /ILLUSTRATIVE RESEARCH PATH/);
-    assert.match(html, /Not available/);
-    assert.match(html, /<button[^>]*disabled=""[^>]*>Run simulation<\/button>/);
-    assert.match(html, /<label for="strategy-name">Strategy name<\/label>/);
-    assert.match(html, /aria-describedby="strategy-name-hint"/);
-    assert.match(html, /id="strategy-name-hint"/);
+    assert.match(html, /PAPER ONLY/);
+    assert.match(html, /NO LIVE DATA/);
+    assert.match(html, /No simulation loaded/);
+    assert.match(html, /No quote data connected/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>New simulation · Coming soon<\/button>/);
+    assert.match(html, /<label for="symbol-search">Find a symbol<\/label>/);
+    assert.match(html, /aria-describedby="symbol-search-hint"/);
+    assert.match(html, /id="symbol-search-hint"/);
+    assert.match(html, /aria-label="Open navigation" aria-expanded="false"/);
+    assert.match(html, /aria-label="Collapse sidebar" aria-expanded="true"/);
     const css = await readFile("src/app/globals.css", "utf8");
     assert.match(css, /prefers-reduced-motion: reduce/);
     assert.match(css, /:focus-visible/);
