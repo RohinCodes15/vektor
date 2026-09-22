@@ -29,6 +29,12 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
       assert.ok(html.includes(`href="#${id}"`));
     }
     assert.match(html, /PAPER ONLY/);
+    assert.match(html, /id="backend-status"/);
+    assert.match(html, /Checking the paper-only health endpoint/);
+    assert.match(html, /aria-busy="true"/);
+    assert.match(html, /aria-live="polite"/);
+    assert.doesNotMatch(html, />Connected</);
+    assert.match(html, /<main id="main" tabindex="-1">/);
     assert.match(html, /NO LIVE DATA/);
     assert.match(html, /No simulation loaded/);
     assert.match(html, /No quote data connected/);
