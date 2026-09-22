@@ -153,6 +153,10 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .instrument-message { flex: 1; text-align: center; padding: 24px 0 32px; }
 .instrument-message .empty-icon { border: 0; margin-bottom: 8px; }
 .instrument-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--color-line); padding-top: 20px; }
+.activity-panel { display: flex; align-items: center; gap: 20px; padding-block: 28px; }
+.activity-mark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--color-line); border-radius: 50%; color: var(--color-muted); font-size: 21px; flex-shrink: 0; }
+.activity-panel p { margin-top: 4px; }
+.activity-panel .button { margin-left: auto; }
 .shell-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; border-top: 1px solid var(--color-line); margin: 0 36px; padding: 24px 0; font-size: 10px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
