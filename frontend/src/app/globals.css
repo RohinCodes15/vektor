@@ -94,6 +94,17 @@ button.future-link:disabled { background: transparent; border-color: transparent
 .help-link { width: 28px; height: 28px; border-radius: 50%; font-size: 12px; }
 main { padding: 36px; max-width: 1600px; margin: auto; }
 .workspace { display: grid; gap: 36px; }
+.dashboard-intro { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
+.dashboard-intro h1 { margin-top: 12px; }
+.lead { margin-top: 12px; color: var(--color-muted); font-size: 13px; }
+.mobile-break { display: none; }
+.data-notice { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--color-line); border-radius: 5px; margin-bottom: 30px; font-size: 11px; background: #86d5c103; }
+.notice-symbol { border: 1px solid var(--color-muted); border-radius: 50%; width: 16px; height: 16px; line-height: 14px; font-size: 10px; text-align: center; flex-shrink: 0; color: var(--color-muted); }
+.data-notice p { flex: 1; }
+.data-notice strong { font-weight: 550; margin-right: 10px; }
+.data-notice p > span { color: var(--color-muted); }
+.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.section-heading h2 { margin-top: 6px; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; margin-bottom: 20px; }
 .metric-card { padding: 20px 24px; }
 .metric-card h3 { font-size: 12px; color: var(--color-muted); font-weight: 400; }
