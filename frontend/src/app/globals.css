@@ -242,7 +242,7 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .workspace { transform: none !important; }
+  .workspace, .panel, .nav-link, .sidebar-content, .instrument-heading { transform: none !important; }
 }
 
 /* Connection feedback stays visible on mobile and never implies market availability. */
