@@ -60,3 +60,22 @@ test("network and CORS failures produce actionable errors", async (t) => {
   t.mock.method(globalThis, "fetch", async () => { throw new TypeError("Failed to fetch"); });
   await assert.rejects(getHealth(), /could not be reached.*frontend origin/);
 });
+
+test("timeout is bounded and reports clearly", async (t) => {
+  t.mock.method(AbortSignal, "timeout", (milliseconds) => {
+    assert.equal(milliseconds, 5000);
+    return AbortSignal.abort(new DOMException("Request timed out", "TimeoutError"));
+  });
+  t.mock.method(globalThis, "fetch", async (_url, { signal }) => { throw signal.reason; });
+  await assert.rejects(getHealth(), /health check timed out/);
+});
+
+test("caller cancellation is preserved for component cleanup", async (t) => {
+  const controller = new AbortController();
+  controller.abort();
+  t.mock.method(globalThis, "fetch", async (_url, { signal }) => {
+    assert.equal(signal.aborted, true);
+    throw signal.reason;
+  });
+  await assert.rejects(getHealth(controller.signal), { name: "AbortError" });
+});
