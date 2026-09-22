@@ -246,3 +246,20 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .workspace { transform: none !important; }
 }
+
+/* Connection feedback stays visible on mobile and never implies market availability. */
+.backend-link { display: inline-flex; gap: 8px; align-items: center; min-height: 32px; font-size: 11px; color: var(--color-muted); }
+.backend-link:hover { color: var(--color-teal); }
+.health-status { display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); padding: 16px 20px; margin-bottom: 28px; scroll-margin-top: 16px; }
+.health-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.health-heading h2 { font-size: 12px; letter-spacing: 0; }
+.health-summary { min-width: 0; }
+.health-summary p { font-size: 11px; color: var(--color-muted); margin-top: 6px; overflow-wrap: anywhere; }
+.health-error { border-left: 2px solid #dfc58e; }
+.health-connected { border-left: 2px solid var(--color-teal); }
+@media (max-width: 760px) {
+  .health-status { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px; }
+  .topbar { flex-wrap: wrap; gap: 8px 12px; }
+  .topbar-actions { gap: 8px; }
+  .backend-link { font-size: 10px; }
+}
