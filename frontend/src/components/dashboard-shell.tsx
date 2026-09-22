@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { MotionConfig, useReducedMotion } from "motion/react";
 import { HealthStatus } from "./health-status";
 import { Badge } from "./ui";
 
@@ -16,6 +17,7 @@ function subscribeToHash(onChange: () => void): () => void {
 }
 
 export function DashboardShell({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileToggle = useRef<HTMLButtonElement>(null);
@@ -27,6 +29,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
+    <MotionConfig reducedMotion="user" transition={{ duration: reduced ? 0 : 0.18, ease: "easeOut" }}>
     <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${mobileOpen ? "mobile-nav-open" : ""}`}>
       <aside className="sidebar" aria-label="Workspace navigation" onKeyDown={(event) => {
         if (event.key === "Escape" && mobileOpen) closeMobileNavigation();
@@ -67,5 +70,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <footer className="shell-footer" id="workspace-notes"><span>Vektor <span className="muted">/ Research with intent.</span></span><span className="muted">Local-first. Paper trading only. No real-money execution.</span></footer>
       </div>
     </div>
+    </MotionConfig>
   );
 }
