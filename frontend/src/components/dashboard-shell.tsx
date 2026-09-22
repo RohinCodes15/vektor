@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { HealthStatus } from "./health-status";
 import { Badge } from "./ui";
 
 const sections = [
@@ -60,9 +61,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <div className="main-shell">
         <header className="topbar">
           <nav aria-label="Breadcrumb"><span className="muted">Workspace</span><span className="breadcrumb" aria-hidden="true">/</span><a href="#overview">Dashboard</a></nav>
-          <div className="topbar-actions"><span className="local-status"><span className="status-dot" />Local workspace</span><Badge tone="positive">PAPER ONLY</Badge><a className="icon-button help-link" href="#workspace-notes" aria-label="About this workspace">?</a></div>
+          <div className="topbar-actions"><a className="backend-link" href="#backend-status">Backend status <span aria-hidden="true">↘</span></a><Badge tone="positive">PAPER ONLY</Badge><a className="icon-button help-link" href="#workspace-notes" aria-label="About this workspace">?</a></div>
         </header>
-        <main id="main">{children}</main>
+        <main id="main" tabIndex={-1}><HealthStatus />{children}</main>
         <footer className="shell-footer" id="workspace-notes"><span>Vektor <span className="muted">/ Research with intent.</span></span><span className="muted">Local-first. Paper trading only. No real-money execution.</span></footer>
       </div>
     </div>

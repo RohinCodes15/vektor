@@ -90,7 +90,6 @@ button.future-link:disabled { background: transparent; border-color: transparent
 .topbar { min-height: 72px; border-bottom: 1px solid var(--color-line); padding: 12px 36px; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 12px; position: sticky; top: 0; z-index: 2; background: var(--color-canvas); }
 .breadcrumb { color: var(--color-muted); margin: 0 14px; }
 .topbar-actions { display: flex; align-items: center; gap: 20px; }
-.local-status { display: flex; align-items: center; gap: 8px; color: var(--color-muted); font-size: 11px; }
 .help-link { width: 28px; height: 28px; border-radius: 50%; font-size: 12px; }
 main { padding: 36px; max-width: 1600px; margin: auto; }
 .workspace { display: grid; gap: 36px; }
@@ -181,7 +180,6 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .instrument-footer { align-items: center; flex-direction: row; }
   .activity-panel { flex-wrap: wrap; }
   .activity-panel .button { margin-left: 60px; }
-  .local-status { display: none; }
 }
 @media (max-width: 760px) {
   html { scroll-padding-top: 84px; }
