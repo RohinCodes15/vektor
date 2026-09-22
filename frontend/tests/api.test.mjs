@@ -40,3 +40,23 @@ test("invalid origins fail before any request", async (t) => {
   }
   assert.equal(request.mock.callCount(), 0);
 });
+
+test("non-paper, failed, incomplete, extra-field and mistyped responses fail validation", async (t) => {
+  const request = t.mock.method(globalThis, "fetch");
+  for (const invalid of [null, [], {}, { ...health, trading_mode: "live" }, { ...health, status: "down" }, { ...health, version: 123 }, { ...health, environment: null }, { ...health, app: undefined }, { ...health, secret: "not displayed" }]) {
+    request.mock.mockImplementation(async () => Response.json(invalid));
+    await assert.rejects(getHealth(), /incompatible health response/);
+  }
+});
+
+test("HTTP and malformed JSON errors do not expose raw response bodies", async (t) => {
+  const request = t.mock.method(globalThis, "fetch", async () => new Response("private diagnostics", { status: 503 }));
+  await assert.rejects(getHealth(), { message: "Backend health check failed (HTTP 503). Try again." });
+  request.mock.mockImplementation(async () => new Response("not json"));
+  await assert.rejects(getHealth(), { message: "Backend returned an invalid health response." });
+});
+
+test("network and CORS failures produce actionable errors", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => { throw new TypeError("Failed to fetch"); });
+  await assert.rejects(getHealth(), /could not be reached.*frontend origin/);
+});
