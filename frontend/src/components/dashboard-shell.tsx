@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { MotionConfig, useReducedMotion } from "motion/react";
+import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import { HealthStatus } from "./health-status";
 import { Badge } from "./ui";
 
@@ -42,13 +42,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <span aria-hidden="true">{mobileOpen ? "×" : "☰"}</span>
           </button>
         </div>
-        <div id="sidebar-navigation" className="sidebar-content">
+        <motion.div id="sidebar-navigation" className="sidebar-content" initial={false} animate={{ y: mobileOpen && !reduced ? [-3, 0] : 0 }}>
           <div className="workspace-label"><span className="sidebar-copy">WORKSPACE / 01</span><span className="status-dot" /></div>
           <nav aria-label="Main">
             {sections.map(({ id, label, icon }) => (
-              <a key={id} href={`#${id}`} className={`nav-link ${hash === `#${id}` ? "nav-active" : ""}`} aria-label={label} aria-current={hash === `#${id}` ? "location" : undefined} title={collapsed ? label : undefined} onClick={() => { if (mobileOpen) closeMobileNavigation(); }}>
+              <motion.a initial={false} whileHover={{ x: reduced ? 0 : 2 }} key={id} href={`#${id}`} className={`nav-link ${hash === `#${id}` ? "nav-active" : ""}`} aria-label={label} aria-current={hash === `#${id}` ? "location" : undefined} title={collapsed ? label : undefined} onClick={() => { if (mobileOpen) closeMobileNavigation(); }}>
                 <span className="nav-icon" aria-hidden="true">{icon}</span><span className="sidebar-copy">{label}</span>
-              </a>
+              </motion.a>
             ))}
           </nav>
           <div className="sidebar-divider" />
@@ -56,7 +56,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <button type="button" className="nav-link future-link" disabled aria-label="Strategies — coming soon"><span className="nav-icon" aria-hidden="true">⧉</span><span className="sidebar-copy">Strategies <small>Soon</small></span></button>
           <button type="button" className="nav-link future-link" disabled aria-label="Backtests — coming soon"><span className="nav-icon" aria-hidden="true">⏱</span><span className="sidebar-copy">Backtests <small>Soon</small></span></button>
           <div className="sidebar-note"><span className="local-mark" aria-hidden="true">⌘</span><div className="sidebar-copy"><strong>On your machine.</strong><p>No account. No brokerage.<br />Your research stays local.</p></div></div>
-        </div>
+        </motion.div>
         <button type="button" className="collapse-toggle" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed} aria-controls="sidebar-navigation" onClick={() => setCollapsed(!collapsed)} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
           <span aria-hidden="true">{collapsed ? "→" : "←"}</span><span className="sidebar-copy">Collapse sidebar</span>
         </button>
