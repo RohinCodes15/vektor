@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
-from app.contracts import MarketHistoryQuery
+from app.contracts import MarketHistoryQuery, PriceBar
 
 
 def query(**overrides: object) -> MarketHistoryQuery:
@@ -54,3 +54,34 @@ def test_query_rejects_unsupported_values(overrides: dict[str, object]) -> None:
 def test_query_is_immutable() -> None:
     with pytest.raises(ValidationError):
         query().symbol = "MSFT"  # type: ignore[misc]
+
+
+BAR = {"date": "2024-01-02", "open": 10.0, "high": 12.0, "low": 9.5, "close": 11.0, "adjusted_close": 10.8, "volume": 1000}
+
+
+def test_price_bar_accepts_valid_ohlcv() -> None:
+    bar = PriceBar(**BAR)
+    assert bar.date == date(2024, 1, 2) and bar.volume == 1000
+
+
+def test_price_bar_accepts_a_flat_bar() -> None:
+    assert PriceBar(**{**BAR, "open": 5, "high": 5, "low": 5, "close": 5, "adjusted_close": 5, "volume": 0}).high == 5
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [{"open": 0}, {"close": -1}, {"adjusted_close": 0}, {"high": float("nan")}, {"low": float("inf")},
+     {"volume": -1}, {"volume": 1.5}, {"open": None}, {"date": "2024-02-30"}],
+)
+def test_price_bar_rejects_invalid_values(overrides: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        PriceBar(**{**BAR, **overrides})
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [{"high": 9.0}, {"low": 11.5}, {"open": 12.5}, {"close": 9.0}, {"high": 9.4, "low": 9.5}],
+)
+def test_price_bar_rejects_inconsistent_ranges(overrides: dict[str, object]) -> None:
+    with pytest.raises(ValidationError, match="low <= open, close <= high"):
+        PriceBar(**{**BAR, **overrides})
