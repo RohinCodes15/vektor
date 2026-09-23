@@ -1,16 +1,22 @@
 """Shared API contracts (v1). Coordinated with frontend/ — see AGENTS.md before changing.
 
 Simulation models are contracts only; no endpoints serve them yet.
+Market history models back the read-only GET /api/v1/market/history endpoint.
 """
 
-from datetime import datetime
+import re
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 TradingMode = Literal["paper"]
+PriceInterval = Literal["1d"]
+
+# Yahoo-style tickers: AAPL, BRK-B, BRK.B, 7203.T, EURUSD=X, GC=F, and indices such as ^GSPC.
+_SYMBOL = re.compile(r"\^?[A-Z0-9][A-Z0-9.=-]{0,14}")
 
 
 class Contract(BaseModel):
@@ -51,3 +57,32 @@ class PaperOrder(Contract):
 
 class ErrorResponse(Contract):
     detail: str
+
+
+class MarketHistoryQuery(Contract):
+    """Query for daily OHLCV history. `start` and `end` are inclusive calendar dates."""
+
+    symbol: str
+    start: date
+    end: date
+    interval: PriceInterval = "1d"
+
+    @field_validator("symbol", mode="before")
+    @classmethod
+    def normalize_symbol(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        symbol = value.strip().upper()
+        if not _SYMBOL.fullmatch(symbol):
+            raise ValueError(
+                "symbol must be 1-15 letters, digits, '.', '-' or '=', optionally prefixed with '^'"
+            )
+        return symbol
+
+    @model_validator(mode="after")
+    def check_date_range(self) -> Self:
+        if self.start > self.end:
+            raise ValueError("start must be on or before end")
+        if self.start > datetime.now(UTC).date():
+            raise ValueError("start cannot be in the future")
+        return self
