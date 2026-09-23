@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api_errors import register_error_handlers
 from app.config import Settings, get_settings
 from app.contracts import HealthResponse
 from app.logging_config import configure_logging
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
+    register_error_handlers(app)
     app.include_router(v1)
     app.dependency_overrides[get_settings] = lambda: settings
     logging.getLogger("vektor").info(
