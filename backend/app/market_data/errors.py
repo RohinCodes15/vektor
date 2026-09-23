@@ -1,5 +1,8 @@
 """Market data failures. Messages are safe to show to API clients; provider details are only logged."""
 
+from datetime import date
+from typing import Self
+
 
 class MarketDataError(Exception):
     status_code = 500
@@ -13,6 +16,13 @@ class MarketDataNotFound(MarketDataError):
     """The provider has no bars for the symbol and range (unknown symbol, or no trading days)."""
 
     status_code = 404
+
+    @classmethod
+    def for_range(cls, symbol: str, start: date, end: date) -> Self:
+        return cls(
+            f"No daily price history found for {symbol} between {start.isoformat()} and {end.isoformat()}. "
+            "Check the symbol or widen the date range."
+        )
 
 
 class InvalidMarketData(MarketDataError):
