@@ -6,8 +6,8 @@ from fastapi import Query
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
 from app.main import create_app
+from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
 
 
 @pytest.fixture
@@ -20,8 +20,11 @@ def client() -> TestClient:
 
     @app.get("/probe/market/{kind}")
     def market(kind: str) -> None:
-        errors = {"missing": MarketDataNotFound("no data"), "invalid": InvalidMarketData("bad data"),
-                  "down": MarketDataUnavailable("provider down")}
+        errors = {
+            "missing": MarketDataNotFound("no data"),
+            "invalid": InvalidMarketData("bad data"),
+            "down": MarketDataUnavailable("provider down"),
+        }
         raise errors[kind]
 
     @app.get("/probe/crash")
@@ -46,7 +49,10 @@ def test_missing_parameters_are_reported(client: TestClient) -> None:
     assert res.status_code == 422 and res.json() == {"detail": "day: Field required"}
 
 
-@pytest.mark.parametrize(("kind", "status", "detail"), [("missing", 404, "no data"), ("invalid", 502, "bad data"), ("down", 503, "provider down")])
+@pytest.mark.parametrize(
+    ("kind", "status", "detail"),
+    [("missing", 404, "no data"), ("invalid", 502, "bad data"), ("down", 503, "provider down")],
+)
 def test_market_data_errors_map_to_status_codes(client: TestClient, kind: str, status: int, detail: str) -> None:
     res = client.get(f"/probe/market/{kind}")
     assert res.status_code == status and res.json() == {"detail": detail}

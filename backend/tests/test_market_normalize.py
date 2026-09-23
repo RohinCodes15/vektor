@@ -15,8 +15,15 @@ def test_normalizes_rows_into_typed_bars() -> None:
     frame = daily_frame(["2024-01-02", "2024-01-03"], [row(), row(11, 13, 10.5, 12.5, 12.3, np.int64(2500))])
     bars = normalize_daily_frame(frame, START, END)
     assert [bar.date for bar in bars] == [date(2024, 1, 2), date(2024, 1, 3)]
-    assert bars[1].model_dump() == {"date": date(2024, 1, 3), "open": 11.0, "high": 13.0, "low": 10.5,
-                                    "close": 12.5, "adjusted_close": 12.3, "volume": 2500}
+    assert bars[1].model_dump() == {
+        "date": date(2024, 1, 3),
+        "open": 11.0,
+        "high": 13.0,
+        "low": 10.5,
+        "close": 12.5,
+        "adjusted_close": 12.3,
+        "volume": 2500,
+    }
     assert type(bars[1].volume) is int and type(bars[1].open) is float
 
 
@@ -32,8 +39,9 @@ def test_accepts_a_timezone_naive_index() -> None:
 
 
 def test_sorts_bars_and_drops_rows_outside_the_range() -> None:
-    frame = daily_frame(["2024-02-01", "2024-01-03", "2023-12-29", "2024-01-02"],
-                        [row(), row(), row(-1, -1, -1, -1, -1, -1), row()])
+    frame = daily_frame(
+        ["2024-02-01", "2024-01-03", "2023-12-29", "2024-01-02"], [row(), row(), row(-1, -1, -1, -1, -1, -1), row()]
+    )
     bars = normalize_daily_frame(frame, START, END)
     assert [bar.date for bar in bars] == [date(2024, 1, 2), date(2024, 1, 3)]
 
