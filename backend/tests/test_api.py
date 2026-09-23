@@ -55,3 +55,18 @@ def test_contracts_validate_input() -> None:
         PaperOrder(symbol="AAPL", side="buy", quantity=0)
     with pytest.raises(ValidationError):
         SimulationCreate(symbols=[], starting_cash=1000, start="2025-01-01T00:00:00Z", end="2025-02-01T00:00:00Z", strategy="x")
+
+
+def test_market_data_settings_default_to_a_local_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VEKTOR_MARKET_DATA_CACHE_PATH", raising=False)
+    monkeypatch.delenv("VEKTOR_MARKET_DATA_CACHE_TTL_HOURS", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.market_data_cache_path.name == "market_data.sqlite3"
+    assert settings.market_data_cache_path.parent.name == "data"
+    assert settings.market_data_cache_ttl_hours == 24
+
+
+@pytest.mark.parametrize("hours", [0, -1, 24 * 365 + 1])
+def test_market_data_cache_ttl_is_bounded(hours: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(market_data_cache_ttl_hours=hours)

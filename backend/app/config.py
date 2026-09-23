@@ -1,7 +1,11 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -15,6 +19,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     # Paper-only by construction: any other value fails validation at startup.
     trading_mode: Literal["paper"] = "paper"
+    # Local SQLite cache for read-only historical prices. Relative paths resolve from the working directory.
+    market_data_cache_path: Path = BACKEND_DIR / "data" / "market_data.sqlite3"
+    # How long a cached provider response is reused before it is fetched again.
+    market_data_cache_ttl_hours: int = Field(default=24, ge=1, le=24 * 365)
 
 
 @lru_cache
