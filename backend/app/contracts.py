@@ -10,10 +10,11 @@ from decimal import Decimal
 from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 TradingMode = Literal["paper"]
 PriceInterval = Literal["1d"]
+MarketDataSource = Literal["yahoo_finance"]
 
 # Yahoo-style tickers: AAPL, BRK-B, BRK.B, 7203.T, EURUSD=X, GC=F, and indices such as ^GSPC.
 _SYMBOL = re.compile(r"\^?[A-Z0-9][A-Z0-9.=-]{0,14}")
@@ -107,4 +108,28 @@ class PriceBar(Contract):
     def check_price_range(self) -> Self:
         if not self.low <= min(self.open, self.close) <= max(self.open, self.close) <= self.high:
             raise ValueError("prices must satisfy low <= open, close <= high")
+        return self
+
+
+class MarketHistoryResponse(Contract):
+    """Read-only daily history for one symbol, exactly as fetched from the provider."""
+
+    symbol: str
+    interval: PriceInterval
+    start: date
+    end: date
+    currency: str | None
+    source: MarketDataSource
+    # True when served from the local cache; `fetched_at` is when the provider returned the data.
+    cached: bool
+    fetched_at: AwareDatetime
+    bars: list[PriceBar]
+
+    @model_validator(mode="after")
+    def check_bars(self) -> Self:
+        dates = [bar.date for bar in self.bars]
+        if any(earlier >= later for earlier, later in zip(dates, dates[1:])):
+            raise ValueError("bars must be in ascending date order without duplicates")
+        if dates and (dates[0] < self.start or dates[-1] > self.end):
+            raise ValueError("bars must fall within start and end")
         return self
