@@ -113,3 +113,31 @@ def test_currency_is_reported_verbatim_or_unknown(
 ) -> None:
     fake_ticker.metadata = metadata
     assert YFinanceProvider().fetch_daily_history("AAPL", START, END).currency == expected
+
+
+class FakeHTTPError(Exception):
+    """Shaped like requests/curl_cffi HTTPError: the status is on `.response`."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__(f"HTTP Error {status}: https://query2.finance.yahoo.com/...")
+        self.response = type("Response", (), {"status_code": status})()
+
+
+def test_http_404_from_the_symbol_lookup_is_not_found(fake_ticker: type[FakeTicker]) -> None:
+    fake_ticker.result = FakeHTTPError(404)
+    with pytest.raises(MarketDataNotFound, match="No daily price history found for ZZZZ"):
+        YFinanceProvider().fetch_daily_history("ZZZZ", START, END)
+
+
+def test_http_429_is_rate_limited(fake_ticker: type[FakeTicker]) -> None:
+    fake_ticker.result = FakeHTTPError(429)
+    with pytest.raises(MarketDataUnavailable, match="rate limiting"):
+        YFinanceProvider().fetch_daily_history("AAPL", START, END)
+
+
+@pytest.mark.parametrize("status", [401, 500, 502])
+def test_other_http_errors_are_unavailable_without_leaking_urls(fake_ticker: type[FakeTicker], status: int) -> None:
+    fake_ticker.result = FakeHTTPError(status)
+    with pytest.raises(MarketDataUnavailable) as raised:
+        YFinanceProvider().fetch_daily_history("AAPL", START, END)
+    assert raised.value.message == "Yahoo Finance could not be reached. Try again later."
