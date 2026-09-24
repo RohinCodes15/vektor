@@ -78,3 +78,11 @@ test("invalid, unordered, duplicate, or out-of-range bars are rejected, never re
     await assert.rejects(getMarketHistory(query), /incompatible market history response/);
   }
 });
+
+test("known HTTP errors have actionable messages without exposing server bodies", async (t) => {
+  const request = t.mock.method(globalThis, "fetch");
+  for (const [status, message] of [[404, /No historical data/], [422, /query was rejected/], [502, /returned invalid data/], [503, /provider is unavailable/], [500, /HTTP 500/]]) {
+    request.mock.mockImplementation(async () => new Response("private provider diagnostics", { status }));
+    await assert.rejects(getMarketHistory(query), message);
+  }
+});

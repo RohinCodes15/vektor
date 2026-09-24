@@ -47,7 +47,18 @@ async function requestJson(path: string, name: "health" | "market history", sign
     if (timeout.aborted) throw new Error(`Backend ${operation} timed out. Try again.`);
     throw new Error("Backend could not be reached. Check that it is running and allows this frontend origin.");
   }
-  if (!response.ok) throw new Error(`Backend ${operation} failed (HTTP ${response.status}). Try again.`);
+  if (!response.ok) {
+    if (name === "market history") {
+      const messages: Record<number, string> = {
+        404: "No historical data found for this symbol and date range.",
+        422: "Market history query was rejected. Check the symbol and dates.",
+        502: "The market data provider returned invalid data. No history was accepted.",
+        503: "The market data provider is unavailable. Try again later.",
+      };
+      if (messages[response.status]) throw new Error(messages[response.status]);
+    }
+    throw new Error(`Backend ${operation} failed (HTTP ${response.status}). Try again.`);
+  }
 
   let data: unknown;
   try {
