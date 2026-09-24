@@ -41,3 +41,11 @@ The default backend origin is `http://localhost:8000`. Optionally copy `.env.exa
 Motion is limited to short 2–4px entrances, once-per-view cards, navigation hover, and instrument selection. A shared MotionConfig respects the OS reduced-motion preference, with zero duration and CSS transform/transition overrides as a backstop. Content is visible in server HTML, with no loading fade, loop, or animation-delayed status changes. Connection feedback is a polite live region, instrument changes are announced, and the skip link has a focusable main target.
 
 API tests use the native Node TypeScript stripping flag and mocked fetch to cover the exact endpoint/options, configured and invalid origins, strict paper-only validation, HTTP/JSON/network failures, timeout, and cancellation. Rendered-page and contrast tests remain in place.
+
+## Market history client
+
+`getMarketHistory({ symbol, start, end }, signal?)` in `src/lib/api.ts` requests read-only `GET /api/v1/market/history`, using the existing origin, no-cache/no-credentials transport, five-second timeout, and cancellation. Dates are inclusive `YYYY-MM-DD` calendar dates; interval is always `1d`. Symbols are trimmed/uppercased according to the backend contract. Errors distinguish invalid input, no data (404), rejected queries (422), invalid provider data (502), unavailable providers (503), network failures, and malformed/incompatible responses. Raw error bodies are not displayed.
+
+Response validation checks exact fields, matching query metadata, timezone-aware fetch time, source/cache metadata, finite positive OHLC/adjusted prices, OHLC bounds, safe integer volume, and strictly increasing dates inside the requested range. It accepts empty bar arrays and nullable currency, preserves provider values, and never fills or repairs data. Volumes outside JavaScript's safe integer range are rejected to prevent silent rounding.
+
+`useMarketHistory()` exposes `{ state, load }` for future consumers. `state.status` is `idle`, `loading`, `success` (with typed `data`), or `error` (with `message`). Call `load(query)` from a user action; it clears stale data, cancels the previous request, ignores superseded results, and cancels on unmount. No history requests, controls, or charts were added to the dashboard.
