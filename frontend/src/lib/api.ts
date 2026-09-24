@@ -65,3 +65,26 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   if (!isHealthResponse(data)) throw new Error("Backend returned an incompatible health response. Expected a healthy paper-only service.");
   return data;
 }
+
+/** Inclusive calendar dates in YYYY-MM-DD format; only daily history is supported. */
+export type MarketHistoryQuery = Readonly<{ symbol: string; start: string; end: string; interval?: "1d" }>;
+export type PriceBar = Readonly<{
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjusted_close: number;
+  volume: number;
+}>;
+export type MarketHistoryResponse = Readonly<{
+  symbol: string;
+  interval: "1d";
+  start: string;
+  end: string;
+  currency: string | null;
+  source: "yahoo_finance";
+  cached: boolean;
+  fetched_at: string;
+  bars: readonly PriceBar[];
+}>;
