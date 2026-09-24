@@ -86,3 +86,17 @@ test("known HTTP errors have actionable messages without exposing server bodies"
     await assert.rejects(getMarketHistory(query), message);
   }
 });
+
+test("history reuses network, JSON, timeout, and cancellation handling", async (t) => {
+  const request = t.mock.method(globalThis, "fetch", async () => { throw new TypeError("network failure"); });
+  await assert.rejects(getMarketHistory(query), /could not be reached/);
+  request.mock.mockImplementation(async () => new Response("bad json"));
+  await assert.rejects(getMarketHistory(query), /invalid market history response/);
+  const timeout = t.mock.method(AbortSignal, "timeout", () => AbortSignal.abort(new DOMException("timeout", "TimeoutError")));
+  request.mock.mockImplementation(async (_url, { signal }) => { throw signal.reason; });
+  await assert.rejects(getMarketHistory(query), /market history request timed out/);
+  timeout.mock.restore();
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(getMarketHistory(query, controller.signal), { name: "AbortError" });
+});
