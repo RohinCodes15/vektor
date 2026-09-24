@@ -88,3 +88,56 @@ export type MarketHistoryResponse = Readonly<{
   fetched_at: string;
   bars: readonly PriceBar[];
 }>;
+
+function hasFields(value: unknown, fields: readonly string[]): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
+}
+
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith("0000")) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isAwareTimestamp(value: unknown): value is string {
+  return typeof value === "string" && isCalendarDate(value.slice(0, 10))
+    && /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(value)
+    && Number.isFinite(Date.parse(value));
+}
+
+function isPriceBar(value: unknown): value is PriceBar {
+  if (!hasFields(value, ["date", "open", "high", "low", "close", "adjusted_close", "volume"]) || !isCalendarDate(value.date)) return false;
+  const { open, high, low, close, adjusted_close, volume } = value;
+  return typeof open === "number" && typeof high === "number" && typeof low === "number" && typeof close === "number"
+    && [open, high, low, close, adjusted_close].every((price) => typeof price === "number" && Number.isFinite(price) && price > 0)
+    && typeof volume === "number" && Number.isSafeInteger(volume) && volume >= 0
+    && low <= Math.min(open, close) && Math.max(open, close) <= high;
+}
+
+function isMarketHistoryResponse(value: unknown, query: MarketHistoryQuery): value is MarketHistoryResponse {
+  if (!hasFields(value, ["symbol", "interval", "start", "end", "currency", "source", "cached", "fetched_at", "bars"])) return false;
+  if (value.symbol !== query.symbol || value.interval !== "1d" || value.start !== query.start || value.end !== query.end
+    || (value.currency !== null && typeof value.currency !== "string") || value.source !== "yahoo_finance"
+    || typeof value.cached !== "boolean" || !isAwareTimestamp(value.fetched_at) || !Array.isArray(value.bars)) return false;
+  let previous = "";
+  for (const bar of value.bars) {
+    if (!isPriceBar(bar) || bar.date <= previous || bar.date < query.start || bar.date > query.end) return false;
+    previous = bar.date;
+  }
+  return true;
+}
+
+export async function getMarketHistory(query: MarketHistoryQuery, signal?: AbortSignal): Promise<MarketHistoryResponse> {
+  const symbol = typeof query.symbol === "string" ? query.symbol.trim().toUpperCase() : "";
+  if (!/^\^?[A-Z0-9][A-Z0-9.=-]{0,14}$/.test(symbol)) throw new Error("Enter a valid market symbol (1–15 characters, optionally prefixed with ^).");
+  if (!isCalendarDate(query.start) || !isCalendarDate(query.end)) throw new Error("Enter valid start and end dates in YYYY-MM-DD format.");
+  if (query.start > query.end) throw new Error("Start date must be on or before end date.");
+  if (query.start > new Date().toISOString().slice(0, 10)) throw new Error("Start date cannot be in the future.");
+  if (query.interval !== undefined && query.interval !== "1d") throw new Error("Only daily market history is supported.");
+  const normalized = { ...query, symbol };
+  const params = new URLSearchParams({ symbol, start: query.start, end: query.end, interval: "1d" });
+  const data = await requestJson("/api/v1/market/history", "market history", signal, params);
+  if (!isMarketHistoryResponse(data, normalized)) throw new Error("Backend returned an incompatible market history response. No data was accepted.");
+  return data;
+}
