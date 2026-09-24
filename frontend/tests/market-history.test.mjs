@@ -41,3 +41,40 @@ test("invalid query input fails before a request", async (t) => {
   ]) await assert.rejects(getMarketHistory({ ...query, ...invalid }));
   assert.equal(request.mock.callCount(), 0);
 });
+
+test("same-day ranges, null currency, empty bars, and cached history are valid", async (t) => {
+  const response = { ...history, end: query.start, currency: null, cached: true, bars: [] };
+  t.mock.method(globalThis, "fetch", async () => Response.json(response));
+  assert.deepEqual(await getMarketHistory({ ...query, end: query.start }), response);
+});
+
+test("history validates metadata and matches the requested symbol and dates", async (t) => {
+  const request = t.mock.method(globalThis, "fetch");
+  for (const invalid of [
+    null, [], {}, { ...history, symbol: "MSFT" }, { ...history, interval: "1h" },
+    { ...history, start: "2024-01-01" }, { ...history, end: "2024-01-04" },
+    { ...history, currency: 1 }, { ...history, source: "synthetic" },
+    { ...history, cached: "false" }, { ...history, fetched_at: "2024-01-04T09:30:00" },
+    { ...history, fetched_at: "2024-02-30T09:30:00Z" },
+    { ...history, fetched_at: "2024-01-04T24:00:00Z" },
+    { ...history, bars: {} }, { ...history, extra: true },
+  ]) {
+    request.mock.mockImplementation(async () => Response.json(invalid));
+    await assert.rejects(getMarketHistory(query), /incompatible market history response/);
+  }
+});
+
+test("invalid, unordered, duplicate, or out-of-range bars are rejected, never repaired", async (t) => {
+  const request = t.mock.method(globalThis, "fetch");
+  for (const bars of [
+    [null], [{ ...bar, open: 0 }], [{ ...bar, adjusted_close: -1 }],
+    [{ ...bar, high: 99 }], [{ ...bar, low: 101 }], [{ ...bar, close: "105" }],
+    [{ ...bar, volume: -1 }], [{ ...bar, volume: 1.5 }], [{ ...bar, volume: Number.MAX_SAFE_INTEGER + 1 }],
+    [{ ...bar, open: Infinity }], [{ ...bar, extra: true }], [{ ...bar, date: "2024-02-30" }],
+    [{ ...bar, date: "2024-01-01" }], [{ ...bar, date: "2024-01-04" }],
+    [bar, bar], [history.bars[1], bar],
+  ]) {
+    request.mock.mockImplementation(async () => Response.json({ ...history, bars }));
+    await assert.rejects(getMarketHistory(query), /incompatible market history response/);
+  }
+});
