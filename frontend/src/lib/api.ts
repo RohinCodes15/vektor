@@ -20,6 +20,15 @@ function isHealthResponse(value: unknown): value is HealthResponse {
     && typeof record.environment === "string";
 }
 
+export class ApiError extends Error {
+  readonly statusCode: number;
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.name = "ApiError";
+    this.statusCode = statusCode;
+  }
+}
+
 async function requestJson(path: string, name: "health" | "market history", signal?: AbortSignal, params?: URLSearchParams): Promise<unknown> {
   const operation = name === "health" ? "health check" : "market history request";
   let url: URL;
@@ -55,9 +64,9 @@ async function requestJson(path: string, name: "health" | "market history", sign
         502: "The market data provider returned invalid data. No history was accepted.",
         503: "The market data provider is unavailable. Try again later.",
       };
-      if (messages[response.status]) throw new Error(messages[response.status]);
+      if (messages[response.status]) throw new ApiError(messages[response.status], response.status);
     }
-    throw new Error(`Backend ${operation} failed (HTTP ${response.status}). Try again.`);
+    throw new ApiError(`Backend ${operation} failed (HTTP ${response.status}). Try again.`, response.status);
   }
 
   let data: unknown;

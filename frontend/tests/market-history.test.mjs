@@ -83,7 +83,11 @@ test("known HTTP errors have actionable messages without exposing server bodies"
   const request = t.mock.method(globalThis, "fetch");
   for (const [status, message] of [[404, /No historical data/], [422, /query was rejected/], [502, /returned invalid data/], [503, /provider is unavailable/], [500, /HTTP 500/]]) {
     request.mock.mockImplementation(async () => new Response("private provider diagnostics", { status }));
-    await assert.rejects(getMarketHistory(query), message);
+    await assert.rejects(getMarketHistory(query), (error) => {
+      assert.match(error.message, message);
+      assert.equal(error.statusCode, status);
+      return true;
+    });
   }
 });
 
