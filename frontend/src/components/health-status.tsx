@@ -31,9 +31,9 @@ export function HealthStatus() {
     <section id="backend-status" className={`health-status health-${state.status}`} aria-labelledby="backend-status-title" aria-busy={state.status === "loading"}>
       <div className="health-summary" role="status" aria-live="polite" aria-atomic="true">
         <div className="health-heading"><h2 id="backend-status-title">Backend connection</h2><Badge tone={state.status === "connected" ? "positive" : state.status === "error" ? "warning" : "neutral"}>{state.status === "loading" ? "Checking…" : state.status === "connected" ? "Connected" : "Connection error"}</Badge></div>
-        {state.status === "loading" && <p>Checking the paper-only health endpoint. Market data remains unavailable.</p>}
+        {state.status === "loading" && <p>Checking the paper-only health endpoint. Health does not verify market data.</p>}
         {state.status === "error" && <p>{state.message}</p>}
-        {state.status === "connected" && <p>{state.health.app} · {state.health.version} · {state.health.environment} · Last check passed at <time dateTime={state.checkedAt.toISOString()}>{state.checkedAt.toLocaleTimeString()}</time>. Health only; no market feed.</p>}
+        {state.status === "connected" && <p>{state.health.app} · {state.health.version} · {state.health.environment} · Last check passed at <time dateTime={state.checkedAt.toISOString()}>{state.checkedAt.toLocaleTimeString()}</time>. Health only; no live quote feed.</p>}
       </div>
       <Button variant="secondary" disabled={state.status === "loading"} aria-label="Check backend connection" onClick={() => { setState({ status: "loading" }); setAttempt((value) => value + 1); }}>{state.status === "loading" ? "Checking…" : state.status === "error" ? "Retry connection" : "Check again"}</Button>
     </section>
