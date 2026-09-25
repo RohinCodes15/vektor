@@ -24,7 +24,7 @@ Use Node.js 22.13+ and npm. Dependencies are pinned in package-lock.json.
 
 `MetricCard` in `src/components/ui.tsx` composes the existing Panel primitive. Portfolio metrics show unavailable values, not fabricated balances or zero positions. The performance view is an empty state, not a synthetic chart.
 
-`src/components/market-workspace.tsx` provides case-insensitive symbol/company search, a no-results state, and selectable reference instruments. Static symbol metadata is explicitly a reference list; there are no prices, timestamps, returns, market-open claims, or network requests. Selection updates the instrument details. Simulation, paper orders, backtests, strategies, and history are disabled and marked coming soon. No shared API contracts were changed.
+`src/components/market-workspace.tsx` provides case-insensitive symbol/company search, a no-results state, and selectable reference instruments. Static symbol metadata is explicitly a reference list with no live quotes. Selection updates the instrument details; StockHistory requests historical prices separately on demand. Simulation, paper orders, backtests, strategies, and history are disabled and marked coming soon. No shared API contracts were changed.
 
 `src/components/reveal.tsx` retains the Motion entrance and OS reduced-motion support. UI colors, typography, native focus states, and reduced-motion CSS follow the existing design system. No new dependencies were added.
 
@@ -48,4 +48,4 @@ API tests use the native Node TypeScript stripping flag and mocked fetch to cove
 
 Response validation checks exact fields, matching query metadata, timezone-aware fetch time, source/cache metadata, finite positive OHLC/adjusted prices, OHLC bounds, safe integer volume, and strictly increasing dates inside the requested range. It accepts empty bar arrays and nullable currency, preserves provider values, and never fills or repairs data. Volumes outside JavaScript's safe integer range are rejected to prevent silent rounding.
 
-`useMarketHistory()` exposes `{ state, load }` for future consumers. `state.status` is `idle`, `loading`, `success` (with typed `data`), or `error` (with `message`). Call `load(query)` from a user action; it clears stale data, cancels the previous request, ignores superseded results, and cancels on unmount. No history requests, controls, or charts were added to the dashboard.
+`useMarketHistory()` exposes `{ state, load }` for future consumers. `state.status` is `idle`, `loading`, `success` (with typed `data`), or `error` (with `message`). Call `load(query)` from a user action; it clears stale data, cancels the previous request, ignores superseded results, and cancels on unmount. StockHistory consumes this hook in the market workspace; it never fetches or substitutes live quotes.
