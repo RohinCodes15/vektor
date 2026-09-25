@@ -37,7 +37,10 @@ test("workspace renders accessible primitives and honest paper-only boundaries",
     assert.match(html, /<main id="main" tabindex="-1">/);
     assert.match(html, /NO LIVE DATA/);
     assert.match(html, /No simulation loaded/);
-    assert.match(html, /No quote data connected/);
+    assert.match(html, /Historical daily closes load on demand/);
+    assert.match(html, /label for="history-start-AAPL"/);
+    assert.match(html, /label for="history-end-AAPL"/);
+    assert.match(html, /No live quotes/);
     assert.match(html, /<button[^>]*disabled=""[^>]*>New simulation · Coming soon<\/button>/);
     assert.match(html, /<label for="symbol-search">Find a symbol<\/label>/);
     assert.match(html, /aria-describedby="symbol-search-hint"/);
