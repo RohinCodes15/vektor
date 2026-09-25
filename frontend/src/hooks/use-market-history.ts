@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getMarketHistory, type MarketHistoryQuery, type MarketHistoryResponse } from "../lib/api";
+import { ApiError, getMarketHistory, type MarketHistoryQuery, type MarketHistoryResponse } from "../lib/api";
 
 export type MarketHistoryState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; data: MarketHistoryResponse }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; statusCode?: number };
 
 export function useMarketHistory(): { state: MarketHistoryState; load: (query: MarketHistoryQuery) => Promise<void> } {
   const [state, setState] = useState<MarketHistoryState>({ status: "idle" });
@@ -23,7 +23,7 @@ export function useMarketHistory(): { state: MarketHistoryState; load: (query: M
       const data = await getMarketHistory(query, controller.signal);
       if (!controller.signal.aborted) setState({ status: "success", data });
     } catch (error) {
-      if (!controller.signal.aborted) setState({ status: "error", message: error instanceof Error ? error.message : "Market history request failed. Try again." });
+      if (!controller.signal.aborted) setState({ status: "error", message: error instanceof Error ? error.message : "Market history request failed. Try again.", statusCode: error instanceof ApiError ? error.statusCode : undefined });
     }
   }, []);
 
