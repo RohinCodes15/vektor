@@ -261,3 +261,29 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
   .topbar-actions { gap: 8px; }
   .backend-link { font-size: 10px; }
 }
+
+/* Historical observations only: no generated points or animated price morphs. */
+.chart-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; text-align: center; gap: 12px; padding: 24px 8px; }
+.chart-state p, .chart-state > span:last-child { font-size: 12px; color: var(--color-muted); line-height: 1.8; max-width: 48ch; }
+.chart-state .empty-icon { margin-bottom: 0; }
+.chart-state .button { margin-top: 8px; }
+.price-chart { width: 100%; min-width: 0; padding-block: 20px; }
+.chart-price { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.chart-price > div { min-width: 0; overflow-wrap: anywhere; }
+.chart-price p { font-size: 28px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin-top: 8px; }
+.chart-price > span { font-size: 10px; }
+.price-plot { display: block; margin-top: 16px; overflow: visible; touch-action: pan-y; }
+.chart-grid-line { stroke: var(--color-line); stroke-width: 1; stroke-dasharray: 3 5; }
+.chart-axis-label { fill: var(--color-muted); font-family: var(--font-mono); font-size: 10px; }
+.chart-price-line { fill: none; stroke: var(--color-teal); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-point { fill: var(--color-teal); stroke: var(--color-surface); stroke-width: 2; }
+.chart-crosshair { pointer-events: none; }
+.chart-crosshair > line { stroke: var(--color-muted); stroke-width: 1; stroke-dasharray: 3 4; }
+.chart-crosshair text { fill: var(--color-muted); font-family: var(--font-mono); font-size: 11px; }
+.chart-crosshair .chart-tooltip-price { fill: var(--color-ink); font-size: 13px; }
+.chart-tooltip-bg { fill: var(--color-canvas); stroke: var(--color-control); }
+.chart-explorer { display: grid; gap: 8px; border-top: 1px solid var(--color-line); padding-top: 16px; }
+.chart-explorer label { font-size: 11px; }
+.chart-explorer input { width: 100%; min-height: 32px; margin: 0; accent-color: var(--color-teal); cursor: pointer; }
+.chart-explorer > span, .chart-provenance { color: var(--color-muted); font-size: 10px; }
+.chart-provenance { margin-top: 16px; overflow-wrap: anywhere; }
