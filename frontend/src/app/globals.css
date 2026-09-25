@@ -263,6 +263,14 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 }
 
 /* Historical observations only: no generated points or animated price morphs. */
+.stock-history { flex: 1; padding-top: 24px; min-width: 0; }
+.history-form { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 12px; align-items: end; }
+.history-form input { min-width: 0; }
+.history-form input:disabled { color: var(--color-muted); cursor: wait; }
+.history-hint { grid-column: 1 / -1; font-size: 10px; }
+.history-status { font-size: 11px; color: var(--color-muted); margin-top: 16px; }
+.history-status:empty { display: none; }
+.history-loaded-range { font-family: var(--font-mono); font-size: 10px; margin-top: 12px; }
 .chart-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; text-align: center; gap: 12px; padding: 24px 8px; }
 .chart-state p, .chart-state > span:last-child { font-size: 12px; color: var(--color-muted); line-height: 1.8; max-width: 48ch; }
 .chart-state .empty-icon { margin-bottom: 0; }
@@ -287,3 +295,12 @@ main { padding: 36px; max-width: 1600px; margin: auto; }
 .chart-explorer input { width: 100%; min-height: 32px; margin: 0; accent-color: var(--color-teal); cursor: pointer; }
 .chart-explorer > span, .chart-provenance { color: var(--color-muted); font-size: 10px; }
 .chart-provenance { margin-top: 16px; overflow-wrap: anywhere; }
+@media (max-width: 1250px) {
+  .history-form { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .history-form .button { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 400px) {
+  .history-form { grid-template-columns: minmax(0,1fr); }
+  .history-form .button { justify-self: stretch; }
+  .chart-price p { font-size: 24px; }
+}
