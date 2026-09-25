@@ -49,3 +49,11 @@ API tests use the native Node TypeScript stripping flag and mocked fetch to cove
 Response validation checks exact fields, matching query metadata, timezone-aware fetch time, source/cache metadata, finite positive OHLC/adjusted prices, OHLC bounds, safe integer volume, and strictly increasing dates inside the requested range. It accepts empty bar arrays and nullable currency, preserves provider values, and never fills or repairs data. Volumes outside JavaScript's safe integer range are rejected to prevent silent rounding.
 
 `useMarketHistory()` exposes `{ state, load }` for future consumers. `state.status` is `idle`, `loading`, `success` (with typed `data`), or `error` (with `message`). Call `load(query)` from a user action; it clears stale data, cancels the previous request, ignores superseded results, and cancels on unmount. StockHistory consumes this hook in the market workspace; it never fetches or substitutes live quotes.
+
+## Phase 2B.2 price chart
+
+The market workspace now uses `useMarketHistory` to fetch a selected symbol and inclusive date range on **Load history**. Changing symbols remounts the history view and aborts pending work. Loading clears the old chart; API 404 and zero-bar responses show an empty state, while other failures show a retry action. HTTP status codes are preserved by `ApiError` for this distinction. No market fixtures are used by the UI and no new dependencies were added.
+
+`PriceChart` renders unadjusted daily closes as a responsive SVG line. It preserves calendar gaps without inventing observations, handles flat and single-point histories, and shows currency, source/cache provenance, fetch time, and requested range. Pointer/touch tooltips snap to actual observations using binary search. A native trading-day range input exposes every date/close to keyboard and assistive-technology users. Axes resize with the container; prices never morph between datasets, and interactions do not introduce motion beyond existing reduced-motion-aware primitives.
+
+Chart geometry tests use numerical test cases only (not runtime market fixtures), covering empty/single/flat/extreme prices, calendar spacing, mobile axes, and cursor snapping. Live Yahoo availability is a backend/provider concern; the frontend never substitutes generated data on failure.
