@@ -8,7 +8,10 @@ def test_summarize_errors_joins_locations_and_messages() -> None:
         {"loc": ("bars", 0, "open"), "msg": "Input should be greater than 0"},
     ]
     summary = summarize_errors(errors)
-    assert summary == "symbol: symbol must be valid; start must be on or before end; bars.0.open: Input should be greater than 0"
+    assert (
+        summary
+        == "symbol: symbol must be valid; start must be on or before end; bars.0.open: Input should be greater than 0"
+    )
     assert "secret-input" not in summary
 
 

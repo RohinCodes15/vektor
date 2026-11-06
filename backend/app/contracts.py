@@ -128,7 +128,7 @@ class MarketHistoryResponse(Contract):
     @model_validator(mode="after")
     def check_bars(self) -> Self:
         dates = [bar.date for bar in self.bars]
-        if any(earlier >= later for earlier, later in zip(dates, dates[1:])):
+        if any(earlier >= later for earlier, later in zip(dates, dates[1:], strict=False)):
             raise ValueError("bars must be in ascending date order without duplicates")
         if dates and (dates[0] < self.start or dates[-1] > self.end):
             raise ValueError("bars must fall within start and end")

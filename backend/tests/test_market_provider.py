@@ -51,11 +51,20 @@ def test_requests_inclusive_daily_unadjusted_history(fake_ticker: type[FakeTicke
     (ticker,) = fake_ticker.instances
     assert ticker.symbol == "AAPL"
     assert ticker.history_kwargs == {
-        "start": "2024-01-02", "end": "2024-01-06", "interval": "1d",
-        "auto_adjust": False, "actions": False, "timeout": 7,
+        "start": "2024-01-02",
+        "end": "2024-01-06",
+        "interval": "1d",
+        "auto_adjust": False,
+        "actions": False,
+        "timeout": 7,
     }
     assert history.currency == "USD"
-    assert [bar.date for bar in history.bars] == [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4), date(2024, 1, 5)]
+    assert [bar.date for bar in history.bars] == [
+        date(2024, 1, 2),
+        date(2024, 1, 3),
+        date(2024, 1, 4),
+        date(2024, 1, 5),
+    ]
     assert history.bars[0].adjusted_close == row()[4]
 
 
@@ -70,13 +79,16 @@ def test_returns_no_bars_for_an_empty_frame(fake_ticker: type[FakeTicker]) -> No
     assert YFinanceProvider().fetch_daily_history("AAPL", START, END).bars == ()
 
 
-@pytest.mark.parametrize("error", [YFPricesMissingError("NOPE", " (1d 2024-01-02 -> 2024-01-06)"), YFTzMissingError("NOPE")])
+@pytest.mark.parametrize(
+    "error", [YFPricesMissingError("NOPE", " (1d 2024-01-02 -> 2024-01-06)"), YFTzMissingError("NOPE")]
+)
 def test_missing_symbols_or_prices_are_not_found(fake_ticker: type[FakeTicker], error: Exception) -> None:
     fake_ticker.result = error
     with pytest.raises(MarketDataNotFound) as raised:
         YFinanceProvider().fetch_daily_history("NOPE", START, END)
     assert raised.value.message == (
-        "No daily price history found for NOPE between 2024-01-02 and 2024-01-05. Check the symbol or widen the date range."
+        "No daily price history found for NOPE between 2024-01-02 and 2024-01-05. "
+        "Check the symbol or widen the date range."
     )
 
 
@@ -106,7 +118,13 @@ def test_invalid_provider_data_is_rejected(fake_ticker: type[FakeTicker]) -> Non
 
 @pytest.mark.parametrize(
     ("metadata", "expected"),
-    [({"currency": "GBp"}, "GBp"), ({}, None), ({"currency": ""}, None), ({"currency": 5}, None), (RuntimeError("x"), None)],
+    [
+        ({"currency": "GBp"}, "GBp"),
+        ({}, None),
+        ({"currency": ""}, None),
+        ({"currency": 5}, None),
+        (RuntimeError("x"), None),
+    ],
 )
 def test_currency_is_reported_verbatim_or_unknown(
     fake_ticker: type[FakeTicker], metadata: Any, expected: str | None

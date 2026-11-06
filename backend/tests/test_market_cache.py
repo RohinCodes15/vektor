@@ -12,14 +12,28 @@ LONG_AGO = FETCHED - timedelta(days=365)
 
 
 def bar(day: str, close: float = 11.0) -> PriceBar:
-    return PriceBar(date=day, open=10, high=max(12, close), low=9.5, close=close, adjusted_close=close - 0.2, volume=1000)
+    return PriceBar(
+        date=day, open=10, high=max(12, close), low=9.5, close=close, adjusted_close=close - 0.2, volume=1000
+    )
 
 
-def response(start: str = "2024-01-01", end: str = "2024-01-31", fetched_at: datetime = FETCHED,
-             symbol: str = "AAPL", bars: list[PriceBar] | None = None, currency: str | None = "USD") -> MarketHistoryResponse:
+def response(
+    start: str = "2024-01-01",
+    end: str = "2024-01-31",
+    fetched_at: datetime = FETCHED,
+    symbol: str = "AAPL",
+    bars: list[PriceBar] | None = None,
+    currency: str | None = "USD",
+) -> MarketHistoryResponse:
     return MarketHistoryResponse(
-        symbol=symbol, interval="1d", start=start, end=end, currency=currency, source="yahoo_finance",
-        cached=False, fetched_at=fetched_at,
+        symbol=symbol,
+        interval="1d",
+        start=start,
+        end=end,
+        currency=currency,
+        source="yahoo_finance",
+        cached=False,
+        fetched_at=fetched_at,
         bars=bars if bars is not None else [bar("2024-01-02"), bar("2024-01-16", 12.0), bar("2024-01-31", 11.5)],
     )
 
@@ -68,7 +82,9 @@ def test_a_covered_range_without_trading_days_loads_empty(cache: HistoryCache) -
     assert loaded is not None and loaded.bars == []
 
 
-@pytest.mark.parametrize(("start", "end"), [("2023-12-31", "2024-01-31"), ("2024-01-01", "2024-02-01"), ("2024-02-01", "2024-02-28")])
+@pytest.mark.parametrize(
+    ("start", "end"), [("2023-12-31", "2024-01-31"), ("2024-01-01", "2024-02-01"), ("2024-02-01", "2024-02-28")]
+)
 def test_misses_ranges_not_fully_covered_by_one_entry(cache: HistoryCache, start: str, end: str) -> None:
     cache.store(response(), expire_before=LONG_AGO)
     assert cache.load(query(start, end), "yahoo_finance", LONG_AGO) is None
@@ -95,7 +111,9 @@ def test_ignores_entries_fetched_before_the_freshness_cutoff(cache: HistoryCache
 def test_prefers_the_newest_covering_entry(cache: HistoryCache) -> None:
     cache.store(response("2023-12-01", "2024-02-28", bars=[bar("2024-01-02", 11.0)]), expire_before=LONG_AGO)
     newer = FETCHED + timedelta(hours=1)
-    cache.store(response("2024-01-01", "2024-01-31", fetched_at=newer, bars=[bar("2024-01-02", 99.0)]), expire_before=LONG_AGO)
+    cache.store(
+        response("2024-01-01", "2024-01-31", fetched_at=newer, bars=[bar("2024-01-02", 99.0)]), expire_before=LONG_AGO
+    )
     loaded = cache.load(query(), "yahoo_finance", LONG_AGO)
     assert loaded is not None and loaded.fetched_at == newer and loaded.bars[0].close == 99.0
 
@@ -122,7 +140,9 @@ def test_stores_unknown_currency_and_empty_entries(cache: HistoryCache) -> None:
     assert loaded is not None and loaded.currency is None and loaded.bars == []
 
 
-def test_failed_store_leaves_no_partial_entry(cache: HistoryCache, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_failed_store_leaves_no_partial_entry(
+    cache: HistoryCache, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     path = tmp_path / "nested" / "cache.sqlite3"
     cache.load(query(), "yahoo_finance", LONG_AGO)
     with sqlite3.connect(path) as conn:

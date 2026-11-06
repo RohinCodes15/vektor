@@ -5,8 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
 from app.main import create_app
+from app.market_data.errors import InvalidMarketData, MarketDataNotFound, MarketDataUnavailable
 from tests.fakes import FakeProvider, make_bar
 
 URL = "/api/v1/market/history"
@@ -32,8 +32,15 @@ def test_returns_normalized_daily_history(client: TestClient, provider: FakeProv
     assert (body["symbol"], body["interval"], body["start"], body["end"]) == ("AAPL", "1d", "2024-01-01", "2024-01-31")
     assert (body["currency"], body["source"], body["cached"]) == ("USD", "yahoo_finance", False)
     assert datetime.fromisoformat(body["fetched_at"]).tzinfo is not None
-    assert body["bars"][0] == {"date": "2024-01-02", "open": 10.0, "high": 12.0, "low": 9.5, "close": 11.0,
-                               "adjusted_close": 11.0, "volume": 1000}
+    assert body["bars"][0] == {
+        "date": "2024-01-02",
+        "open": 10.0,
+        "high": 12.0,
+        "low": 9.5,
+        "close": 11.0,
+        "adjusted_close": 11.0,
+        "volume": 1000,
+    }
     assert [bar["date"] for bar in body["bars"]] == ["2024-01-02", "2024-01-03"]
     assert provider.calls[0][0] == "AAPL"
 
@@ -61,7 +68,10 @@ def test_accepts_an_explicit_daily_interval(client: TestClient) -> None:
     ("params", "detail"),
     [
         ({"symbol": "AAPL", "start": "2024-01-01"}, "end: Field required"),
-        ({**PARAMS, "symbol": "AA PL"}, "symbol: symbol must be 1-15 letters, digits, '.', '-' or '=', optionally prefixed with '^'"),
+        (
+            {**PARAMS, "symbol": "AA PL"},
+            "symbol: symbol must be 1-15 letters, digits, '.', '-' or '=', optionally prefixed with '^'",
+        ),
         ({**PARAMS, "start": "2024-02-01"}, "start must be on or before end"),
         ({**PARAMS, "start": "01/02/2024"}, "start: Input should be a valid date"),
         ({**PARAMS, "interval": "1h"}, "interval: Input should be '1d'"),
@@ -87,14 +97,19 @@ def test_no_bars_returns_404(client: TestClient, provider: FakeProvider) -> None
     provider.bars = [make_bar("2023-06-01")]
     res = client.get(URL, params=PARAMS)
     assert res.status_code == 404
-    assert res.json() == {"detail": "No daily price history found for AAPL between 2024-01-01 and 2024-01-31. "
-                                    "Check the symbol or widen the date range."}
+    assert res.json() == {
+        "detail": "No daily price history found for AAPL between 2024-01-01 and 2024-01-31. "
+        "Check the symbol or widen the date range."
+    }
 
 
 @pytest.mark.parametrize(
     ("error", "status"),
-    [(MarketDataNotFound("none"), 404), (InvalidMarketData("Provider returned duplicate bars for 2024-01-02."), 502),
-     (MarketDataUnavailable("Yahoo Finance could not be reached. Try again later."), 503)],
+    [
+        (MarketDataNotFound("none"), 404),
+        (InvalidMarketData("Provider returned duplicate bars for 2024-01-02."), 502),
+        (MarketDataUnavailable("Yahoo Finance could not be reached. Try again later."), 503),
+    ],
 )
 def test_provider_errors_return_their_status_and_message(
     client: TestClient, provider: FakeProvider, error: Exception, status: int

@@ -13,8 +13,9 @@ class FakeProvider:
 
     source: MarketDataSource = "yahoo_finance"
 
-    def __init__(self, bars: list[PriceBar] | None = None, currency: str | None = "USD",
-                 error: Exception | None = None) -> None:
+    def __init__(
+        self, bars: list[PriceBar] | None = None, currency: str | None = "USD", error: Exception | None = None
+    ) -> None:
         self.bars = bars if bars is not None else [make_bar("2024-01-02"), make_bar("2024-01-03", 11.5)]
         self.currency = currency
         self.error = error

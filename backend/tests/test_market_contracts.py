@@ -12,8 +12,16 @@ def query(**overrides: object) -> MarketHistoryQuery:
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
-    [("aapl", "AAPL"), ("  msft ", "MSFT"), ("brk-b", "BRK-B"), ("BRK.B", "BRK.B"), ("^gspc", "^GSPC"),
-     ("eurusd=x", "EURUSD=X"), ("7203.T", "7203.T"), ("A" * 15, "A" * 15)],
+    [
+        ("aapl", "AAPL"),
+        ("  msft ", "MSFT"),
+        ("brk-b", "BRK-B"),
+        ("BRK.B", "BRK.B"),
+        ("^gspc", "^GSPC"),
+        ("eurusd=x", "EURUSD=X"),
+        ("7203.T", "7203.T"),
+        ("A" * 15, "A" * 15),
+    ],
 )
 def test_query_normalizes_valid_symbols(raw: str, expected: str) -> None:
     assert query(symbol=raw).symbol == expected
@@ -45,7 +53,9 @@ def test_query_rejects_future_start() -> None:
         query(start=tomorrow, end=tomorrow + timedelta(days=5))
 
 
-@pytest.mark.parametrize("overrides", [{"interval": "1h"}, {"start": "2024-13-01"}, {"end": "yesterday"}, {"extra": "x"}])
+@pytest.mark.parametrize(
+    "overrides", [{"interval": "1h"}, {"start": "2024-13-01"}, {"end": "yesterday"}, {"extra": "x"}]
+)
 def test_query_rejects_unsupported_values(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         query(**overrides)
@@ -56,7 +66,15 @@ def test_query_is_immutable() -> None:
         query().symbol = "MSFT"  # type: ignore[misc]
 
 
-BAR = {"date": "2024-01-02", "open": 10.0, "high": 12.0, "low": 9.5, "close": 11.0, "adjusted_close": 10.8, "volume": 1000}
+BAR = {
+    "date": "2024-01-02",
+    "open": 10.0,
+    "high": 12.0,
+    "low": 9.5,
+    "close": 11.0,
+    "adjusted_close": 10.8,
+    "volume": 1000,
+}
 
 
 def test_price_bar_accepts_valid_ohlcv() -> None:
@@ -70,8 +88,17 @@ def test_price_bar_accepts_a_flat_bar() -> None:
 
 @pytest.mark.parametrize(
     "overrides",
-    [{"open": 0}, {"close": -1}, {"adjusted_close": 0}, {"high": float("nan")}, {"low": float("inf")},
-     {"volume": -1}, {"volume": 1.5}, {"open": None}, {"date": "2024-02-30"}],
+    [
+        {"open": 0},
+        {"close": -1},
+        {"adjusted_close": 0},
+        {"high": float("nan")},
+        {"low": float("inf")},
+        {"volume": -1},
+        {"volume": 1.5},
+        {"open": None},
+        {"date": "2024-02-30"},
+    ],
 )
 def test_price_bar_rejects_invalid_values(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
@@ -89,8 +116,14 @@ def test_price_bar_rejects_inconsistent_ranges(overrides: dict[str, object]) -> 
 
 def history(**overrides: object) -> MarketHistoryResponse:
     fields = {
-        "symbol": "AAPL", "interval": "1d", "start": "2024-01-01", "end": "2024-01-05", "currency": "USD",
-        "source": "yahoo_finance", "cached": False, "fetched_at": "2024-01-06T00:00:00Z",
+        "symbol": "AAPL",
+        "interval": "1d",
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+        "currency": "USD",
+        "source": "yahoo_finance",
+        "cached": False,
+        "fetched_at": "2024-01-06T00:00:00Z",
         "bars": [{**BAR, "date": "2024-01-02"}, {**BAR, "date": "2024-01-03"}],
     }
     return MarketHistoryResponse(**{**fields, **overrides})
@@ -121,7 +154,9 @@ def test_history_response_rejects_bars_outside_the_range(day: str) -> None:
         history(bars=[{**BAR, "date": day}])
 
 
-@pytest.mark.parametrize("overrides", [{"fetched_at": "2024-01-06T00:00:00"}, {"source": "broker"}, {"interval": "1wk"}])
+@pytest.mark.parametrize(
+    "overrides", [{"fetched_at": "2024-01-06T00:00:00"}, {"source": "broker"}, {"interval": "1wk"}]
+)
 def test_history_response_rejects_invalid_metadata(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         history(**overrides)
