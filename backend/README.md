@@ -60,3 +60,16 @@ Unknown parameters are rejected. A successful response (`MarketHistoryResponse` 
 - `open`/`high`/`low`/`close` are as Yahoo reports them (split-adjusted). `adjusted_close` also reflects dividends.
 - `currency` is Yahoo's code, verbatim (`GBp` means pence), or `null` if Yahoo did not report one.
 - `cached` says whether the response came from the local cache. `fetched_at` is when Yahoo returned the data.
+
+Every error is `{"detail": "<message>"}`:
+
+| Status | Meaning |
+|--------|---------|
+| 422 | Invalid symbol, dates, interval, or unknown parameter. The provider is not called. |
+| 404 | No bars for the symbol and range: unknown symbol, or no trading days (e.g. a weekend). |
+| 502 | Yahoo returned invalid data: missing values, duplicate dates, non-positive or non-finite prices, `high`/`low` that do not bound `open`/`close`, or negative or fractional volume. The whole response is rejected. |
+| 503 | Yahoo could not be reached, timed out (10 s), or rate-limited the request. |
+
+### Data integrity
+
+Market data is never fabricated, filled, interpolated, or repaired. A response is either Yahoo's data, validated bar by bar, or an error. Rows that yfinance returns entirely empty (no prices and no volume) are dropped by yfinance itself, so those dates are simply absent.
