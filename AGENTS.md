@@ -23,17 +23,22 @@ If a task needs a change in an area you don't own, stop and hand it off. Don't e
 
 ```
 backend/                  Python 3.12+, FastAPI, managed with uv
-  app/main.py             create_app(): logging, CORS, /api/v1 router, /api/v1/health
+  app/main.py             create_app(): logging, CORS, error handlers, /api/v1 router, /api/v1/health
   app/config.py           Settings (pydantic-settings, VEKTOR_* env vars / backend/.env)
   app/contracts.py        Shared Pydantic request/response models (the API contract)
+  app/api_errors.py       Every API error is an ErrorResponse {"detail": str}
+  app/validation.py       Readable, input-free summaries of validation errors
   app/logging_config.py   JSON-lines logging (stdlib)
-  tests/                  pytest
+  app/routers/market.py   GET /api/v1/market/history (read-only)
+  app/market_data/        Historical OHLCV: yfinance provider, normalization, SQLite cache, service
+  tests/                  pytest (provider mocked; no network)
 frontend/                 Owned by Codex (not yet created)
 ```
 
 - The API is versioned under `/api/v1`. Breaking changes go into a new version prefix, never into an existing one.
 - Contracts are Pydantic models with `extra="forbid"` and `frozen=True`. Validation happens at the boundary through field constraints.
 - `Simulation`, `SimulationCreate` and `PaperOrder` are contracts only. No endpoints serve them yet.
+- Market data is read-only daily history from Yahoo Finance (free, no API key). It is never fabricated, filled, or repaired: invalid provider data is rejected with an error.
 
 ## Engineering standards
 
