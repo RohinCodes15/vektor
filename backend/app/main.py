@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -8,6 +9,10 @@ from app.api_errors import register_error_handlers
 from app.config import Settings, get_settings
 from app.contracts import HealthResponse
 from app.logging_config import configure_logging
+from app.market_data.cache import HistoryCache
+from app.market_data.provider import HistoryProvider, YFinanceProvider
+from app.market_data.service import MarketDataService
+from app.routers import market
 
 try:
     VERSION = version("vektor-backend")
@@ -28,7 +33,10 @@ def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
     )
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+v1.include_router(market.router)
+
+
+def create_app(settings: Settings | None = None, *, market_data_provider: HistoryProvider | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
     app = FastAPI(title=settings.app_name, version=VERSION)
@@ -39,6 +47,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     register_error_handlers(app)
+    app.state.market_data_service = MarketDataService(
+        provider=market_data_provider or YFinanceProvider(),
+        cache=HistoryCache(settings.market_data_cache_path),
+        cache_ttl=timedelta(hours=settings.market_data_cache_ttl_hours),
+    )
     app.include_router(v1)
     app.dependency_overrides[get_settings] = lambda: settings
     logging.getLogger("vektor").info(
