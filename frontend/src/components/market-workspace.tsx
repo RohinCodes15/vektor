@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { Badge, Button, Field, Panel } from "./ui";
 
@@ -12,6 +13,7 @@ const symbols = [
 ] as const;
 
 export function MarketWorkspace() {
+  const reduced = useReducedMotion();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<(typeof symbols)[number]>(symbols[0]);
   const matches = symbols.filter(({ symbol, name }) => `${symbol} ${name}`.toLowerCase().includes(query.trim().toLowerCase()));
@@ -25,12 +27,12 @@ export function MarketWorkspace() {
           <Field id="symbol-search" label="Find a symbol" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search symbol or company" autoComplete="off" hint="Reference list only. Quotes are unavailable." />
           <div className="watchlist-heading" aria-hidden="true"><span>INSTRUMENT</span><span>QUOTE</span></div>
           <ul className="symbol-list" aria-label="Reference symbols">
-            {matches.map((item) => <li key={item.symbol}><button type="button" className={`symbol-row ${selected.symbol === item.symbol ? "symbol-selected" : ""}`} aria-pressed={selected.symbol === item.symbol} onClick={() => setSelected(item)}><span className="symbol-monogram" aria-hidden="true">{item.symbol.slice(0, 1)}</span><span className="symbol-name"><strong>{item.symbol}</strong><span>{item.name}</span></span><span className="quote-unavailable">Unavailable</span></button></li>)}
+            {matches.map((item) => <li key={item.symbol}><button type="button" className={`symbol-row ${selected.symbol === item.symbol ? "symbol-selected" : ""}`} aria-pressed={selected.symbol === item.symbol} aria-controls="instrument-details" onClick={() => setSelected(item)}><span className="symbol-monogram" aria-hidden="true">{item.symbol.slice(0, 1)}</span><span className="symbol-name"><strong>{item.symbol}</strong><span>{item.name}</span></span><span className="quote-unavailable">Unavailable</span></button></li>)}
           </ul>
           <p role="status" className="search-result muted">{matches.length === 0 ? "No matching symbols. Try another name or ticker." : `${matches.length} reference ${matches.length === 1 ? "symbol" : "symbols"}`}</p>
         </Panel>
-        <Panel className="instrument" aria-labelledby="instrument-title">
-          <div className="panel-heading"><div className="instrument-heading"><span className="instrument-mark" aria-hidden="true">{selected.symbol.slice(0, 1)}</span><div><h3 id="instrument-title">{selected.symbol}</h3><p className="muted text-xs">{selected.name}</p></div></div><Badge>Reference</Badge></div>
+        <Panel id="instrument-details" className="instrument" aria-labelledby="instrument-title">
+          <div className="panel-heading"><div aria-live="polite" aria-atomic="true"><motion.div key={selected.symbol} className="instrument-heading" initial={false} animate={{ y: reduced ? 0 : [2, 0] }}><span className="instrument-mark" aria-hidden="true">{selected.symbol.slice(0, 1)}</span><div><h3 id="instrument-title">{selected.symbol}</h3><p className="muted text-xs">{selected.name}</p></div></motion.div></div><Badge>Reference</Badge></div>
           <div className="instrument-meta"><span>{selected.exchange}</span><span>{selected.sector}</span><span>USD</span></div>
           <div className="quote-empty"><span className="mono muted">PRICE / USD</span><p aria-label="Price unavailable">—</p><span className="muted">No quote data connected</span></div>
           <div className="instrument-message"><span className="empty-icon" aria-hidden="true">⌁</span><h3>Context before conviction.</h3><p>Select a reference symbol to explore the workspace.<br />Price history and market quotes are not available yet.</p></div>

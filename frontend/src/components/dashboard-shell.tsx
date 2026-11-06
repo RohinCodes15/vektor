@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { MotionConfig, motion, useReducedMotion } from "motion/react";
+import { HealthStatus } from "./health-status";
 import { Badge } from "./ui";
 
 const sections = [
@@ -15,6 +17,7 @@ function subscribeToHash(onChange: () => void): () => void {
 }
 
 export function DashboardShell({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileToggle = useRef<HTMLButtonElement>(null);
@@ -26,6 +29,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
+    <MotionConfig reducedMotion="user" transition={{ duration: reduced ? 0 : 0.18, ease: "easeOut" }}>
     <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${mobileOpen ? "mobile-nav-open" : ""}`}>
       <aside className="sidebar" aria-label="Workspace navigation" onKeyDown={(event) => {
         if (event.key === "Escape" && mobileOpen) closeMobileNavigation();
@@ -38,13 +42,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <span aria-hidden="true">{mobileOpen ? "×" : "☰"}</span>
           </button>
         </div>
-        <div id="sidebar-navigation" className="sidebar-content">
+        <motion.div id="sidebar-navigation" className="sidebar-content" initial={false} animate={{ y: mobileOpen && !reduced ? [-3, 0] : 0 }}>
           <div className="workspace-label"><span className="sidebar-copy">WORKSPACE / 01</span><span className="status-dot" /></div>
           <nav aria-label="Main">
             {sections.map(({ id, label, icon }) => (
-              <a key={id} href={`#${id}`} className={`nav-link ${hash === `#${id}` ? "nav-active" : ""}`} aria-label={label} aria-current={hash === `#${id}` ? "location" : undefined} title={collapsed ? label : undefined} onClick={() => { if (mobileOpen) closeMobileNavigation(); }}>
+              <motion.a initial={false} whileHover={{ x: reduced ? 0 : 2 }} key={id} href={`#${id}`} className={`nav-link ${hash === `#${id}` ? "nav-active" : ""}`} aria-label={label} aria-current={hash === `#${id}` ? "location" : undefined} title={collapsed ? label : undefined} onClick={() => { if (mobileOpen) closeMobileNavigation(); }}>
                 <span className="nav-icon" aria-hidden="true">{icon}</span><span className="sidebar-copy">{label}</span>
-              </a>
+              </motion.a>
             ))}
           </nav>
           <div className="sidebar-divider" />
@@ -52,7 +56,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <button type="button" className="nav-link future-link" disabled aria-label="Strategies — coming soon"><span className="nav-icon" aria-hidden="true">⧉</span><span className="sidebar-copy">Strategies <small>Soon</small></span></button>
           <button type="button" className="nav-link future-link" disabled aria-label="Backtests — coming soon"><span className="nav-icon" aria-hidden="true">⏱</span><span className="sidebar-copy">Backtests <small>Soon</small></span></button>
           <div className="sidebar-note"><span className="local-mark" aria-hidden="true">⌘</span><div className="sidebar-copy"><strong>On your machine.</strong><p>No account. No brokerage.<br />Your research stays local.</p></div></div>
-        </div>
+        </motion.div>
         <button type="button" className="collapse-toggle" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed} aria-controls="sidebar-navigation" onClick={() => setCollapsed(!collapsed)} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
           <span aria-hidden="true">{collapsed ? "→" : "←"}</span><span className="sidebar-copy">Collapse sidebar</span>
         </button>
@@ -60,11 +64,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <div className="main-shell">
         <header className="topbar">
           <nav aria-label="Breadcrumb"><span className="muted">Workspace</span><span className="breadcrumb" aria-hidden="true">/</span><a href="#overview">Dashboard</a></nav>
-          <div className="topbar-actions"><span className="local-status"><span className="status-dot" />Local workspace</span><Badge tone="positive">PAPER ONLY</Badge><a className="icon-button help-link" href="#workspace-notes" aria-label="About this workspace">?</a></div>
+          <div className="topbar-actions"><a className="backend-link" href="#backend-status">Backend status <span aria-hidden="true">↘</span></a><Badge tone="positive">PAPER ONLY</Badge><a className="icon-button help-link" href="#workspace-notes" aria-label="About this workspace">?</a></div>
         </header>
-        <main id="main">{children}</main>
+        <main id="main" tabIndex={-1}><HealthStatus />{children}</main>
         <footer className="shell-footer" id="workspace-notes"><span>Vektor <span className="muted">/ Research with intent.</span></span><span className="muted">Local-first. Paper trading only. No real-money execution.</span></footer>
       </div>
     </div>
+    </MotionConfig>
   );
 }
