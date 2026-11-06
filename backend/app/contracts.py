@@ -7,7 +7,7 @@ Market history models back the read-only GET /api/v1/market/history endpoint.
 import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -85,4 +85,26 @@ class MarketHistoryQuery(Contract):
             raise ValueError("start must be on or before end")
         if self.start > datetime.now(UTC).date():
             raise ValueError("start cannot be in the future")
+        return self
+
+
+PositivePrice = Annotated[float, Field(gt=0, allow_inf_nan=False)]
+
+
+class PriceBar(Contract):
+    """One daily bar. `date` is the trading day in the exchange's local calendar."""
+
+    date: date
+    open: PositivePrice
+    high: PositivePrice
+    low: PositivePrice
+    close: PositivePrice
+    # Close adjusted for splits and dividends, as reported by the provider.
+    adjusted_close: PositivePrice
+    volume: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def check_price_range(self) -> Self:
+        if not self.low <= min(self.open, self.close) <= max(self.open, self.close) <= self.high:
+            raise ValueError("prices must satisfy low <= open, close <= high")
         return self
