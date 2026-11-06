@@ -26,7 +26,7 @@ uv run pytest
 
 ## Configuration
 
-All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`.
+All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache.
 
 ## Historical market data (Phase 2A)
 
@@ -73,3 +73,20 @@ Every error is `{"detail": "<message>"}`:
 ### Data integrity
 
 Market data is never fabricated, filled, interpolated, or repaired. A response is either Yahoo's data, validated bar by bar, or an error. Rows that yfinance returns entirely empty (no prices and no volume) are dropped by yfinance itself, so those dates are simply absent.
+
+### Cache
+
+Responses are cached in SQLite at `backend/data/market_data.sqlite3` (git-ignored; set `VEKTOR_MARKET_DATA_CACHE_PATH` to move it). Each entry is one complete Yahoo response. A request is served from the cache only when a single entry fetched within `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (default 24) covers its whole range, so history is never stitched together from fetches made at different times. Repeated and narrower requests are served locally; wider ones are fetched again.
+
+Ranges that end today (UTC) or later are never cached, because today's bar may still change. Cache read or write failures are logged and fall back to Yahoo; they never fail a request. To clear the cache, stop the server and delete the file.
+
+### Limitations
+
+- Yahoo Finance is an unofficial, free source with no uptime guarantee and undocumented rate limits. Its data can contain errors; 502 responses surface the ones that fail validation.
+- yfinance reports a missing daily volume as `0`, so a zero volume cannot be told apart from an unreported one.
+- Yahoo restates split- and dividend-adjusted values after corporate actions. A cached entry can lag such a restatement by up to the cache TTL.
+- Only daily bars are supported. Requests are made synchronously, one symbol at a time.
+- yfinance keeps its own small timezone cache in the user cache directory.
+- yfinance 1.7 emits `Pandas4Warning` deprecation warnings with pandas 3.1. They are harmless.
+
+Tests mock the provider and use temporary cache files; `uv run pytest` makes no network requests.
