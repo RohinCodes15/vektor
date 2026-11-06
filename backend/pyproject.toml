@@ -1,0 +1,26 @@
+[project]
+name = "vektor-backend"
+version = "0.1.0"
+description = "Vektor: local-first, paper-only algorithmic trading simulator (backend)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+# shortcut: starlette's TestClient warns about httpx; revisit when FastAPI's TestClient migrates.
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
