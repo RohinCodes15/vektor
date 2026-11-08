@@ -82,3 +82,9 @@ def test_provider_failures_map_to_gateway_errors(tmp_path: Path, error: Exceptio
 def test_ungrounded_ai_output_is_a_bad_gateway(tmp_path: Path) -> None:
     _, res = analyze(client_for(tmp_path, FakeAI(interpretation(evidence=["made_up"]))))
     assert res.status_code == 502 and "not measured" in res.json()["detail"]
+
+
+def test_the_endpoint_is_documented_under_v1(tmp_path: Path) -> None:
+    paths = client_for(tmp_path, None).get("/openapi.json").json()["paths"]
+    operation = paths["/api/v1/backtests/{backtest_id}/analysis"]["post"]
+    assert set(operation["responses"]) >= {"200", "404", "422", "502", "503"}
