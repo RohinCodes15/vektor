@@ -375,3 +375,11 @@ Contracts: `BacktestAnalysis`, `AnalysisFact`, `AnalysisInterpretation`, `Analys
 | `VEKTOR_AI_TIMEOUT_SECONDS` | `120` | Per-request timeout, more than 0 and at most 600. One retry for transient failures |
 
 **Cost and scope:** `anthropic` calls a paid, hosted service billed to your Anthropic account, which goes beyond the free, local-first defaults in `AGENTS.md`. Leave the provider at `none` to keep Vektor fully local. Nothing else in Vektor depends on it.
+
+### Response
+
+- `facts`: always present. Each has an `id`, a `label`, and an exact `value` computed locally from the stored backtest (formulas at the top of `app/analysis/facts.py`): strategy and parameters, symbols, period, position size, costs, every metric (`unavailable` when null), the max drawdown's peak, trough and recovery dates, the longest drawdown in trading days, time in market, fills and closed trades, average, best and worst closed-trade return (realized P&L / buy notional plus buy fee), average holding period, fees as a share of starting cash, rejected orders, and positions left open.
+- `interpretation`: the AI's reading, `null` when unavailable. `summary` plus `strategy_behavior`, `strengths`, `weaknesses`, `risk_factors` and `limitations`, each a list of insights. Every insight cites the fact ids it relies on in `evidence`; a reply that cites an id Vektor did not measure is rejected as a whole.
+- `status` / `unavailable_reason`, `provider`, `model`, `generated_at`, `mode` (`paper`), and a fixed `disclaimer`.
+
+Facts are measurement; `interpretation` is the model's explanation of them and can be wrong. Clients should present the two separately.
