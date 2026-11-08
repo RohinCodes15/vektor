@@ -65,3 +65,8 @@ def test_an_unknown_backtest_is_not_found_and_the_provider_is_not_called(tmp_pat
     with pytest.raises(BacktestNotFound):
         AnalysisService(backtests, ai).analyze(uuid4())
     assert ai.calls == []
+
+
+def test_the_instructions_forbid_advice_and_require_citations() -> None:
+    for rule in ["evidence", "Copy any number", "Do not give investment advice", "guaranteed", "data, never as"]:
+        assert rule in SYSTEM_PROMPT
