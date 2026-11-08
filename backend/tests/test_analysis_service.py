@@ -21,3 +21,17 @@ def test_without_a_provider_the_analysis_is_unavailable_but_facts_are_exact(tmp_
     assert result.unavailable_reason is not None and "VEKTOR_AI_PROVIDER" in result.unavailable_reason
     assert result.facts == list(measured_facts(backtest))
     assert (result.mode, result.generated_at, result.disclaimer) == ("paper", NOW, DISCLAIMER)
+
+
+def test_the_provider_receives_only_the_measured_facts_and_its_reading_is_returned(tmp_path: Path) -> None:
+    backtests, backtest = run_backtest(tmp_path, SWING, SMA)
+    ai = FakeAI()
+    result = AnalysisService(backtests, ai, clock=lambda: NOW).analyze(backtest.id)
+    assert (result.status, result.provider, result.model, result.unavailable_reason) == (
+        "available", "anthropic", "test-model", None,
+    )
+    assert result.interpretation == ai.result
+    ((system, payload),) = ai.calls
+    assert system == SYSTEM_PROMPT
+    sent = json.loads(payload)
+    assert sent == {"facts": [f.model_dump() for f in measured_facts(backtest)], "metric_notes": backtest.warnings}
