@@ -26,7 +26,7 @@ uv run pytest
 
 ## Configuration
 
-All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
+All settings are `VEKTOR_*` environment variables or keys in `backend/.env` (see `.env.example`). The optional AI analysis settings (`VEKTOR_AI_*`) are described under Phase 3A.1 below. Unknown keys in `.env` are rejected. `VEKTOR_TRADING_MODE` only accepts `paper`. `VEKTOR_MARKET_DATA_CACHE_PATH` and `VEKTOR_MARKET_DATA_CACHE_TTL_HOURS` (1 to 8760) control the market data cache. `VEKTOR_PORTFOLIO_DB_PATH` sets where paper portfolios are stored (default `backend/data/portfolios.sqlite3`). `VEKTOR_BACKTEST_DB_PATH` sets where backtest results are stored (default `backend/data/backtests.sqlite3`).
 
 ## Historical market data (Phase 2A)
 
@@ -364,3 +364,14 @@ curl -X POST localhost:8000/api/v1/backtests/<id>/analysis
 ```
 
 Contracts: `BacktestAnalysis`, `AnalysisFact`, `AnalysisInterpretation`, `AnalysisInsight` in `app/contracts.py`. The request has no body: only a stored backtest can be analyzed, so the numbers always come from a real simulation, never from the client. The analysis is generated on each request and not stored.
+
+### Configuration
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `VEKTOR_AI_PROVIDER` | `none` | `none` (AI off) or `anthropic` (Claude through the official `anthropic` SDK) |
+| `VEKTOR_AI_MODEL` | `claude-opus-5-5` | Model name sent to the provider |
+| `VEKTOR_AI_API_KEY` | unset | Read from the environment only, held as a secret, never logged or returned. Unset: the SDK uses `ANTHROPIC_API_KEY` |
+| `VEKTOR_AI_TIMEOUT_SECONDS` | `120` | Per-request timeout, more than 0 and at most 600. One retry for transient failures |
+
+**Cost and scope:** `anthropic` calls a paid, hosted service billed to your Anthropic account, which goes beyond the free, local-first defaults in `AGENTS.md`. Leave the provider at `none` to keep Vektor fully local. Nothing else in Vektor depends on it.
