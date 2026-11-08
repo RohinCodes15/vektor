@@ -57,3 +57,10 @@ def test_a_configured_provider_returns_a_grounded_interpretation(tmp_path: Path)
     assert (body["status"], body["provider"], body["model"]) == ("available", "anthropic", "test-model")
     assert body["interpretation"] == interpretation().model_dump(mode="json")
     assert len(ai.calls) == 1
+
+
+def test_unknown_and_invalid_backtest_ids(tmp_path: Path) -> None:
+    client = client_for(tmp_path, FakeAI())
+    missing = client.post(f"/api/v1/backtests/{uuid4()}/analysis")
+    assert missing.status_code == 404 and set(missing.json()) == {"detail"}
+    assert client.post("/api/v1/backtests/not-a-uuid/analysis").status_code == 422
