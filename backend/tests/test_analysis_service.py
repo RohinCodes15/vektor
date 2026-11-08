@@ -51,3 +51,9 @@ def test_an_interpretation_citing_unmeasured_facts_is_rejected(tmp_path: Path) -
     ai = FakeAI(interpretation(evidence=["total_return_pct", "next_year_forecast"]))
     with pytest.raises(InvalidAnalysis, match="cites facts that were not measured"):
         AnalysisService(backtests, ai).analyze(backtest.id)
+
+
+def test_provider_failures_propagate_unchanged(tmp_path: Path) -> None:
+    backtests, backtest = run_backtest(tmp_path, SWING, SMA)
+    with pytest.raises(AnalysisUnavailable, match="timed out"):
+        AnalysisService(backtests, FakeAI(AnalysisUnavailable("The AI provider timed out."))).analyze(backtest.id)
