@@ -97,3 +97,12 @@ def test_provider_errors_become_safe_client_errors(error: Exception, expected: t
     with pytest.raises(expected, match=message) as raised:
         provider(FakeClientFactory(error)).interpret("s", "p")
     assert "sk-ant-leaked" not in str(raised.value) and raised.value.__cause__ is None
+
+
+def test_a_reply_that_fails_the_contract_is_malformed() -> None:
+    try:
+        AnalysisInterpretation.model_validate({"summary": ""})
+    except ValidationError as error:
+        invalid = error
+    with pytest.raises(InvalidAnalysis, match="malformed"):
+        provider(FakeClientFactory(invalid)).interpret("s", "p")
