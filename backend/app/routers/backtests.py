@@ -3,8 +3,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
 
+from app.analysis.service import AnalysisService
 from app.backtest.service import BacktestService
-from app.contracts import Backtest, BacktestCreate, BacktestSummary, ErrorResponse
+from app.contracts import Backtest, BacktestAnalysis, BacktestCreate, BacktestSummary, ErrorResponse
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
@@ -19,6 +20,12 @@ RUN_RESPONSES: dict[int | str, dict[str, Any]] = {
     502: {"model": ErrorResponse, "description": "Market data provider returned invalid data"},
     503: {"model": ErrorResponse, "description": "Market data provider unreachable, timed out, or rate limited"},
 }
+ANALYSIS_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **NOT_FOUND,
+    **INVALID,
+    502: {"model": ErrorResponse, "description": "AI provider rejected the request or returned an invalid analysis"},
+    503: {"model": ErrorResponse, "description": "AI provider timed out, rate limited, unreachable, or unauthorized"},
+}
 
 
 def get_backtest_service(request: Request) -> BacktestService:
@@ -27,6 +34,11 @@ def get_backtest_service(request: Request) -> BacktestService:
 
 
 Service = Annotated[BacktestService, Depends(get_backtest_service)]
+
+
+def get_analysis_service(request: Request) -> AnalysisService:
+    service: AnalysisService = request.app.state.analysis_service
+    return service
 
 
 @router.post("", response_model=Backtest, status_code=status.HTTP_201_CREATED, responses=RUN_RESPONSES)
@@ -43,3 +55,11 @@ def list_backtests(service: Service) -> list[BacktestSummary]:
 @router.get("/{backtest_id}", response_model=Backtest, responses={**NOT_FOUND, **INVALID})
 def get_backtest(backtest_id: UUID, service: Service) -> Backtest:
     return service.get(backtest_id)
+
+
+@router.post("/{backtest_id}/analysis", response_model=BacktestAnalysis, responses=ANALYSIS_RESPONSES)
+def analyze_backtest(
+    backtest_id: UUID, service: Annotated[AnalysisService, Depends(get_analysis_service)]
+) -> BacktestAnalysis:
+    """Educational explanation of a stored backtest: measured facts, plus an AI interpretation when configured."""
+    return service.analyze(backtest_id)
