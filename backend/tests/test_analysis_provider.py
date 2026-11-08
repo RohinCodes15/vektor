@@ -73,3 +73,27 @@ def test_missing_credentials_are_unavailable() -> None:
 
     with pytest.raises(AnalysisUnavailable, match="no provider credentials"):
         provider(no_credentials, api_key=None).interpret("s", "p")
+
+
+@pytest.mark.parametrize(
+    ("error", "expected", "message"),
+    [
+        (anthropic.APITimeoutError(request=REQUEST), AnalysisUnavailable, "timed out"),
+        (anthropic.APIConnectionError(request=REQUEST), AnalysisUnavailable, "could not be reached"),
+        (anthropic.RateLimitError("429", response=response(429), body=SECRET_BODY), AnalysisUnavailable,
+         "rate limiting"),
+        (anthropic.AuthenticationError("401", response=response(401), body=SECRET_BODY), AnalysisUnavailable,
+         "rejected the configured credentials"),
+        (anthropic.InternalServerError("500", response=response(500), body=SECRET_BODY), AnalysisUnavailable,
+         "overloaded or failing"),
+        (anthropic.OverloadedError("529", response=response(529), body=SECRET_BODY), AnalysisUnavailable,
+         "overloaded or failing"),
+        (anthropic.BadRequestError("400", response=response(400), body=SECRET_BODY), InvalidAnalysis,
+         "rejected the analysis request"),
+        (anthropic.APIResponseValidationError(response(200), SECRET_BODY), InvalidAnalysis, "malformed"),
+    ],
+)
+def test_provider_errors_become_safe_client_errors(error: Exception, expected: type[Exception], message: str) -> None:
+    with pytest.raises(expected, match=message) as raised:
+        provider(FakeClientFactory(error)).interpret("s", "p")
+    assert "sk-ant-leaked" not in str(raised.value) and raised.value.__cause__ is None
