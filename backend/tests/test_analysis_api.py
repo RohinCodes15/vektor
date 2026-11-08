@@ -47,3 +47,13 @@ def test_without_a_provider_the_endpoint_reports_unavailable_with_facts(tmp_path
     facts = {fact["id"]: fact["value"] for fact in body["facts"]}
     assert facts["total_return_pct"] == f"{backtest['metrics']['total_return_pct']}%"
     assert "not investment advice" in body["disclaimer"]
+
+
+def test_a_configured_provider_returns_a_grounded_interpretation(tmp_path: Path) -> None:
+    ai = FakeAI()
+    _, res = analyze(client_for(tmp_path, ai))
+    assert res.status_code == 200
+    body = res.json()
+    assert (body["status"], body["provider"], body["model"]) == ("available", "anthropic", "test-model")
+    assert body["interpretation"] == interpretation().model_dump(mode="json")
+    assert len(ai.calls) == 1
