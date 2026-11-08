@@ -383,3 +383,7 @@ Contracts: `BacktestAnalysis`, `AnalysisFact`, `AnalysisInterpretation`, `Analys
 - `status` / `unavailable_reason`, `provider`, `model`, `generated_at`, `mode` (`paper`), and a fixed `disclaimer`.
 
 Facts are measurement; `interpretation` is the model's explanation of them and can be wrong. Clients should present the two separately.
+
+### What is sent to the provider
+
+Only fixed instructions and a JSON list of the facts above with the backtest's metric notes. No backtest id, timestamps, raw trades, or account dollar amounts (starting cash, equity, P&L) leave the machine; the only dollar figure is the configured fee per fill. The instructions tell the model to use only those facts, cite them, copy numbers exactly, separate measurement from interpretation, and give no advice. The reply is constrained to the `AnalysisInterpretation` schema (structured output) and validated again by Vektor.
