@@ -10,6 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from app.backtest.comparison import differences, leaders
 from app.backtest.engine import Costs, Holding, Simulation, simulate
 from app.backtest.errors import BacktestNotFound, BacktestRejected
 from app.backtest.metrics import Performance, compute_performance
@@ -18,6 +19,8 @@ from app.backtest.store import BacktestStore
 from app.backtest.strategies import signal_series, warmup_bars
 from app.contracts import (
     Backtest,
+    BacktestComparison,
+    BacktestComparisonCreate,
     BacktestCreate,
     BacktestEquityPoint,
     BacktestMetrics,
@@ -28,6 +31,7 @@ from app.contracts import (
     BacktestSummary,
     BacktestTrade,
     MarketHistoryQuery,
+    StrategyComparisonResult,
 )
 from app.market_data.errors import MarketDataNotFound
 from app.market_data.service import MarketDataService, utc_now
@@ -37,6 +41,10 @@ logger = logging.getLogger("vektor.backtest")
 
 BACKTEST_CURRENCY = "USD"
 BASIS_POINTS = Decimal(10_000)
+COMPARISON_DISCLAIMER = (
+    "Paper simulation on past daily prices. A strategy that led in this comparison is not guaranteed, or even likely, "
+    "to lead or return anything in the future. Not investment advice."
+)
 
 
 class BacktestService:
@@ -68,6 +76,39 @@ class BacktestService:
             },
         )
         return backtest
+
+    def compare(self, request: BacktestComparisonCreate) -> BacktestComparison:
+        """Backtest each strategy on the same adjusted bars. Nothing is stored. Raises BacktestRejected on unusable
+        data; a strategy with too little history for its warm-up is reported as unavailable instead.
+        """
+        aligned = align({request.symbol: self._bars(request.symbol, request)})
+        results = [_compared(request, strategy, aligned) for strategy in request.strategies]
+        baseline = results[0].metrics
+        if baseline is not None:
+            results = [
+                r.model_copy(update={"vs_baseline": differences(r.metrics, baseline)}) if r.metrics else r
+                for r in results
+            ]
+        logger.info(
+            "backtest comparison completed",
+            extra={
+                "symbol": request.symbol,
+                "strategies": [strategy.kind for strategy in request.strategies],
+                "bars": len(aligned.calendar),
+            },
+        )
+        return BacktestComparison(
+            currency=BACKTEST_CURRENCY,
+            source="yahoo_finance",
+            config=request,
+            bars=len(aligned.calendar),
+            first_date=aligned.calendar[0],
+            last_date=aligned.calendar[-1],
+            dates=list(aligned.calendar),
+            results=results,
+            leaders=leaders([r.metrics for r in results]),
+            disclaimer=COMPARISON_DISCLAIMER,
+        )
 
     def get(self, backtest_id: UUID) -> Backtest:
         backtest = self._store.get(backtest_id)
@@ -105,6 +146,28 @@ def _shortfall(request: BacktestSettings, strategy: BacktestStrategy, aligned: A
     return (
         f"Not enough history: {strategy.kind} needs at least {required} trading days on which every "
         f"symbol has a bar between {request.start} and {request.end}; found {len(aligned.calendar)}."
+    )
+
+
+def _compared(
+    request: BacktestComparisonCreate, strategy: BacktestStrategy, aligned: Aligned
+) -> StrategyComparisonResult:
+    shortfall = _shortfall(request, strategy, aligned)
+    if shortfall is not None:
+        return StrategyComparisonResult(
+            strategy=strategy, status="unavailable", unavailable_reason=shortfall, metrics=None, warnings=[],
+            equity=None, vs_baseline=None,
+        )
+    simulation = _simulate(request, strategy, aligned)
+    performance = _performance(request, simulation)
+    return StrategyComparisonResult(
+        strategy=strategy,
+        status="available",
+        unavailable_reason=None,
+        metrics=_metrics(simulation, performance),
+        warnings=list(performance.warnings),
+        equity=[point.equity for point in simulation.equity_curve],
+        vs_baseline=None,
     )
 
 
