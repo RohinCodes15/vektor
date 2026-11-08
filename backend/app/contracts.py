@@ -1,6 +1,7 @@
 """Shared API contracts (v1). Coordinated with frontend/ — see AGENTS.md before changing.
 
 Simulation models are contracts only; no endpoints serve them yet. Backtest models back /api/v1/backtests.
+Analysis models back POST /api/v1/backtests/{id}/analysis (Phase 3A.1, educational AI explanations of a backtest).
 Market history models back the read-only GET /api/v1/market/history endpoint.
 Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots, analytics, allocation
 and risk live under the same prefix. Money is a Decimal, serialized as a JSON string: cash, cost and P&L have 2 decimal
@@ -588,3 +589,52 @@ class BacktestSummary(Contract):
     first_date: date
     last_date: date
     metrics: BacktestMetrics
+
+
+# AI strategy analysis (Phase 3A.1). Educational and paper-only: explains a stored backtest and never gives advice.
+AnalysisProviderName = Literal["anthropic"]
+
+
+class AnalysisFact(Contract):
+    """A value Vektor measured from the stored backtest. Facts are computed locally, never by the AI provider."""
+
+    id: str
+    label: str
+    value: str
+
+
+class AnalysisInsight(Contract):
+    """One AI interpretation. `evidence` lists the ids of the measured facts it is based on."""
+
+    text: str = Field(min_length=1, max_length=600)
+    evidence: list[str] = Field(min_length=1, max_length=6)
+
+
+class AnalysisInterpretation(Contract):
+    """The AI provider's reading of the measured facts: interpretation, not measurement, and never advice."""
+
+    summary: str = Field(min_length=1, max_length=800)
+    strategy_behavior: list[AnalysisInsight] = Field(min_length=1, max_length=5)
+    strengths: list[AnalysisInsight] = Field(max_length=5)
+    weaknesses: list[AnalysisInsight] = Field(max_length=5)
+    risk_factors: list[AnalysisInsight] = Field(max_length=5)
+    limitations: list[AnalysisInsight] = Field(min_length=1, max_length=5)
+
+
+class BacktestAnalysis(Contract):
+    """Measured facts about a stored backtest plus, when an AI provider is configured, its interpretation.
+
+    `status` is "unavailable" (with `unavailable_reason`, and `interpretation`, `provider` and `model` null) when no
+    provider is configured. `facts` are always present and exact; nothing in them comes from the AI provider.
+    """
+
+    backtest_id: UUID
+    mode: TradingMode = "paper"
+    status: MetricStatus
+    unavailable_reason: str | None
+    generated_at: AwareDatetime
+    provider: AnalysisProviderName | None
+    model: str | None
+    facts: list[AnalysisFact]
+    interpretation: AnalysisInterpretation | None
+    disclaimer: str
