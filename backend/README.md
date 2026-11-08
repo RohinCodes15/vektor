@@ -387,3 +387,14 @@ Facts are measurement; `interpretation` is the model's explanation of them and c
 ### What is sent to the provider
 
 Only fixed instructions and a JSON list of the facts above with the backtest's metric notes. No backtest id, timestamps, raw trades, or account dollar amounts (starting cash, equity, P&L) leave the machine; the only dollar figure is the configured fee per fill. The instructions tell the model to use only those facts, cite them, copy numbers exactly, separate measurement from interpretation, and give no advice. The reply is constrained to the `AnalysisInterpretation` schema (structured output) and validated again by Vektor.
+
+### Errors
+
+Every error is `{"detail": "..."}`; provider error bodies and keys are only logged by type and status, never returned.
+
+| Status | Meaning |
+|--------|---------|
+| 404 | Backtest not found |
+| 422 | Invalid backtest id |
+| 502 | The provider rejected the request, declined it, returned a truncated or malformed reply, or cited unmeasured facts |
+| 503 | The provider timed out, rate-limited the request, could not be reached, was overloaded, or has missing or rejected credentials |
