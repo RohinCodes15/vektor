@@ -29,3 +29,19 @@ def test_facts_copy_the_stored_strategy_and_metrics(tmp_path: Path) -> None:
     assert facts["sharpe_ratio"] == str(metrics.sharpe_ratio)
     assert (facts["fills"], facts["closed_trades"]) == (str(metrics.trades), str(metrics.closed_trades))
     assert facts["fees_pct_of_starting_cash"] == f"{(metrics.total_fees / 100).quantize(D('0.0001'))}%"
+
+
+def test_trade_and_curve_facts_match_an_independent_calculation(tmp_path: Path) -> None:
+    _, backtest = run_backtest(tmp_path, SWING, SMA)
+    facts = by_id(backtest)
+    sells = [t for t in backtest.trades if t.side == "sell"]
+    buys = [t for t in backtest.trades if t.side == "buy"]
+    assert sells, "the swing series must close at least one trade"
+    costs = [buy.notional + buy.fee for buy in buys]
+    returns = [t.realized_pnl / costs[i] * 100 for i, t in enumerate(sells)]  # type: ignore[operator]
+    assert facts["best_trade_return_pct"] == f"{max(returns).quantize(D('0.0001'))}%"
+    assert facts["worst_trade_return_pct"] == f"{min(returns).quantize(D('0.0001'))}%"
+    days = [(t.fill_date - buys[i].fill_date).days for i, t in enumerate(sells)]
+    assert facts["average_holding_days"] == f"{D(sum(days)) / len(days):.1f} calendar days"
+    invested = sum(1 for p in backtest.equity_curve if p.positions_value > 0)
+    assert facts["time_in_market_pct"] == f"{(D(invested) / backtest.bars * 100).quantize(D('0.0001'))}%"
