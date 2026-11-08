@@ -65,3 +65,11 @@ def test_without_a_configured_key_the_sdk_resolves_its_own_credentials() -> None
     factory = FakeClientFactory(reply())
     provider(factory, api_key=None).interpret("s", "p")
     assert "api_key" not in factory.options
+
+
+def test_missing_credentials_are_unavailable() -> None:
+    def no_credentials(**_: Any) -> None:
+        raise anthropic.CredentialsError("no credentials")
+
+    with pytest.raises(AnalysisUnavailable, match="no provider credentials"):
+        provider(no_credentials, api_key=None).interpret("s", "p")
