@@ -21,3 +21,9 @@ def test_the_anthropic_provider_uses_the_configured_model_and_key(monkeypatch: p
     assert isinstance(provider, AnthropicProvider)
     assert (provider.name, provider.model) == ("anthropic", "claude-sonnet-5-5")
     assert "sk-ant-test-secret" not in repr(settings) and "sk-ant-test-secret" not in str(settings.model_dump())
+
+
+def test_ai_settings_are_validated() -> None:
+    for bad in [{"ai_provider": "openai"}, {"ai_timeout_seconds": 0}, {"ai_timeout_seconds": 601}, {"ai_model": ""}]:
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, **bad)
