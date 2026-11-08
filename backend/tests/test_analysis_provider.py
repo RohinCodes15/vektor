@@ -106,3 +106,16 @@ def test_a_reply_that_fails_the_contract_is_malformed() -> None:
         invalid = error
     with pytest.raises(InvalidAnalysis, match="malformed"):
         provider(FakeClientFactory(invalid)).interpret("s", "p")
+
+
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    [
+        (reply(stop_reason="refusal"), "declined"),
+        (reply(stop_reason="max_tokens"), "incomplete"),
+        (SimpleNamespace(stop_reason="end_turn", parsed_output=None), "malformed"),
+    ],
+)
+def test_refused_truncated_or_empty_replies_are_invalid(outcome: SimpleNamespace, message: str) -> None:
+    with pytest.raises(InvalidAnalysis, match=message):
+        provider(FakeClientFactory(outcome)).interpret("s", "p")
