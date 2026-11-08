@@ -45,3 +45,11 @@ def test_trade_and_curve_facts_match_an_independent_calculation(tmp_path: Path) 
     assert facts["average_holding_days"] == f"{D(sum(days)) / len(days):.1f} calendar days"
     invested = sum(1 for p in backtest.equity_curve if p.positions_value > 0)
     assert facts["time_in_market_pct"] == f"{(D(invested) / backtest.bars * 100).quantize(D('0.0001'))}%"
+
+
+def test_facts_never_include_account_dollar_amounts(tmp_path: Path) -> None:
+    _, backtest = run_backtest(tmp_path, SWING, SMA)
+    values = " ".join(fact.value for fact in measured_facts(backtest))
+    amounts = [backtest.metrics.final_equity, backtest.config.starting_cash, *(p.equity for p in backtest.equity_curve)]
+    for amount in amounts:
+        assert str(amount) not in values
