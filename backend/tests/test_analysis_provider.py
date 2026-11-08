@@ -59,3 +59,9 @@ def test_a_structured_reply_is_returned_and_the_request_is_minimal() -> None:
         "model": "claude-opus-5-5", "max_tokens": MAX_OUTPUT_TOKENS, "system": "system rules",
         "messages": [{"role": "user", "content": '{"facts":[]}'}], "output_format": AnalysisInterpretation,
     }
+
+
+def test_without_a_configured_key_the_sdk_resolves_its_own_credentials() -> None:
+    factory = FakeClientFactory(reply())
+    provider(factory, api_key=None).interpret("s", "p")
+    assert "api_key" not in factory.options
