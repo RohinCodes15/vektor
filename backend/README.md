@@ -398,3 +398,9 @@ Every error is `{"detail": "..."}`; provider error bodies and keys are only logg
 | 422 | Invalid backtest id |
 | 502 | The provider rejected the request, declined it, returned a truncated or malformed reply, or cited unmeasured facts |
 | 503 | The provider timed out, rate-limited the request, could not be reached, was overloaded, or has missing or rejected credentials |
+
+### Limitations
+
+- The interpretation is generated text: it can be incomplete or wrong even when grounded in the facts. Citations are checked; the wording is not.
+- Each request calls the provider again, so two analyses of the same backtest can differ and each one is billed.
+- No server-side refusal fallback is configured, because the model is user-selectable; a declined request returns 502.
