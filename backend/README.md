@@ -351,6 +351,33 @@ The simulation is deterministic: the same request on the same market data gives 
 - Backtests run synchronously in the request. Very long ranges with many symbols take longer to fetch the first time; later runs use the market data cache.
 - Past performance in a simulation does not predict future results.
 
+## Strategy comparison (Phase 3B.1)
+
+Backtests 2 to 5 strategies on one symbol with the same range, starting cash, position size, fees, and slippage, and compares them. Each strategy runs through the same engine and metrics as `POST /backtests` on the same adjusted bars, so its numbers equal a standalone backtest with those settings. Paper-only, computed on request, and never stored.
+
+| Method and path (under `/api/v1`) | Does | Success |
+|-----------------------------------|------|---------|
+| `POST /backtests/comparisons` | Run and compare the strategies | 200 `BacktestComparison` |
+
+```bash
+curl -X POST localhost:8000/api/v1/backtests/comparisons -H 'content-type: application/json' -d '{
+  "symbol": "AAPL", "start": "2023-01-01", "end": "2024-12-31", "starting_cash": "10000",
+  "strategies": [{"kind": "buy_and_hold"}, {"kind": "sma_crossover", "fast_window": 20, "slow_window": 50},
+                 {"kind": "rsi", "period": 14}],
+  "fee_per_trade": "1.00", "slippage_bps": "5"
+}'
+```
+
+**Request** (`BacktestComparisonCreate`): `symbol` is one tradable ticker; `strategies` holds 2 to 5 distinct strategies (same `kind` with different parameters is allowed; an exact repeat is rejected); every other field means what it does in a backtest request (`BacktestSettings`). The first strategy is the **baseline**.
+
+**Response** (`BacktestComparison`): `dates` is the shared trading calendar and each result's `equity` has one value per date, so the curves are aligned by construction. `results` follow the request order, each with `metrics` (`BacktestMetrics`), `warnings`, and `vs_baseline`: the strategy's metric minus the baseline's (percentage points; Sharpe units), null when either side is null. `leaders` has one entry per metric (`total_return_pct`, `annualized_return_pct`, `volatility_pct`, `sharpe_ratio`, `max_drawdown_pct`, `win_rate_pct`) naming the indices of the best strategies, ties included. Higher is better except volatility; max drawdown is negative, so the shallowest leads. `disclaimer` states that leading in the past guarantees nothing.
+
+**Unavailable states:** a strategy whose warm-up needs more trading days than the range has is returned with `status: "unavailable"`, an `unavailable_reason`, and null `metrics`, `equity`, and `vs_baseline`; the others still run. When the baseline is unavailable, every `vs_baseline` is null. A metric has no leader (empty `leaders`, with a `reason`) when fewer than 2 strategies define it (for example, win rate with no closed trades) or all are equal.
+
+**Errors and bounds:** 422 for an invalid request, unknown symbol, or non-USD prices; 502/503 for provider failures, as for backtests. The workload is bounded: one symbol fetched once (then cached), at most 5 simulations. Deterministic: the same request on the same data returns the same body.
+
+**Limitations:** all the backtest limitations apply. The comparison ranks one historical path; a lead can come from chance, the chosen range, or the parameters, and says nothing about future returns. Trade counts and win rates on few trades are weak evidence.
+
 ## AI strategy analysis (Phase 3A.1)
 
 Educational explanations of a stored backtest. Vektor measures the facts itself; an optional AI provider only interprets them. **Off by default:** with no provider configured the endpoint returns the measured facts and `"status": "unavailable"`, never a made-up analysis. Paper-only and educational: it describes a simulation and never gives investment advice, recommendations, forecasts, or promises of returns.
