@@ -1,6 +1,7 @@
 """Shared API contracts (v1). Coordinated with frontend/ — see AGENTS.md before changing.
 
-Simulation models are contracts only; no endpoints serve them yet. Backtest models back /api/v1/backtests.
+Simulation models are contracts only; no endpoints serve them yet. Backtest models back /api/v1/backtests;
+comparison models back POST /api/v1/backtests/comparisons (Phase 3B.1).
 Analysis models back POST /api/v1/backtests/{id}/analysis (Phase 3A.1, educational AI explanations of a backtest).
 Market history models back the read-only GET /api/v1/market/history endpoint.
 Portfolio models back the paper portfolio endpoints under /api/v1/portfolios; equity snapshots, analytics, allocation
@@ -622,6 +623,68 @@ class BacktestSummary(Contract):
     first_date: date
     last_date: date
     metrics: BacktestMetrics
+
+
+# Strategy comparison (Phase 3B.1). Computed on request from real history, never stored; nothing reaches a broker.
+ComparisonMetric = Literal[
+    "total_return_pct", "annualized_return_pct", "volatility_pct", "sharpe_ratio", "max_drawdown_pct", "win_rate_pct"
+]
+
+
+class MetricDifferences(Contract):
+    """This strategy's metric minus the baseline's: percentage points, or Sharpe units. Null when either is null."""
+
+    total_return_pct: Decimal | None
+    annualized_return_pct: Decimal | None
+    volatility_pct: Decimal | None
+    sharpe_ratio: Decimal | None
+    max_drawdown_pct: Decimal | None
+    win_rate_pct: Decimal | None
+
+
+class StrategyComparisonResult(Contract):
+    """One strategy's backtest. "unavailable" (with a reason, and metrics, equity and differences null) when the
+    range has too few trading days for the strategy's warm-up.
+    """
+
+    strategy: BacktestStrategy
+    status: MetricStatus
+    unavailable_reason: str | None
+    metrics: BacktestMetrics | None
+    warnings: list[str]
+    # Equity at each close, aligned one to one with `BacktestComparison.dates`.
+    equity: list[Decimal] | None
+    # Null for an unavailable strategy or when the baseline (the first strategy) is unavailable.
+    vs_baseline: MetricDifferences | None
+
+
+class MetricLeader(Contract):
+    """The strategies (indices into `results`) with the best value of `metric`, ties included.
+
+    `leaders` is empty, with a `reason`, when fewer than 2 strategies have the metric or all of them are equal.
+    """
+
+    metric: ComparisonMetric
+    better: Literal["higher", "lower"]
+    leaders: list[int]
+    reason: str | None
+
+
+class BacktestComparison(Contract):
+    """Deterministic: the same request on the same data gives the same result. Describes the past only."""
+
+    mode: TradingMode = "paper"
+    currency: PortfolioCurrency
+    source: MarketDataSource
+    config: BacktestComparisonCreate
+    # Trading days in the range, shared by every strategy.
+    bars: int
+    first_date: date
+    last_date: date
+    dates: list[date]
+    results: list[StrategyComparisonResult]  # same order as config.strategies
+    leaders: list[MetricLeader]
+    disclaimer: str
 
 
 # AI strategy analysis (Phase 3A.1). Educational and paper-only: explains a stored backtest and never gives advice.
