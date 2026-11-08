@@ -62,3 +62,20 @@ def test_a_rising_buy_and_hold_has_no_drawdown_and_no_closed_trades(tmp_path: Pa
     assert (facts["max_drawdown_period"], facts["longest_drawdown_days"]) == ("no drawdown", "0 trading days")
     assert facts["win_rate_pct"] == facts["average_trade_return_pct"] == facts["average_holding_days"] == "unavailable"
     assert facts["open_positions"] == "1"
+
+
+def test_the_drawdown_period_names_its_peak_trough_and_recovery(tmp_path: Path) -> None:
+    _, backtest = run_backtest(tmp_path, [10, 12, 11, 9, 13, 8], {"kind": "buy_and_hold"})
+    facts = by_id(backtest)
+    first = backtest.first_date
+    # The highest close (13, day 4) comes just before the deepest fall (8, day 5), which never recovers.
+    assert facts["max_drawdown_period"] == (
+        f"peak {first + timedelta(days=4)}, trough {first + timedelta(days=5)}, not recovered by the last day"
+    )
+    _, recovered = run_backtest(tmp_path / "r", [10, 12, 9, 13], {"kind": "buy_and_hold"})
+    assert by_id(recovered)["max_drawdown_period"] == (
+        # Fees and slippage put day 1 below the starting cash, so the peak is the first close.
+        f"peak {first}, trough {first + timedelta(days=2)}, recovered {first + timedelta(days=3)}"
+    )
+    # Days 1-3 sit below the starting cash (costs, then 11 and 9); day 4 sets a new peak; day 5 falls again.
+    assert by_id(backtest)["longest_drawdown_days"] == "3 trading days"
