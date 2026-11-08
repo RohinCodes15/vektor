@@ -497,6 +497,28 @@ class BacktestCreate(BacktestSettings):
         return symbols
 
 
+class BacktestComparisonCreate(BacktestSettings):
+    """2 to 5 distinct strategies backtested on one symbol with the same range, cash, sizing, fees and slippage.
+
+    The first strategy is the baseline that `StrategyComparisonResult.vs_baseline` is measured against.
+    """
+
+    symbol: str
+    strategies: list[BacktestStrategy] = Field(min_length=2, max_length=5)
+
+    @field_validator("symbol", mode="before")
+    @classmethod
+    def normalize_symbol(cls, value: object) -> object:
+        return _tradable(value) if isinstance(value, str) else value
+
+    @field_validator("strategies")
+    @classmethod
+    def distinct_strategies(cls, value: list[BacktestStrategy]) -> list[BacktestStrategy]:
+        if len(set(value)) != len(value):
+            raise ValueError("strategies must not repeat: each needs a different kind or different parameters")
+        return value
+
+
 class BacktestTrade(Contract):
     """One simulated fill at the open of `fill_date`, from a signal at the close of `signal_date`.
 
