@@ -1,0 +1,49 @@
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.analysis.errors import AnalysisUnavailable, InvalidAnalysis
+from app.config import Settings
+from app.main import create_app
+from tests.analysis_support import SWING, FakeAI, interpretation, price_bars
+from tests.fakes import FakeProvider
+
+BACKTEST = {
+    "symbols": ["AAPL"], "start": "2024-01-01", "end": "2024-06-28", "starting_cash": "10000",
+    "strategy": {"kind": "sma_crossover", "fast_window": 2, "slow_window": 3},
+}
+
+
+def client_for(tmp_path: Path, ai: FakeAI | None) -> TestClient:
+    settings = Settings(
+        environment="test",
+        market_data_cache_path=tmp_path / "cache.sqlite3",
+        portfolio_db_path=tmp_path / "portfolios.sqlite3",
+        backtest_db_path=tmp_path / "backtests.sqlite3",
+        ai_provider="none",  # never reach a real provider, whatever the developer's environment says
+    )
+    app = create_app(settings, market_data_provider=FakeProvider(price_bars(SWING)), analysis_provider=ai)
+    return TestClient(app)
+
+
+def analyze(client: TestClient) -> Any:
+    backtest = client.post("/api/v1/backtests", json=BACKTEST).json()
+    return backtest, client.post(f"/api/v1/backtests/{backtest['id']}/analysis")
+
+
+def test_without_a_provider_the_endpoint_reports_unavailable_with_facts(tmp_path: Path) -> None:
+    backtest, res = analyze(client_for(tmp_path, None))
+    assert res.status_code == 200
+    body = res.json()
+    assert body.keys() == {
+        "backtest_id", "mode", "status", "unavailable_reason", "generated_at", "provider", "model", "facts",
+        "interpretation", "disclaimer",
+    }
+    assert (body["backtest_id"], body["mode"], body["status"]) == (backtest["id"], "paper", "unavailable")
+    assert body["interpretation"] is None and body["provider"] is None
+    facts = {fact["id"]: fact["value"] for fact in body["facts"]}
+    assert facts["total_return_pct"] == f"{backtest['metrics']['total_return_pct']}%"
+    assert "not investment advice" in body["disclaimer"]
