@@ -23,6 +23,8 @@ from app.contracts import (
     BacktestMetrics,
     BacktestPosition,
     BacktestRejectedOrder,
+    BacktestSettings,
+    BacktestStrategy,
     BacktestSummary,
     BacktestTrade,
     MarketHistoryQuery,
@@ -48,18 +50,11 @@ class BacktestService:
     def run(self, request: BacktestCreate) -> Backtest:
         """Simulate the request on adjusted daily bars and store the result. Raises BacktestRejected on unusable data."""
         aligned = align({symbol: self._bars(symbol, request) for symbol in request.symbols})
-        required = warmup_bars(request.strategy)
-        if len(aligned.calendar) < required:
-            raise BacktestRejected(
-                f"Not enough history: {request.strategy.kind} needs at least {required} trading days on which every "
-                f"symbol has a bar between {request.start} and {request.end}; found {len(aligned.calendar)}."
-            )
-        simulation = _simulate(request, aligned)
-        performance = compute_performance(
-            request.starting_cash,
-            [point.equity for point in simulation.equity_curve],
-            [fill.realized_pnl for fill in simulation.account.fills if fill.realized_pnl is not None],
-        )
+        shortfall = _shortfall(request, request.strategy, aligned)
+        if shortfall is not None:
+            raise BacktestRejected(shortfall)
+        simulation = _simulate(request, request.strategy, aligned)
+        performance = _performance(request, simulation)
         backtest = _backtest(uuid4(), self._clock(), request, aligned, simulation, performance)
         self._store.add(backtest)
         logger.info(
@@ -83,7 +78,7 @@ class BacktestService:
     def list_backtests(self) -> list[BacktestSummary]:
         return self._store.list_summaries()
 
-    def _bars(self, symbol: str, request: BacktestCreate) -> list[Bar]:
+    def _bars(self, symbol: str, request: BacktestSettings) -> list[Bar]:
         query = MarketHistoryQuery(symbol=symbol, start=request.start, end=request.end)
         try:
             history = self._market_data.get_history(query)
@@ -102,10 +97,19 @@ class BacktestService:
         return [bar for bar in bars if bar is not None]
 
 
-def _simulate(request: BacktestCreate, aligned: Aligned) -> Simulation:
-    signals = {
-        symbol: signal_series(request.strategy, [bar.close for bar in bars]) for symbol, bars in aligned.bars.items()
-    }
+def _shortfall(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> str | None:
+    """Why the range is too short for the strategy's warm-up, or None when it is long enough."""
+    required = warmup_bars(strategy)
+    if len(aligned.calendar) >= required:
+        return None
+    return (
+        f"Not enough history: {strategy.kind} needs at least {required} trading days on which every "
+        f"symbol has a bar between {request.start} and {request.end}; found {len(aligned.calendar)}."
+    )
+
+
+def _simulate(request: BacktestSettings, strategy: BacktestStrategy, aligned: Aligned) -> Simulation:
+    signals = {symbol: signal_series(strategy, [bar.close for bar in bars]) for symbol, bars in aligned.bars.items()}
     costs = Costs(
         fee_per_trade=request.fee_per_trade,
         fee_rate=request.fee_bps / BASIS_POINTS,
@@ -113,6 +117,31 @@ def _simulate(request: BacktestCreate, aligned: Aligned) -> Simulation:
     )
     return simulate(
         aligned.calendar, aligned.bars, signals, request.starting_cash, costs, request.position_size_pct / 100
+    )
+
+
+def _performance(request: BacktestSettings, simulation: Simulation) -> Performance:
+    return compute_performance(
+        request.starting_cash,
+        [point.equity for point in simulation.equity_curve],
+        [fill.realized_pnl for fill in simulation.account.fills if fill.realized_pnl is not None],
+    )
+
+
+def _metrics(simulation: Simulation, performance: Performance) -> BacktestMetrics:
+    fills = simulation.account.fills
+    return BacktestMetrics(
+        final_equity=simulation.equity_curve[-1].equity,
+        total_return_pct=performance.total_return_pct,
+        annualized_return_pct=performance.annualized_return_pct,
+        volatility_pct=performance.volatility_pct,
+        max_drawdown_pct=performance.max_drawdown_pct,
+        sharpe_ratio=performance.sharpe_ratio,
+        win_rate_pct=performance.win_rate_pct,
+        trades=len(fills),
+        closed_trades=performance.closed_trades,
+        winning_trades=performance.winning_trades,
+        total_fees=sum((fill.fee for fill in fills), Decimal("0.00")),
     )
 
 
@@ -135,19 +164,7 @@ def _backtest(
         bars=len(aligned.calendar),
         first_date=aligned.calendar[0],
         last_date=aligned.calendar[-1],
-        metrics=BacktestMetrics(
-            final_equity=curve[-1].equity,
-            total_return_pct=performance.total_return_pct,
-            annualized_return_pct=performance.annualized_return_pct,
-            volatility_pct=performance.volatility_pct,
-            max_drawdown_pct=performance.max_drawdown_pct,
-            sharpe_ratio=performance.sharpe_ratio,
-            win_rate_pct=performance.win_rate_pct,
-            trades=len(account.fills),
-            closed_trades=performance.closed_trades,
-            winning_trades=performance.winning_trades,
-            total_fees=sum((fill.fee for fill in account.fills), Decimal("0.00")),
-        ),
+        metrics=_metrics(simulation, performance),
         warnings=list(performance.warnings),
         equity_curve=[
             BacktestEquityPoint(
