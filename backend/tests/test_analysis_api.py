@@ -64,3 +64,16 @@ def test_unknown_and_invalid_backtest_ids(tmp_path: Path) -> None:
     missing = client.post(f"/api/v1/backtests/{uuid4()}/analysis")
     assert missing.status_code == 404 and set(missing.json()) == {"detail"}
     assert client.post("/api/v1/backtests/not-a-uuid/analysis").status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (AnalysisUnavailable("The AI provider timed out. Try again later."), 503),
+        (InvalidAnalysis("The AI provider returned a malformed analysis."), 502),
+    ],
+)
+def test_provider_failures_map_to_gateway_errors(tmp_path: Path, error: Exception, status: int) -> None:
+    _, res = analyze(client_for(tmp_path, FakeAI(error)))
+    assert res.status_code == status
+    assert res.json() == {"detail": str(error)}
