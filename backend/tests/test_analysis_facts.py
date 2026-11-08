@@ -79,3 +79,8 @@ def test_the_drawdown_period_names_its_peak_trough_and_recovery(tmp_path: Path) 
     )
     # Days 1-3 sit below the starting cash (costs, then 11 and 9); day 4 sets a new peak; day 5 falls again.
     assert by_id(backtest)["longest_drawdown_days"] == "3 trading days"
+
+
+def test_rsi_parameters_are_described(tmp_path: Path) -> None:
+    _, backtest = run_backtest(tmp_path, SWING, {"kind": "rsi", "period": 3, "oversold": "25", "overbought": "75.5"})
+    assert by_id(backtest)["strategy"] == "RSI (period 3): buy while RSI < 25, sell while RSI > 75.5"
