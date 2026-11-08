@@ -44,3 +44,10 @@ def test_the_payload_holds_no_ids_timestamps_or_account_amounts(tmp_path: Path) 
                     str(backtest.metrics.final_equity)]:
         assert private not in payload
     assert payload == provider_payload(measured_facts(backtest), backtest.warnings)  # deterministic
+
+
+def test_an_interpretation_citing_unmeasured_facts_is_rejected(tmp_path: Path) -> None:
+    backtests, backtest = run_backtest(tmp_path, SWING, SMA)
+    ai = FakeAI(interpretation(evidence=["total_return_pct", "next_year_forecast"]))
+    with pytest.raises(InvalidAnalysis, match="cites facts that were not measured"):
+        AnalysisService(backtests, ai).analyze(backtest.id)
