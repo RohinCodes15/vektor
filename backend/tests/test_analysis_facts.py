@@ -53,3 +53,12 @@ def test_facts_never_include_account_dollar_amounts(tmp_path: Path) -> None:
     amounts = [backtest.metrics.final_equity, backtest.config.starting_cash, *(p.equity for p in backtest.equity_curve)]
     for amount in amounts:
         assert str(amount) not in values
+
+
+def test_a_rising_buy_and_hold_has_no_drawdown_and_no_closed_trades(tmp_path: Path) -> None:
+    _, backtest = run_backtest(tmp_path, [10, 11, 12, 13], {"kind": "buy_and_hold"}, NO_COSTS)
+    facts = by_id(backtest)
+    assert facts["strategy"] == "Buy and hold: buy every symbol on the first bar and hold to the end"
+    assert (facts["max_drawdown_period"], facts["longest_drawdown_days"]) == ("no drawdown", "0 trading days")
+    assert facts["win_rate_pct"] == facts["average_trade_return_pct"] == facts["average_holding_days"] == "unavailable"
+    assert facts["open_positions"] == "1"
