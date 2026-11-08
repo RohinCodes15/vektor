@@ -350,3 +350,17 @@ The simulation is deterministic: the same request on the same market data gives 
 - Indicators warm up inside the range, so a strategy cannot signal on the first `slow_window` (or `period`) days.
 - Backtests run synchronously in the request. Very long ranges with many symbols take longer to fetch the first time; later runs use the market data cache.
 - Past performance in a simulation does not predict future results.
+
+## AI strategy analysis (Phase 3A.1)
+
+Educational explanations of a stored backtest. Vektor measures the facts itself; an optional AI provider only interprets them. **Off by default:** with no provider configured the endpoint returns the measured facts and `"status": "unavailable"`, never a made-up analysis. Paper-only and educational: it describes a simulation and never gives investment advice, recommendations, forecasts, or promises of returns.
+
+| Method and path (under `/api/v1`) | Does | Success |
+|-----------------------------------|------|---------|
+| `POST /backtests/{id}/analysis` | Measured facts about the stored backtest, plus an AI interpretation when a provider is configured | 200 `BacktestAnalysis` |
+
+```bash
+curl -X POST localhost:8000/api/v1/backtests/<id>/analysis
+```
+
+Contracts: `BacktestAnalysis`, `AnalysisFact`, `AnalysisInterpretation`, `AnalysisInsight` in `app/contracts.py`. The request has no body: only a stored backtest can be analyzed, so the numbers always come from a real simulation, never from the client. The analysis is generated on each request and not stored.
