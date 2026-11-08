@@ -57,3 +57,11 @@ def test_provider_failures_propagate_unchanged(tmp_path: Path) -> None:
     backtests, backtest = run_backtest(tmp_path, SWING, SMA)
     with pytest.raises(AnalysisUnavailable, match="timed out"):
         AnalysisService(backtests, FakeAI(AnalysisUnavailable("The AI provider timed out."))).analyze(backtest.id)
+
+
+def test_an_unknown_backtest_is_not_found_and_the_provider_is_not_called(tmp_path: Path) -> None:
+    backtests, _ = run_backtest(tmp_path, SWING, SMA)
+    ai = FakeAI()
+    with pytest.raises(BacktestNotFound):
+        AnalysisService(backtests, ai).analyze(uuid4())
+    assert ai.calls == []
