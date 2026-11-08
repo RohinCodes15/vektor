@@ -433,17 +433,22 @@ BacktestStrategy = Annotated[BuyAndHoldStrategy | SmaCrossoverStrategy | RsiStra
 BasisPoints = Annotated[Decimal, Field(ge=0, le=1000, max_digits=6, decimal_places=2)]
 
 
-class BacktestCreate(Contract):
-    """A backtest over completed daily bars. `start` and `end` are inclusive calendar dates before today (UTC).
+def _tradable(symbol: str) -> str:
+    symbol = symbol.strip().upper()
+    if not _TRADABLE_SYMBOL.fullmatch(symbol):
+        raise ValueError("each symbol must be a ticker of 1-15 letters, digits, '.' or '-'")
+    return symbol
 
-    Long-only and whole shares. Each entry targets `position_size_pct` of equity split equally across `symbols`.
+
+class BacktestSettings(Contract):
+    """Range, cash, sizing and costs shared by a backtest and a strategy comparison.
+
+    `start` and `end` are inclusive calendar dates before today (UTC). Long-only and whole shares.
     """
 
-    symbols: list[str] = Field(min_length=1, max_length=10)
     start: date
     end: date
     starting_cash: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
-    strategy: BacktestStrategy
     position_size_pct: Decimal = Field(default=Decimal(100), gt=0, le=100, max_digits=5, decimal_places=2)
     # Fixed commission per fill, in dollars.
     fee_per_trade: Decimal = Field(default=Decimal("0.00"), ge=0, le=1000, max_digits=6, decimal_places=2)
@@ -451,21 +456,6 @@ class BacktestCreate(Contract):
     fee_bps: BasisPoints = Decimal(0)
     # Price moved against every fill: buys pay more, sells receive less.
     slippage_bps: BasisPoints = Decimal(0)
-
-    @field_validator("symbols", mode="before")
-    @classmethod
-    def normalize_symbols(cls, value: object) -> object:
-        if not isinstance(value, list):
-            return value
-        symbols = [item.strip().upper() if isinstance(item, str) else item for item in value]
-        # Non-strings are left for the list[str] check, which rejects them; they may not even be hashable.
-        tickers = [symbol for symbol in symbols if isinstance(symbol, str)]
-        for symbol in tickers:
-            if not _TRADABLE_SYMBOL.fullmatch(symbol):
-                raise ValueError("each symbol must be a ticker of 1-15 letters, digits, '.' or '-'")
-        if len(set(tickers)) != len(tickers):
-            raise ValueError("symbols must not repeat")
-        return symbols
 
     @field_validator("starting_cash", "fee_per_trade")
     @classmethod
@@ -484,6 +474,27 @@ class BacktestCreate(Contract):
         if self.end >= datetime.now(UTC).date():
             raise ValueError("end must be before today (UTC): only completed daily bars are simulated")
         return self
+
+
+class BacktestCreate(BacktestSettings):
+    """A backtest over completed daily bars. Each entry targets `position_size_pct` of equity split equally across
+    `symbols`.
+    """
+
+    symbols: list[str] = Field(min_length=1, max_length=10)
+    strategy: BacktestStrategy
+
+    @field_validator("symbols", mode="before")
+    @classmethod
+    def normalize_symbols(cls, value: object) -> object:
+        if not isinstance(value, list):
+            return value
+        # Non-strings are left for the list[str] check, which rejects them; they may not even be hashable.
+        symbols = [_tradable(item) if isinstance(item, str) else item for item in value]
+        tickers = [symbol for symbol in symbols if isinstance(symbol, str)]
+        if len(set(tickers)) != len(tickers):
+            raise ValueError("symbols must not repeat")
+        return symbols
 
 
 class BacktestTrade(Contract):
