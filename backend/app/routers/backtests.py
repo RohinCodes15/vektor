@@ -5,7 +5,15 @@ from fastapi import APIRouter, Depends, Request, status
 
 from app.analysis.service import AnalysisService
 from app.backtest.service import BacktestService
-from app.contracts import Backtest, BacktestAnalysis, BacktestCreate, BacktestSummary, ErrorResponse
+from app.contracts import (
+    Backtest,
+    BacktestAnalysis,
+    BacktestComparison,
+    BacktestComparisonCreate,
+    BacktestCreate,
+    BacktestSummary,
+    ErrorResponse,
+)
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
@@ -19,6 +27,14 @@ RUN_RESPONSES: dict[int | str, dict[str, Any]] = {
     },
     502: {"model": ErrorResponse, "description": "Market data provider returned invalid data"},
     503: {"model": ErrorResponse, "description": "Market data provider unreachable, timed out, or rate limited"},
+}
+COMPARE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **RUN_RESPONSES,
+    422: {
+        "model": ErrorResponse,
+        "description": "Invalid request, unknown symbol, or non-USD prices. A strategy with too little history is "
+        "reported as unavailable instead.",
+    },
 }
 ANALYSIS_RESPONSES: dict[int | str, dict[str, Any]] = {
     **NOT_FOUND,
@@ -45,6 +61,12 @@ def get_analysis_service(request: Request) -> AnalysisService:
 def run_backtest(body: BacktestCreate, service: Service) -> Backtest:
     """Run a paper-only backtest on completed daily history and store the result."""
     return service.run(body)
+
+
+@router.post("/comparisons", response_model=BacktestComparison, responses=COMPARE_RESPONSES)
+def compare_strategies(body: BacktestComparisonCreate, service: Service) -> BacktestComparison:
+    """Backtest 2 to 5 strategies on the same symbol, range, cash and costs and compare them. Nothing is stored."""
+    return service.compare(body)
 
 
 @router.get("", response_model=list[BacktestSummary])
