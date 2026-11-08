@@ -77,3 +77,8 @@ def test_provider_failures_map_to_gateway_errors(tmp_path: Path, error: Exceptio
     _, res = analyze(client_for(tmp_path, FakeAI(error)))
     assert res.status_code == status
     assert res.json() == {"detail": str(error)}
+
+
+def test_ungrounded_ai_output_is_a_bad_gateway(tmp_path: Path) -> None:
+    _, res = analyze(client_for(tmp_path, FakeAI(interpretation(evidence=["made_up"]))))
+    assert res.status_code == 502 and "not measured" in res.json()["detail"]
