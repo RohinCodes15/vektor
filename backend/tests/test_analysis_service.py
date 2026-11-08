@@ -35,3 +35,12 @@ def test_the_provider_receives_only_the_measured_facts_and_its_reading_is_return
     assert system == SYSTEM_PROMPT
     sent = json.loads(payload)
     assert sent == {"facts": [f.model_dump() for f in measured_facts(backtest)], "metric_notes": backtest.warnings}
+
+
+def test_the_payload_holds_no_ids_timestamps_or_account_amounts(tmp_path: Path) -> None:
+    _, backtest = run_backtest(tmp_path, SWING, SMA)
+    payload = provider_payload(measured_facts(backtest), backtest.warnings)
+    for private in [str(backtest.id), backtest.created_at.isoformat(), str(backtest.config.starting_cash),
+                    str(backtest.metrics.final_equity)]:
+        assert private not in payload
+    assert payload == provider_payload(measured_facts(backtest), backtest.warnings)  # deterministic
