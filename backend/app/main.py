@@ -6,6 +6,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.analysis.provider import AnalysisProvider, AnthropicProvider
+from app.analysis.service import AnalysisService
 from app.api_errors import register_error_handlers
 from app.backtest.service import BacktestService
 from app.backtest.store import BacktestStore
@@ -43,7 +45,20 @@ v1.include_router(portfolios.router)
 v1.include_router(backtests.router)
 
 
-def create_app(settings: Settings | None = None, *, market_data_provider: HistoryProvider | None = None) -> FastAPI:
+def build_analysis_provider(settings: Settings) -> AnalysisProvider | None:
+    """The configured AI provider, or None when AI analysis is off (the default)."""
+    if settings.ai_provider == "none":
+        return None
+    key = settings.ai_api_key.get_secret_value() if settings.ai_api_key else None
+    return AnthropicProvider(settings.ai_model, key, settings.ai_timeout_seconds)
+
+
+def create_app(
+    settings: Settings | None = None,
+    *,
+    market_data_provider: HistoryProvider | None = None,
+    analysis_provider: AnalysisProvider | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
     app = FastAPI(title=settings.app_name, version=VERSION)
@@ -61,11 +76,19 @@ def create_app(settings: Settings | None = None, *, market_data_provider: Histor
     )
     app.state.market_data_service = market_data_service
     app.state.portfolio_service = PortfolioService(PortfolioStore(settings.portfolio_db_path), market_data_service)
-    app.state.backtest_service = BacktestService(BacktestStore(settings.backtest_db_path), market_data_service)
+    backtest_service = BacktestService(BacktestStore(settings.backtest_db_path), market_data_service)
+    app.state.backtest_service = backtest_service
+    provider = analysis_provider or build_analysis_provider(settings)
+    app.state.analysis_service = AnalysisService(backtest_service, provider)
     app.include_router(v1)
     app.dependency_overrides[get_settings] = lambda: settings
     logging.getLogger("vektor").info(
-        "app configured", extra={"environment": settings.environment, "trading_mode": settings.trading_mode}
+        "app configured",
+        extra={
+            "environment": settings.environment,
+            "trading_mode": settings.trading_mode,
+            "ai_provider": settings.ai_provider,
+        },
     )
     return app
 
