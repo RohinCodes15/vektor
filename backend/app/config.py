@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     portfolio_db_path: Path = BACKEND_DIR / "data" / "portfolios.sqlite3"
     # Completed backtest results, stored whole so they can be retrieved later.
     backtest_db_path: Path = BACKEND_DIR / "data" / "backtests.sqlite3"
+    # Optional AI explanations of backtests (Phase 3A.1). "none" (the default) keeps Vektor fully local and free.
+    ai_provider: Literal["none", "anthropic"] = "none"
+    ai_model: str = Field(default="claude-opus-5-5", min_length=1, max_length=100)
+    # Read from the environment only; never logged or returned. Unset: the SDK falls back to ANTHROPIC_API_KEY.
+    ai_api_key: SecretStr | None = None
+    ai_timeout_seconds: float = Field(default=120, gt=0, le=600)
 
 
 @lru_cache
