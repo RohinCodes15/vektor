@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ApiError, runBacktestComparison } from "../src/lib/api.ts";
+import { ApiError, runBacktestComparison, runBacktestOptimization } from "../src/lib/api.ts";
 
 const strategies = [{ kind: "buy_and_hold" }, { kind: "sma_crossover", fast_window: 2, slow_window: 3 }];
 const config = {
@@ -42,8 +42,23 @@ test("comparison accepts 2–5 configurations, defaults, and distinct parameters
   const five = [strategies[0], strategies[1], { kind: "sma_crossover", fast_window: 3, slow_window: 4 }, { kind: "rsi", period: 2, oversold: "30", overbought: "70" }, { kind: "rsi", period: 3, oversold: "30", overbought: "70" }];
   assert.equal((await runBacktestComparison({ ...config, strategies: five })).results.length, 5);
   t.mock.method(globalThis, "fetch", async () => Response.json({ ...result, config: { ...config, strategies: [strategies[0], { kind: "sma_crossover", fast_window: 20, slow_window: 50 }] }, results: [unavailable(strategies[0]), unavailable({ kind: "sma_crossover", fast_window: 20, slow_window: 50 })] }));
-  const { position_size_pct, fee_per_trade, fee_bps, slippage_bps, ...minimal } = config;
+  const minimal = { symbol: config.symbol, start: config.start, end: config.end, starting_cash: config.starting_cash };
   assert.equal((await runBacktestComparison({ ...minimal, strategies: [strategies[0], { kind: "sma_crossover" }] })).results[1].status, "unavailable");
+});
+
+test("optimization preserves specific 422 validation messages and falls back for malformed errors", async (t) => {
+  const query = { symbol: config.symbol, start: config.start, end: config.end, starting_cash: config.starting_cash,
+    grid: { kind: "sma_crossover", fast_windows: [2], slow_windows: [3] }, objective: "total_return_pct" };
+  const detail = "The test segment has too few trading days for the selected grid.";
+  const request = t.mock.method(globalThis, "fetch", async () => Response.json({ detail }, { status: 422 }));
+  await assert.rejects(runBacktestOptimization(query), (error) => error instanceof ApiError && error.statusCode === 422 && error.message === detail);
+  for (const body of ["not JSON", "null", JSON.stringify({ detail: [] }), JSON.stringify({ detail: " " }), JSON.stringify({ message: "private details" })]) {
+    request.mock.mockImplementation(async () => new Response(body, { status: 422 }));
+    await assert.rejects(runBacktestOptimization(query), (error) => error instanceof ApiError && error.statusCode === 422
+      && error.message === "Optimization was rejected. Check the parameter grid, objective, train/test split, dates, and costs.");
+  }
+  request.mock.mockImplementation(async () => Response.json({ detail }, { status: 503 }));
+  await assert.rejects(runBacktestOptimization(query), (error) => error instanceof ApiError && error.statusCode === 503 && error.message === "The market data provider is unavailable. Try again later.");
 });
 
 test("comparison rejects invalid input and semantic duplicates before fetching", async (t) => {
