@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { BacktestComparison } from "../lib/api";
 import { comparisonChartGeometry, comparisonStrategyLabel } from "../lib/comparison-chart";
 import { nearestBacktestPoint } from "../lib/backtest-chart";
@@ -16,8 +16,9 @@ export function ComparisonChart({ data }: { data: BacktestComparison }) {
   const [index, setIndex] = useState<number | null>(null);
   const [hidden, setHidden] = useState<readonly number[]>([]);
   const slider = useId();
-  const series = data.results.map((result, i) => result.status === "available" && !hidden.includes(i) ? result.equity : null);
-  const geometry = comparisonChartGeometry(data.dates, series, width);
+  const series = useMemo(() => data.results.map((result, i) => result.status === "available" && !hidden.includes(i) ? result.equity : null), [data.results, hidden]);
+  const geometry = useMemo(() => comparisonChartGeometry(data.dates, series, width), [data.dates, series, width]);
+  const paths = useMemo(() => geometry.curves.map((points) => points.map((point, j) => `${j ? "L" : "M"}${point.x},${point.y}`).join(" ")), [geometry]);
   const selected = Math.max(0, Math.min(index ?? data.dates.length - 1, data.dates.length - 1));
   const reference = geometry.curves.find((points) => points.length > 0) ?? [];
   const active = reference[selected];
@@ -45,7 +46,7 @@ export function ComparisonChart({ data }: { data: BacktestComparison }) {
         {geometry.valueTicks.map((tick, i) => <g key={i}><line className="chart-grid-line" x1={geometry.plot.left} x2={geometry.plot.right} y1={tick.y} y2={tick.y} /><text className="chart-axis-label" x={geometry.plot.left - 10} y={tick.y + 4} textAnchor="end">{axisNumber.format(tick.value)}</text></g>)}
         {geometry.dateTicks.map((tick, i) => <text key={tick.date} className="chart-axis-label" x={tick.x} y="266" textAnchor={i === 0 ? "start" : "end"}>{tick.date}</text>)}
         {geometry.curves.map((points, i) => points.length > 0 && <g key={i}>
-          <path fill="none" stroke={colors[i]} strokeWidth="2" strokeDasharray={dashes[i]} d={points.map((point, j) => `${j ? "L" : "M"}${point.x},${point.y}`).join(" ")} />
+          <path fill="none" stroke={colors[i]} strokeWidth="2" strokeDasharray={dashes[i]} d={paths[i]} />
           {(points.length === 1 || index !== null) && points[selected] && <circle fill={colors[i]} cx={points[selected].x} cy={points[selected].y} r="4" />}
         </g>)}
         {index !== null && active && <line className="chart-grid-line" x1={active.x} x2={active.x} y1={geometry.plot.top} y2={geometry.plot.bottom} />}
