@@ -6,6 +6,7 @@ import { nearestBacktestPoint } from "../src/lib/backtest-chart.ts";
 import { formatMoney, formatTotalPnl } from "../src/lib/portfolio-values.ts";
 
 const ui = Object.fromEntries(["Badge", "Button", "Field", "Panel", "MetricCard"].map((name) => [name, function Mock() {}]));
+function MockResults() {}
 function MockAllocation() {}
 function MockPerformance() {}
 function MockTransactions() {}
@@ -53,4 +54,24 @@ test("dashboard holds child section elements stable when holdings finish; trade 
   const refreshed = nodes(component.render()).find((node) => node.type === MockPerformance);
   assert.notEqual(refreshed, loaded[1]);
   assert.equal(refreshed.props.refreshVersion, 1);
+});
+
+test("backtest results skip field-edit renders, double submissions send once, and unmount aborts late work", async () => {
+  let resolve, signal, calls = 0;
+  const component = await mount("../src/components/backtest-form.tsx", {
+    "../lib/api": { runBacktest: (_config, abortSignal) => { calls++; signal = abortSignal; return new Promise((done) => { resolve = done; }); } },
+    "./ui": ui, "./backtest-results": { BacktestResults: MockResults },
+  }, "BacktestForm");
+  let tree = component.render(); component.flush();
+  const initial = nodes(tree).find((node) => node.type === MockResults);
+  nodes(tree).find((node) => node.props?.id === "backtest-symbol").props.onChange({ target: { value: "AAPL" } });
+  tree = component.render();
+  assert.equal(nodes(tree).find((node) => node.type === MockResults), initial);
+  const submit = nodes(tree).find((node) => node.type === "form").props.onSubmit;
+  const pending = submit({ preventDefault() {} });
+  await submit({ preventDefault() {} });
+  assert.equal(calls, 1);
+  component.unmount(); assert.equal(signal.aborted, true);
+  resolve({ id: "late" }); await pending;
+  assert.equal(nodes(component.render()).find((node) => node.type === MockResults).props.state.status, "loading");
 });
