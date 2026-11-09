@@ -13,12 +13,15 @@ export type BacktestAnalysisState =
 export function useBacktestAnalysis(): { state: BacktestAnalysisState; load: (backtestId: string) => Promise<void> } {
   const [state, setState] = useState<BacktestAnalysisState>({ status: "idle" });
   const pending = useRef<AbortController | null>(null);
+  const pendingId = useRef<string | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
 
   const load = useCallback(async (backtestId: string): Promise<void> => {
+    if (pendingId.current === backtestId && pending.current && !pending.current.signal.aborted) return;
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
+    pendingId.current = backtestId;
     setState({ status: "loading", backtestId });
     try {
       await Promise.resolve();
@@ -30,6 +33,8 @@ export function useBacktestAnalysis(): { state: BacktestAnalysisState; load: (ba
       }
     } catch (error) {
       if (!controller.signal.aborted) setState({ status: "error", backtestId, message: error instanceof Error ? error.message : "Backtest analysis request failed. Try again.", statusCode: error instanceof ApiError ? error.statusCode : undefined });
+    } finally {
+      if (pending.current === controller) pendingId.current = null;
     }
   }, []);
 
