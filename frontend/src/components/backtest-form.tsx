@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { runBacktest, type Backtest, type BacktestStrategy } from "../lib/api";
 import { Badge, Button, Field, Panel } from "./ui";
 import { BacktestResults, type BacktestResultState } from "./backtest-results";
@@ -25,7 +25,8 @@ export function BacktestForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Backtest | null>(null);
-  const resultState: BacktestResultState = loading ? { status: "loading" } : error ? { status: "error", message: error } : result ? { status: "success", data: result } : { status: "idle" };
+  const resultState = useMemo<BacktestResultState>(() => loading ? { status: "loading" } : error ? { status: "error", message: error } : result ? { status: "success", data: result } : { status: "idle" }, [loading, error, result]);
+  const results = useMemo(() => <BacktestResults state={resultState} />, [resultState]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -86,7 +87,7 @@ export function BacktestForm() {
           <div className="backtest-actions"><Button type="submit" disabled={loading}>{loading ? "Running backtest…" : "Run backtest"}</Button><p className="muted text-xs">Signals use completed daily bars. No orders leave this machine.</p></div>
         </form>
       </Panel>
-      <BacktestResults state={resultState} />
+      {results}
     </section>
   );
 }
