@@ -61,6 +61,11 @@ async function requestJson(path: string, name: "health" | "market history" | "po
   }
   if (!response.ok) {
     if (name === "strategy optimization") {
+      if (response.status === 422) {
+        const data: unknown = await response.json().catch(() => null);
+        if (hasFields(data, ["detail"]) && typeof data.detail === "string" && data.detail.trim())
+          throw new ApiError(data.detail, response.status);
+      }
       const messages: Record<number, string> = {
         404: "No historical data found for this optimization's symbol and date range.",
         422: "Optimization was rejected. Check the parameter grid, objective, train/test split, dates, and costs.",
