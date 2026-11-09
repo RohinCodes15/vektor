@@ -4,6 +4,7 @@ import { mount, nodes } from "./component-runtime.mjs";
 import { comparisonChartGeometry, comparisonStrategyLabel } from "../src/lib/comparison-chart.ts";
 import { nearestBacktestPoint } from "../src/lib/backtest-chart.ts";
 import { formatMoney, formatTotalPnl } from "../src/lib/portfolio-values.ts";
+import { ApiError } from "../src/lib/api.ts";
 
 const ui = Object.fromEntries(["Badge", "Button", "Field", "Panel", "MetricCard"].map((name) => [name, function Mock() {}]));
 function MockResults() {}
@@ -74,4 +75,20 @@ test("backtest results skip field-edit renders, double submissions send once, an
   component.unmount(); assert.equal(signal.aborted, true);
   resolve({ id: "late" }); await pending;
   assert.equal(nodes(component.render()).find((node) => node.type === MockResults).props.state.status, "loading");
+});
+
+test("concurrent identical analysis requests send once, allow retry after completion, and cancel stale ids", async () => {
+  const pending = [];
+  const component = await mount("../src/hooks/use-backtest-analysis.ts", { "../lib/api": { ApiError,
+    getBacktestAnalysis: (id, signal) => new Promise((resolve) => pending.push({ id, signal, resolve })),
+  } }, "useBacktestAnalysis");
+  component.render(); component.flush();
+  const first = component.render().load("a"); await Promise.resolve();
+  await component.render().load("a"); assert.equal(pending.length, 1);
+  pending[0].resolve({ status: "available" }); await first;
+  const retry = component.render().load("a"); await Promise.resolve(); assert.equal(pending.length, 2);
+  const latest = component.render().load("b"); await Promise.resolve(); assert.equal(pending[1].signal.aborted, true);
+  pending[2].resolve({ status: "unavailable" }); await latest;
+  pending[1].resolve({ status: "available" }); await retry;
+  assert.equal(component.render().state.status, "unavailable");
 });
