@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBacktest, type Backtest, type BacktestStrategy } from "../lib/api";
 import { Badge, Button, Field, Panel } from "./ui";
 import { BacktestResults, type BacktestResultState } from "./backtest-results";
@@ -25,11 +25,16 @@ export function BacktestForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Backtest | null>(null);
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
   const resultState = useMemo<BacktestResultState>(() => loading ? { status: "loading" } : error ? { status: "error", message: error } : result ? { status: "success", data: result } : { status: "idle" }, [loading, error, result]);
   const results = useMemo(() => <BacktestResults state={resultState} />, [resultState]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
     setLoading(true);
     setError("");
     setResult(null);
@@ -37,14 +42,16 @@ export function BacktestForm() {
       : kind === "sma_crossover" ? { kind, fast_window: Number(fastWindow), slow_window: Number(slowWindow) }
       : { kind, period: Number(rsiPeriod), oversold, overbought };
     try {
-      setResult(await runBacktest({
+      const data = await runBacktest({
         symbols: [symbol], start, end, starting_cash: startingCash, strategy,
         fee_per_trade: feePerTrade, fee_bps: feeBps, slippage_bps: slippageBps,
-      }));
+      }, controller.signal);
+      if (!controller.signal.aborted) setResult(data);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Backtest could not be run. Try again.");
+      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "Backtest could not be run. Try again.");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
+      pending.current = null;
     }
   }
 
