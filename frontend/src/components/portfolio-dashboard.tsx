@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getPortfolios, getPortfolioHoldings, type Portfolio, type PortfolioHoldings } from "../lib/api";
 import { formatMoney, formatTotalPnl } from "../lib/portfolio-values";
 import { PortfolioAllocationSection } from "./portfolio-allocation";
@@ -61,6 +61,11 @@ export function PortfolioDetails({ id }: { id: string }) {
     return () => controller.abort();
   }, [id, revision]);
   const refreshAfterTrades = useCallback(() => { setState({ status: "loading" }); setRevision((value) => value + 1); }, []);
+  const sections = useMemo(() => <>
+    <PortfolioAllocationSection id={id} refreshVersion={revision} />
+    <PortfolioPerformance id={id} refreshVersion={revision} />
+    <TransactionHistory id={id} onTrades={refreshAfterTrades} />
+  </>, [id, revision, refreshAfterTrades]);
   const data = state.status === "success" ? state.data : null;
   return (
     <div aria-busy={state.status === "loading"}>
@@ -81,9 +86,7 @@ export function PortfolioDetails({ id }: { id: string }) {
             <div className="holdings-scroll" role="region" aria-label="Portfolio holdings" tabIndex={0}><table className="holdings-table"><caption className="muted">Paper positions · USD · Unpriced values are unavailable</caption><thead><tr><th scope="col">Symbol</th><th scope="col">Quantity</th><th scope="col">Cost basis</th><th scope="col">Market value</th><th scope="col">Unrealized P&L</th><th scope="col">Price date</th></tr></thead><tbody>{data.holdings.map((holding) => <tr key={holding.symbol}><th scope="row">{holding.symbol}</th><td>{holding.quantity}</td><td>{formatMoney(holding.cost_basis)}</td><td>{formatMoney(holding.market_value)}</td><td>{formatMoney(holding.unrealized_pnl)}</td><td>{holding.price_date ?? "Unavailable"}</td></tr>)}</tbody></table></div>}
         </>}
       </Panel>
-      <PortfolioAllocationSection id={id} refreshVersion={revision} />
-      <PortfolioPerformance id={id} refreshVersion={revision} />
-      <TransactionHistory id={id} onTrades={refreshAfterTrades} />
+      {sections}
     </div>
   );
 }
