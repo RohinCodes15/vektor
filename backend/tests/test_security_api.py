@@ -171,3 +171,45 @@ def test_limit_responses_are_documented_for_expensive_endpoints(tmp_path: Path) 
     for path in ("/api/v1/backtests", "/api/v1/backtests/comparisons", "/api/v1/backtests/optimizations",
                  "/api/v1/backtests/{backtest_id}/analysis"):
         assert set(paths[path]["post"]["responses"]) >= {"413", "429", "503"}
+
+
+OWNER_KEY = "o" * 48
+OWNER = {"x-vektor-owner-key": OWNER_KEY}
+
+
+def public_client(tmp_path: Path) -> TestClient:
+    return make_client(tmp_path, environment="production", cors_origins=["https://vektor.example"], owner_key=OWNER_KEY)
+
+
+def test_in_production_visitors_cannot_create_change_or_trade_paper_portfolios(tmp_path: Path) -> None:
+    client = public_client(tmp_path)
+    assert client.post("/api/v1/portfolios", json={"name": "x", "starting_cash": "100.00"}).status_code == 403
+    portfolio = client.post("/api/v1/portfolios", json={"name": "Owner", "starting_cash": "1000.00"}, headers=OWNER)
+    assert portfolio.status_code == 201
+    pid = portfolio.json()["id"]
+    order = {"client_order_id": "o1", "symbol": "AAPL", "side": "buy", "quantity": "1"}
+    assert client.post(f"/api/v1/portfolios/{pid}/orders", json=order).status_code == 403
+    assert client.patch(f"/api/v1/portfolios/{pid}", json={"name": "vandal"}).status_code == 403
+    assert client.delete(f"/api/v1/portfolios/{pid}").status_code == 403
+    assert client.post(f"/api/v1/portfolios/{pid}/snapshots").status_code == 403
+    # Reading stays open, and nothing a visitor sent changed the owner's portfolio.
+    listing = client.get("/api/v1/portfolios")
+    assert listing.status_code == 200 and [p["name"] for p in listing.json()] == ["Owner"]
+    assert client.get(f"/api/v1/portfolios/{pid}/transactions").json() == []
+
+
+def test_in_production_visitors_run_research_but_cannot_list_every_stored_backtest(tmp_path: Path) -> None:
+    client = public_client(tmp_path)
+    backtest = client.post("/api/v1/backtests", json=BACKTEST)
+    assert backtest.status_code == 201
+    assert client.get(f"/api/v1/backtests/{backtest.json()['id']}").status_code == 200
+    assert client.post("/api/v1/backtests/comparisons", json=COMPARISON).status_code == 200
+    assert client.post("/api/v1/backtests/optimizations", json=OPTIMIZATION).status_code == 200
+    assert client.get("/api/v1/backtests").status_code == 403
+    assert client.get("/api/v1/backtests", headers=OWNER).status_code == 200
+
+
+def test_owner_only_rejections_keep_cors_so_the_browser_can_read_them(tmp_path: Path) -> None:
+    client = public_client(tmp_path)
+    res = client.post("/api/v1/portfolios", json={}, headers={"origin": "https://vektor.example"})
+    assert res.status_code == 403 and res.headers["access-control-allow-origin"] == "https://vektor.example"
