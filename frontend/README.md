@@ -21,3 +21,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The backend's development CORS defaults permit this origin. If either origin changes, configure the backend's exact allowed frontend origin; a frontend variable alone cannot change CORS. Configuration files such as `.env.local` are ignored by Git.
 
+## Public environment configuration
+
+`NEXT_PUBLIC_API_ORIGIN` is the backend **origin only**: no `/api/v1` suffix, path, query, fragment, or credentials. The API client adds the versioned endpoint path.
+
+- **Development:** optional; defaults to `http://localhost:8000`. HTTP or HTTPS origins are accepted.
+- **Production:** required before building; use the actual HTTPS backend origin. `next.config.ts` and `src/lib/api-origin.ts` reject missing, HTTP, loopback, or malformed production origins. The client also validates the origin before requests.
+- **Build time:** Next.js embeds `NEXT_PUBLIC_API_ORIGIN` in browser JavaScript. Restart development or rebuild production after changing it; changing only a running server's environment does not update an existing browser bundle.
+- **Secrets:** this variable is public. Never add backend credentials, `VEKTOR_AI_API_KEY`, `ANTHROPIC_API_KEY`, or other secrets to this frontend or any `NEXT_PUBLIC_*` variable.
+
+AI analysis is optional and configured on the backend only. With the provider off, measured facts remain available while AI interpretation is explicitly unavailable. Enabling Anthropic incurs provider charges. The guide does not generate AI requests automatically.
+
