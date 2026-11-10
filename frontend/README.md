@@ -47,3 +47,12 @@ Build before `npm test`: rendered-page tests read `.next/server/app/index.html`.
 
 See [frontend deployment](DEPLOYMENT.md) and [backend deployment](../backend/DEPLOYMENT.md) for Vercel/Fly.io settings, exact HTTPS CORS origins, persistent storage, costs, and access limitations. No deployment is performed by these commands. The API has no authentication; do not expose it to untrusted users merely because CORS is configured.
 
+## Existing workflows and UI
+
+The dashboard includes paper portfolio holdings and recorded analytics, historical market charts, strategy backtests, optional AI Insights, strategy comparison, and SMA/RSI parameter optimization with train/test results. Portfolio creation, order submission, and snapshot recording are API workflows. The guided demo links to these existing views without inventing data.
+
+`src/components/ui.tsx` provides shared Button, Badge, Panel, Field, and MetricCard primitives. `src/app/globals.css` owns the dark theme, spacing, responsive layouts, visible focus, and reduced-motion styles. Custom SVG charts preserve returned observations and offer keyboard exploration; monetary labels retain exact decimal values. `src/app/favicon.ico` reuses the sidebar's teal chevron on the canvas color and is served automatically at `/favicon.ico` by Next.js.
+
+`src/lib/api.ts` validates request inputs and backend response fields, including paper-only literals. Requests omit credentials, bypass caches, reject redirects, and support cancellation. Timeouts are five seconds for ordinary reads, thirty seconds for backtests/comparisons/optimizations, and five minutes for AI analysis. Health success is a liveness/configuration snapshot, not proof of market-data or AI availability. Provider-off, missing data, errors, and undefined metrics are displayed explicitly.
+
+Tests use Node's test runner with TypeScript stripping and mocked requests, plus production HTML checks. They cover API validation, exact financial presentation, chart geometry/interactivity, component states, keyboard controls, request cleanup, and focused performance regressions. Live-provider and assistive-technology checks are separate manual work.
