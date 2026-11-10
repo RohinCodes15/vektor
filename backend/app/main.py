@@ -20,6 +20,7 @@ from app.market_data.provider import HistoryProvider, YFinanceProvider
 from app.market_data.service import MarketDataService
 from app.middleware import (
     ExpensiveConcurrencyLimit,
+    OwnerOnly,
     RateLimit,
     RequestBodyLimit,
     RequestLogging,
@@ -74,6 +75,12 @@ def add_middleware(app: FastAPI, settings: Settings) -> None:
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES, compresslevel=GZIP_LEVEL)
     app.add_middleware(RequestBodyLimit, max_bytes=settings.max_request_body_bytes)
     app.add_middleware(ExpensiveConcurrencyLimit, max_concurrent=settings.max_concurrent_expensive_requests)
+    # Inside the rate limit, so rejected guesses at the owner key still count against the client.
+    app.add_middleware(
+        OwnerOnly,
+        enabled=settings.public_mode,
+        owner_key=settings.owner_key.get_secret_value() if settings.owner_key else None,
+    )
     app.add_middleware(
         RateLimit,
         per_minute=settings.rate_limit_per_minute,
