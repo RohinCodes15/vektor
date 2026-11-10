@@ -3,6 +3,7 @@
 - RequestBodyLimit: 413 for a body over the limit, whether declared by Content-Length or streamed.
 - RateLimit: fixed one-minute windows per client IP, with a stricter bucket for expensive requests; 429 + Retry-After.
 - ExpensiveConcurrencyLimit: at most N expensive requests run at once across all clients; 503 + Retry-After.
+- OwnerOnly: in public mode, paper portfolio writes and the stored-backtest listing need the owner key; 403 otherwise.
 - SecurityHeaders: nosniff, no framing, no referrer, no caching, a deny-all CSP for API responses, HSTS in production.
 - UnexpectedErrors: an unhandled exception becomes the generic 500 inside this stack, so it still gets CORS, security
   headers and the request id. Starlette would otherwise answer it from its outermost middleware, outside all of these.
@@ -15,6 +16,7 @@ which the client wrote itself. uvicorn's --forwarded-allow-ips "*" uses the left
 IP for every request.
 """
 
+import hmac
 import ipaddress
 import logging
 import math
@@ -37,6 +39,9 @@ WINDOW_SECONDS = 60
 MAX_TRACKED_KEYS = 10_000
 CONCURRENCY_RETRY_AFTER_SECONDS = 5
 REQUEST_ID_HEADER = b"x-request-id"
+OWNER_KEY_HEADER = b"x-vektor-owner-key"
+OWNER_ONLY = "This public deployment is read-only for paper portfolios. This request needs the owner key."
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 SAFE_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 # Swagger UI and ReDoc load scripts and styles, so the deny-all CSP would break them.
 DOCS_PATHS = ("/docs", "/redoc")
@@ -46,6 +51,18 @@ def is_expensive(scope: Scope) -> bool:
     """Backtests, comparisons, optimizations, and AI analysis: every POST under /api/v1/backtests."""
     path: str = scope["path"]
     return scope["method"] == "POST" and (path == "/api/v1/backtests" or path.startswith("/api/v1/backtests/"))
+
+
+def is_owner_only(scope: Scope) -> bool:
+    """Writes to paper portfolios (create, edit, delete, orders, snapshots) and the list of every stored backtest.
+
+    Visitors can still read a portfolio by id and run, read and analyze backtests, comparisons and optimizations.
+    """
+    path: str = scope["path"]
+    method: str = scope["method"]
+    if method == "GET" and path.rstrip("/") == "/api/v1/backtests":
+        return True
+    return method in WRITE_METHODS and (path == "/api/v1/portfolios" or path.startswith("/api/v1/portfolios/"))
 
 
 def client_ip(scope: Scope, trusted_proxy_hops: int = 0) -> str:
@@ -162,6 +179,26 @@ class RateLimit:
             return max(1, math.ceil(start + WINDOW_SECONDS - now))
         self.windows[(client, bucket)] = (start, count + 1)
         return None
+
+
+class OwnerOnly:
+    def __init__(self, app: ASGIApp, enabled: bool, owner_key: str | None) -> None:
+        self.app = app
+        self.enabled = enabled
+        self.owner_key = owner_key.encode() if owner_key else None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not self.enabled or not is_owner_only(scope) or self._is_owner(scope):
+            await self.app(scope, receive, send)
+            return
+        logger.warning("owner-only request rejected", extra={"method": scope["method"], "path": scope["path"]})
+        await send_error(send, 403, OWNER_ONLY)
+
+    def _is_owner(self, scope: Scope) -> bool:
+        if self.owner_key is None:
+            return False
+        sent = next((value for name, value in scope["headers"] if name == OWNER_KEY_HEADER), b"")
+        return hmac.compare_digest(sent, self.owner_key)
 
 
 class ExpensiveConcurrencyLimit:
