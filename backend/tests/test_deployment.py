@@ -1,10 +1,12 @@
 """Phase 5A deployment artifacts: the manifests agree with the startup checks, and backups are consistent."""
 
+import json
 import os
 import sqlite3
 import tomllib
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -23,8 +25,13 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name)
 
 
-def vektor_env(env: dict[str, str]) -> dict[str, str]:
-    return {key.removeprefix("VEKTOR_").lower(): value for key, value in env.items() if key.startswith("VEKTOR_")}
+def vektor_env(env: dict[str, str]) -> dict[str, Any]:
+    """VEKTOR_* manifest values as Settings arguments; JSON lists decoded as the environment source would."""
+    return {
+        key.removeprefix("VEKTOR_").lower(): json.loads(value) if value.startswith("[") else value
+        for key, value in env.items()
+        if key.startswith("VEKTOR_")
+    }
 
 
 def test_fly_keeps_every_database_on_the_mounted_volume() -> None:
