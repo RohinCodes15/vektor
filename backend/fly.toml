@@ -25,6 +25,10 @@ primary_region = "iad"
   FORWARDED_ALLOW_IPS = "*"
   # Required. The exact https origin(s) of the frontend, as a JSON list. Startup fails without it.
   VEKTOR_CORS_ORIGINS = '["https://vektor-paper.vercel.app"]'
+  # Public: there are no user accounts, so paper portfolio writes need the owner key (a Fly secret).
+  VEKTOR_PUBLIC_MODE = "true"
+  # Lower than the 300 default: bounds what one client can cost in outbound bandwidth ($0.02/GB on Fly).
+  VEKTOR_RATE_LIMIT_PER_MINUTE = "60"
 
 [[mounts]]
   source = "vektor_data"

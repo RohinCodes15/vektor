@@ -61,6 +61,12 @@ def test_fly_holds_no_secrets_and_allows_only_the_deployed_frontend() -> None:
     assert settings.cors_origins == ["https://vektor-paper.vercel.app"] and settings.owner_key is None
 
 
+def test_fly_locks_portfolio_writes_and_lowers_the_general_rate_limit() -> None:
+    settings = Settings(_env_file=None, **vektor_env(FLY["env"]))
+    assert settings.public_mode is True and settings.trusted_proxy_hops == 1
+    assert settings.rate_limit_per_minute == 60 and settings.expensive_rate_limit_per_minute == 30
+
+
 def test_the_production_env_example_is_complete_and_loadable() -> None:
     settings = Settings(_env_file=BACKEND / "deploy" / "production.env.example")
     assert settings.environment == "production" and settings.trading_mode == "paper"
