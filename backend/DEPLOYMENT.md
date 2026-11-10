@@ -101,17 +101,21 @@ production rejects `*` and plain-`http` origins (except localhost), turns the do
 
 ## Deploying to Fly.io
 
-Prerequisites: the `flyctl` CLI, a Fly account, and the frontend's final https origin.
+Prerequisites: the `flyctl` CLI, a Fly account, and the frontend's final https origin. These are the commands that
+created the live deployment; for a new one, change `app` and `VEKTOR_CORS_ORIGINS` in `fly.toml` first.
 
 ```bash
 cd backend
-fly launch --no-deploy --copy-config --name <your-app-name>       # keeps fly.toml; update `app` if asked
-fly volumes create vektor_data --size 1 --region iad               # one volume, same region as primary_region
-# Edit fly.toml: uncomment VEKTOR_CORS_ORIGINS and set your frontend's origin(s).
-fly secrets set VEKTOR_AI_API_KEY=...                              # only if you set VEKTOR_AI_PROVIDER=anthropic
-fly deploy
-curl https://<your-app-name>.fly.dev/api/v1/health                 # {"status":"ok",...,"trading_mode":"paper"}
+fly apps create vektor-api --org personal
+fly volumes create vektor_data --size 1 --region iad -a vektor-api --yes   # same region as primary_region
+umask 077; mkdir -p ~/.config/vektor
+python3 -c "import secrets; print(secrets.token_urlsafe(36))" > ~/.config/vektor/owner_key
+printf 'VEKTOR_OWNER_KEY=%s\n' "$(cat ~/.config/vektor/owner_key)" | fly secrets import -a vektor-api --stage
+fly deploy --ha=false                                              # one machine: SQLite and the limits need one process
+curl https://vektor-api.fly.dev/api/v1/health                      # {"status":"ok",...,"trading_mode":"paper"}
 ```
+
+Set `VEKTOR_AI_API_KEY` with `fly secrets set` only if you deliberately turn on paid AI analysis.
 
 Then point the frontend at it with `NEXT_PUBLIC_API_ORIGIN=https://<your-app-name>.fly.dev`.
 
