@@ -32,3 +32,18 @@ Open [http://localhost:3000](http://localhost:3000). The backend's development C
 
 AI analysis is optional and configured on the backend only. With the provider off, measured facts remain available while AI interpretation is explicitly unavailable. Enabling Anthropic incurs provider charges. The guide does not generate AI requests automatically.
 
+## Verification and production
+
+```sh
+npm run typecheck
+npm run lint
+# Reserved example for build verification only; replace with your real backend before publishing.
+NEXT_PUBLIC_API_ORIGIN=https://backend.example.com npm run build
+npm test
+npm start
+```
+
+Build before `npm test`: rendered-page tests read `.next/server/app/index.html`. For restricted environments where Turbopack cannot bind its build-worker port, the supported alternative is `npm run build -- --webpack` with the same environment variable. Neither build command requires a reachable backend; runtime features do.
+
+See [frontend deployment](DEPLOYMENT.md) and [backend deployment](../backend/DEPLOYMENT.md) for Vercel/Fly.io settings, exact HTTPS CORS origins, persistent storage, costs, and access limitations. No deployment is performed by these commands. The API has no authentication; do not expose it to untrusted users merely because CORS is configured.
+
