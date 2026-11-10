@@ -1,7 +1,7 @@
 # Fly.io manifest for the Vektor backend (Phase 5A). Paper-only: no broker settings exist.
-# Before the first deploy: replace `app`, create the volume, and set VEKTOR_CORS_ORIGINS (see backend/DEPLOYMENT.md).
-# Secrets (VEKTOR_AI_API_KEY) go in `fly secrets set`, never in this file.
-app = "vektor-api-change-me"
+# Live at https://vektor-api.fly.dev for the frontend at https://vektor-paper.vercel.app (see backend/DEPLOYMENT.md).
+# Secrets (VEKTOR_OWNER_KEY, and VEKTOR_AI_API_KEY if AI is ever turned on) go in `fly secrets`, never in this file.
+app = "vektor-api"
 primary_region = "iad"
 
 [build]
@@ -23,8 +23,8 @@ primary_region = "iad"
   VEKTOR_TRUSTED_PROXY_HOPS = "1"
   # Lets uvicorn take the scheme (https) from Fly's proxy. It does not decide the rate-limit address.
   FORWARDED_ALLOW_IPS = "*"
-  # Required. The exact https origin(s) of your frontend, as a JSON list. Startup fails until this is set.
-  # VEKTOR_CORS_ORIGINS = '["https://your-frontend.example"]'
+  # Required. The exact https origin(s) of the frontend, as a JSON list. Startup fails without it.
+  VEKTOR_CORS_ORIGINS = '["https://vektor-paper.vercel.app"]'
 
 [[mounts]]
   source = "vektor_data"

@@ -54,11 +54,11 @@ def test_fly_keys_rate_limits_on_the_address_its_proxy_appended() -> None:
     assert Settings(_env_file=None, **vektor_env(FLY["env"])).trusted_proxy_hops == 1
 
 
-def test_fly_holds_no_secrets_and_leaves_cors_to_the_operator() -> None:
+def test_fly_holds_no_secrets_and_allows_only_the_deployed_frontend() -> None:
     assert not any("KEY" in name or "SECRET" in name or "TOKEN" in name for name in FLY["env"])
-    # Deliberately unset: startup must fail until the operator names the frontend origin.
-    problems = configuration_problems(Settings(_env_file=None, **vektor_env(FLY["env"])))
-    assert len(problems) == 1 and "VEKTOR_CORS_ORIGINS" in problems[0]
+    settings = Settings(_env_file=None, **vektor_env(FLY["env"]))
+    assert configuration_problems(settings) == []
+    assert settings.cors_origins == ["https://vektor-paper.vercel.app"] and settings.owner_key is None
 
 
 def test_the_production_env_example_is_complete_and_loadable() -> None:
