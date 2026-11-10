@@ -33,6 +33,20 @@ def test_production_defaults_to_no_cors_origins_and_no_docs() -> None:
     assert s.cors_origins == [] and s.docs_enabled is False
 
 
+def test_public_mode_is_on_in_production_and_off_elsewhere_unless_set() -> None:
+    assert settings(environment="production").public_mode is True
+    assert settings().public_mode is False and settings(environment="test").public_mode is False
+    explicit = settings(environment="production", public_mode=False)
+    assert explicit.public_mode is False and "public_mode" in explicit.model_fields_set
+
+
+def test_the_owner_key_must_be_long_and_never_appears_in_settings_output() -> None:
+    with pytest.raises(ValidationError):
+        settings(owner_key="short")
+    s = settings(owner_key="o" * 31 + "SECRETOWNERKEY")
+    assert "SECRETOWNERKEY" not in repr(s) and "SECRETOWNERKEY" not in str(s.model_dump())
+
+
 def test_production_keeps_explicit_https_origins_and_docs() -> None:
     s = settings(environment="production", cors_origins=["https://vektor.example", "http://localhost:3000"],
                  docs_enabled=True)
