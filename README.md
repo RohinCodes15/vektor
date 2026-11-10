@@ -201,8 +201,8 @@ The documented setup is **Vercel for Next.js** and **Fly.io for the FastAPI back
 **Live:** https://vektor-paper.vercel.app (frontend) and https://vektor-api.fly.dev ([health](https://vektor-api.fly.dev/api/v1/health)), deployed and verified on 2026-11-09. Details, costs, and the live check results are in [backend/DEPLOYMENT.md](backend/DEPLOYMENT.md) and [backend/LAUNCH_READINESS.md](backend/LAUNCH_READINESS.md).
 
 1. Configure the frontend host with root directory `frontend`, the Next.js framework, `npm ci`, and `npm run build`.
-2. Set `NEXT_PUBLIC_API_ORIGIN` to the actual HTTPS backend origin **before building**. The checked-in client validates it for production requests; this checkout has no `next.config.ts` build-time validation hook, so do not assume a successful build proves the origin was configured.
-3. Run the backend as **one process on one machine**, with a persistent volume for both portfolio and backtest databases. The [Fly manifest](backend/fly.toml) is a template requiring an application name and explicit frontend CORS origins.
+2. Set `NEXT_PUBLIC_API_ORIGIN` to the actual HTTPS backend origin **before building**. `next.config.ts` fails a production build when it is missing, not HTTPS, or a loopback address.
+3. Run the backend as **one process on one machine**, with a persistent volume for both portfolio and backtest databases. The [Fly manifest](backend/fly.toml) is configured for the live `vektor-api` app; change `app` and `VEKTOR_CORS_ORIGINS` for a deployment of your own.
 4. Keep AI credentials on the backend, configure exact HTTPS CORS origins, and verify health plus real data workflows before sharing access.
 5. Follow the backend deployment guide for backups and rollback. A frontend rollback does not restore backend data.
 
