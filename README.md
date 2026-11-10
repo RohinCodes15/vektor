@@ -196,7 +196,9 @@ Build before `npm test`: rendered-page tests read the production HTML. Frontend 
 
 ## Deployment
 
-The documented setup is **Vercel for Next.js** and **Fly.io for the FastAPI backend**. Vercel Hobby is free only for eligible uses; Fly.io compute and persistent storage incur charges. Check current provider terms and pricing. There is no verified public deployment URL included here.
+The documented setup is **Vercel for Next.js** and **Fly.io for the FastAPI backend**. Vercel Hobby is free only for eligible uses; Fly.io compute and persistent storage incur charges. Check current provider terms and pricing.
+
+**Live:** https://vektor-paper.vercel.app (frontend) and https://vektor-api.fly.dev ([health](https://vektor-api.fly.dev/api/v1/health)), deployed and verified on 2026-11-09. Details, costs, and the live check results are in [backend/DEPLOYMENT.md](backend/DEPLOYMENT.md) and [backend/LAUNCH_READINESS.md](backend/LAUNCH_READINESS.md).
 
 1. Configure the frontend host with root directory `frontend`, the Next.js framework, `npm ci`, and `npm run build`.
 2. Set `NEXT_PUBLIC_API_ORIGIN` to the actual HTTPS backend origin **before building**. The checked-in client validates it for production requests; this checkout has no `next.config.ts` build-time validation hook, so do not assume a successful build proves the origin was configured.
