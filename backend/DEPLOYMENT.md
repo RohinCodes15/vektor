@@ -5,6 +5,42 @@ Vektor is **paper-only**. No setting, image, or manifest here enables a broker, 
 
 Nothing in this repository deploys anything or creates resources. Every command below is one you run yourself.
 
+## Live deployment (Phase 5F)
+
+Deployed and verified on 2026-11-09:
+
+| | |
+|---|---|
+| Frontend | https://vektor-paper.vercel.app (Vercel project `vektor-paper`, Hobby, Root Directory `frontend`) |
+| Backend | https://vektor-api.fly.dev ([health](https://vektor-api.fly.dev/api/v1/health)), Fly app `vektor-api` |
+| Machine | one shared-cpu-1x, 512 MB, region `iad`, stops when idle |
+| Storage | volume `vektor_data`, 1 GB, encrypted, at `/data`, with daily snapshots kept 5 days |
+| Network | shared IPv4 and IPv6 (no dedicated IPv4) |
+| AI | off (`VEKTOR_AI_PROVIDER=none`); no AI key is set |
+| Owner key | Fly secret `VEKTOR_OWNER_KEY`; a copy is kept outside the repository at `~/.config/vektor/owner_key` |
+
+Expected cost: up to $3.69 a month for the machine if it never stops, plus $0.15 for the volume. Fly waives a personal
+organization's bill under $5 a month (per its pricing page on 2026-11-09). What could raise it: outbound bandwidth at
+$0.02/GB, a second machine (`fly deploy` on a new app creates two unless `--ha=false`), a dedicated IPv4 ($2/month), or
+a larger VM. The Vercel project deploys every push to `main` automatically.
+
+### Public mode and the owner key
+
+The API has no user accounts, so the public deployment runs in **public mode** (the production default):
+- Anyone can read paper portfolios and run, read and analyze backtests, comparisons and optimizations.
+- Creating, editing or deleting portfolios, placing orders, recording snapshots, and listing every stored backtest
+  answer `403` unless the request carries the owner key in `X-Vektor-Owner-Key`.
+
+Using the key from your machine, without putting it in your shell history:
+
+```bash
+curl -X POST https://vektor-api.fly.dev/api/v1/portfolios -H 'content-type: application/json' \
+  -H "X-Vektor-Owner-Key: $(cat ~/.config/vektor/owner_key)" -d '{"name":"My portfolio","starting_cash":"10000.00"}'
+```
+
+To rotate it: write a new random value to the file, then
+`printf 'VEKTOR_OWNER_KEY=%s\n' "$(cat ~/.config/vektor/owner_key)" | fly secrets import -a vektor-api`.
+
 ## What the backend needs
 
 | Need | Why | Consequence |
