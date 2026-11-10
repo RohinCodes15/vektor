@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DEVELOPMENT_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+MIN_OWNER_KEY_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -52,6 +53,19 @@ class Settings(BaseSettings):
     max_concurrent_expensive_requests: int = Field(default=4, ge=1, le=64)
     # Longest start-to-end span a backtest, comparison, or optimization may request (about 20 years).
     max_backtest_range_days: int = Field(default=7305, ge=30, le=36_525)
+    # Public deployments (Phase 5F): paper portfolio writes and the listing of every stored backtest need the owner
+    # key, because the API has no user accounts. Production defaults to on.
+    public_mode: bool = False
+    # Sent as the X-Vektor-Owner-Key header to unlock owner-only requests. Environment only (a host secret); never
+    # logged or returned. Unset in public mode: nobody can write portfolios.
+    owner_key: SecretStr | None = None
+
+    @field_validator("owner_key")
+    @classmethod
+    def check_owner_key(cls, key: SecretStr | None) -> SecretStr | None:
+        if key is not None and len(key.get_secret_value()) < MIN_OWNER_KEY_LENGTH:
+            raise ValueError(f"the owner key must be at least {MIN_OWNER_KEY_LENGTH} characters (random)")
+        return key
 
     @field_validator("cors_origins")
     @classmethod
@@ -66,11 +80,13 @@ class Settings(BaseSettings):
         """Production locks down what development leaves open, unless a value is set explicitly."""
         if self.environment != "production":
             return self
-        defaulted = {"cors_origins", "docs_enabled"} - self.model_fields_set
+        defaulted = {"cors_origins", "docs_enabled", "public_mode"} - self.model_fields_set
         if "cors_origins" in defaulted:
             self.cors_origins = []
         if "docs_enabled" in defaulted:
             self.docs_enabled = False
+        if "public_mode" in defaulted:
+            self.public_mode = True
         # Assignment marks a field as set; keep model_fields_set meaning "set by the operator" (app.startup uses it).
         self.model_fields_set.difference_update(defaulted)
         for origin in self.cors_origins:
