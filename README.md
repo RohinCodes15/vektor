@@ -208,7 +208,7 @@ The documented setup is **Vercel for Next.js** and **Fly.io for the FastAPI back
 
 Render's free backend option is documented for disposable demos only: without persistent storage, portfolio/backtest data can be lost on restart or redeployment. Fly idle stops introduce cold starts, and restarts interrupt in-flight requests. Yahoo may rate-limit or block hosting-provider IPs. Frontend errors report outages rather than inventing data.
 
-**Access limitation:** there is no authentication or per-user isolation. Anyone with API access can change simulated portfolios; CORS does not secure non-browser clients. Hosted AI can also incur costs. Review access controls before exposing the service publicly. API docs are disabled by default in production.
+**Access limitation:** there are no user accounts or per-user isolation. Production runs in public mode: anyone can read paper portfolios and run research, but creating, changing or trading in portfolios needs the deployment owner's key. CORS does not secure non-browser clients. Hosted AI can incur costs and is off on the live deployment. API docs are disabled by default in production.
 
 ## Engineering decisions
 
