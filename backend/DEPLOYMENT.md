@@ -93,6 +93,9 @@ production rejects `*` and plain-`http` origins (except localhost), turns the do
 | `VEKTOR_CORS_ORIGINS` | `fly.toml` `[env]` | Not a secret. Required. |
 | `VEKTOR_*_DB_PATH`, `VEKTOR_MARKET_DATA_CACHE_PATH` | `fly.toml` `[env]` (preset to `/data`) | Must be on the volume |
 | `VEKTOR_AI_API_KEY` | `fly secrets set` only | Never in a file, a commit, or a log |
+| `VEKTOR_PUBLIC_MODE` | `fly.toml` `[env]` (`true`; also the production default) | Portfolio writes and the stored-backtest list need the owner key |
+| `VEKTOR_OWNER_KEY` | Fly secret only | 32+ random characters, sent as `X-Vektor-Owner-Key`. Unset in public mode: nobody can write portfolios |
+| `VEKTOR_RATE_LIMIT_PER_MINUTE` | `fly.toml` `[env]` (`60`) | Lowered from 300 to bound outbound bandwidth cost |
 | `VEKTOR_TRUSTED_PROXY_HOPS` | `fly.toml` `[env]` (preset to `1`) | How many proxies append to `X-Forwarded-For`. Rate limits key on the address the outermost one appended. With `0` behind a proxy, every client shares one limit. |
 | `FORWARDED_ALLOW_IPS` | `fly.toml` `[env]` (preset to `*`) | Read by uvicorn for the request scheme. It does not choose the rate-limit address: with `*`, uvicorn takes the leftmost `X-Forwarded-For` entry, which the client can write. |
 
