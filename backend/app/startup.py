@@ -79,3 +79,7 @@ def _warn_about_risky_choices(settings: Settings) -> None:
         logger.warning("interactive API docs are enabled in production")
     if not settings.cors_origins:
         logger.warning("no CORS origins: browsers on other origins cannot call the API")
+    if not settings.public_mode:
+        logger.warning("public mode is off in production: anyone can change or delete paper portfolios")
+    elif settings.owner_key is None:
+        logger.warning("public mode without an owner key: nobody can create or change paper portfolios")
