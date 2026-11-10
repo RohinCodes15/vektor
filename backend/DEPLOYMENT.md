@@ -166,8 +166,9 @@ stake.
 
 ## Limitations and remaining risks
 
-- **No authentication.** Anyone who can reach the URL can create and change paper portfolios. CORS limits browsers
-  only. Do not share the URL with people you do not trust. An auth layer is future work.
+- **No user accounts.** Public mode keeps visitors from changing portfolios, but every portfolio is readable by anyone,
+  and visitors cannot keep portfolios of their own. Per-visitor portfolios would need an API contract change and
+  frontend work. Whoever holds the owner key controls every portfolio.
 - **Yahoo Finance availability.** It is unofficial and free, with undocumented rate limits, and some cloud IP ranges
   get blocked. Expect occasional `503`s. Vektor never fabricates data to cover gaps.
 - **Single machine.** A restart, deploy, or idle stop interrupts in-flight requests, and the in-memory rate limits reset.
