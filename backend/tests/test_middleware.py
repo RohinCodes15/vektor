@@ -11,12 +11,14 @@ from starlette.types import Message, Receive, Scope, Send
 
 from app.middleware import (
     ExpensiveConcurrencyLimit,
+    OwnerOnly,
     RateLimit,
     RequestBodyLimit,
     RequestLogging,
     SecurityHeaders,
     client_ip,
     is_expensive,
+    is_owner_only,
 )
 
 
@@ -189,6 +191,74 @@ def test_a_client_cannot_dodge_the_rate_limit_by_inventing_forwarded_addresses()
     assert codes == [200, 200, 429]
     other = client.get("/api/v1/health", headers={"x-forwarded-for": "203.0.113.8"})
     assert other.status_code == 200  # a different real client keeps its own window
+
+
+# --- owner-only requests (public mode) ---------------------------------------------------------------------------
+
+OWNER_KEY = "k" * 40
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "expected"),
+    [
+        ("POST", "/api/v1/portfolios", True),
+        ("PATCH", "/api/v1/portfolios/3f1c", True),
+        ("DELETE", "/api/v1/portfolios/3f1c", True),
+        ("POST", "/api/v1/portfolios/3f1c/orders", True),
+        ("POST", "/api/v1/portfolios/3f1c/snapshots", True),
+        ("GET", "/api/v1/backtests", True),
+        ("GET", "/api/v1/backtests/", True),
+        ("GET", "/api/v1/portfolios", False),
+        ("GET", "/api/v1/portfolios/3f1c/holdings", False),
+        ("POST", "/api/v1/backtests", False),
+        ("POST", "/api/v1/backtests/comparisons", False),
+        ("GET", "/api/v1/backtests/3f1c", False),
+        ("POST", "/api/v1/backtests/3f1c/analysis", False),
+        ("OPTIONS", "/api/v1/portfolios", False),
+    ],
+)
+def test_owner_only_requests_are_portfolio_writes_and_the_backtest_listing(
+    method: str, path: str, expected: bool
+) -> None:
+    assert is_owner_only({"method": method, "path": path}) is expected
+
+
+def owner_app(enabled: bool, owner_key: str | None) -> TestClient:
+    app = FastAPI()
+
+    @app.post("/api/v1/portfolios")
+    def create() -> dict[str, str]:
+        return {"created": "yes"}
+
+    @app.get("/api/v1/portfolios")
+    def listing() -> list[str]:
+        return []
+
+    app.add_middleware(OwnerOnly, enabled=enabled, owner_key=owner_key)
+    return TestClient(app)
+
+
+def test_public_mode_turns_away_portfolio_writes_without_the_owner_key(caplog: pytest.LogCaptureFixture) -> None:
+    client = owner_app(enabled=True, owner_key=OWNER_KEY)
+    for headers in ({}, {"x-vektor-owner-key": "wrong"}, {"x-vektor-owner-key": OWNER_KEY[:-1]}):
+        res = client.post("/api/v1/portfolios", headers=headers)
+        assert res.status_code == 403 and res.json()["detail"].startswith("This public deployment is read-only")
+    assert client.get("/api/v1/portfolios").status_code == 200  # reading is still open
+    assert OWNER_KEY not in caplog.text and "wrong" not in caplog.text
+
+
+def test_the_owner_key_unlocks_owner_only_requests() -> None:
+    client = owner_app(enabled=True, owner_key=OWNER_KEY)
+    assert client.post("/api/v1/portfolios", headers={"x-vektor-owner-key": OWNER_KEY}).status_code == 200
+
+
+def test_public_mode_without_an_owner_key_allows_no_writes_at_all() -> None:
+    client = owner_app(enabled=True, owner_key=None)
+    assert client.post("/api/v1/portfolios", headers={"x-vektor-owner-key": ""}).status_code == 403
+
+
+def test_outside_public_mode_writes_need_no_key() -> None:
+    assert owner_app(enabled=False, owner_key=None).post("/api/v1/portfolios").status_code == 200
 
 
 # --- expensive concurrency limit ---------------------------------------------------------------------------------
