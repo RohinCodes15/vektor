@@ -6,6 +6,36 @@ below. Nothing was deployed and no paid resource was created. Every result here 
 **Verdict: ready to deploy.** Every critical check passes. What remains are operator steps (an account, a domain, a
 volume), not code defects. See "Before the first deploy".
 
+## Live verification (Phase 5F)
+
+Deployed on 2026-11-09: frontend https://vektor-paper.vercel.app, backend https://vektor-api.fly.dev. Before
+deploying, Phase 5F found that the API let anyone list, change or delete every paper portfolio, and added public mode
+with an owner key (see `DEPLOYMENT.md`). It also lowered the general rate limit to 60 a minute to bound bandwidth cost.
+
+| Check (live, against the deployed services) | Result |
+|---|---|
+| Backend tests after the public mode change | PASS: 765 passed |
+| Health, HTTPS redirect, HSTS, deny-all CSP, request id, `/docs` 404 | PASS |
+| CORS: `https://vektor-paper.vercel.app` allowed, other origins refused | PASS |
+| Yahoo Finance from Fly (AAPL January 2024, MSFT 2023: 250 sessions); unknown symbol 404 | PASS |
+| Visitors cannot create, edit, delete, trade in or snapshot a portfolio, or list stored backtests (403) | PASS |
+| Owner key: a showcase portfolio with three buys at real closes, a snapshot, an oversell rejected (422) | PASS |
+| Visitors read holdings, transactions, equity history, analytics, allocation and risk | PASS |
+| Backtest deterministic; a truncated run is an exact prefix (no look-ahead) | PASS |
+| AI Insights with the provider off: measured facts, interpretation unavailable | PASS |
+| Comparison equals a standalone backtest; optimization trains strictly before it tests | PASS |
+| Oversized body 413; validation errors never echo input | PASS |
+| Rate limit: 59 requests passed, then 429 with `Retry-After` and CORS, despite a new invented `X-Forwarded-For` on each | PASS |
+| SQLite on the volume: the portfolio and its trades survive a machine restart; files owned by the unprivileged user | PASS |
+| Browser, live site: Connected, showcase portfolio shown, favicon, requests only to the configured backend | PASS |
+| Browser, live site: price chart (251 observations), backtest, AI Insights, comparison, optimization, guided demo | PASS |
+| Browser, live site at 390 px after results load | **FAIL** (frontend): the page is 1,732 px wide |
+| API checks through the live API script | 26/26 |
+
+The 390 px failure: `.workspace` in `frontend/src/app/globals.css` is a grid with no column size, so its one implicit
+column grows to the widest table once results load. Adding `grid-template-columns: minmax(0, 1fr);` to `.workspace`
+was tested in the live page and brings it back to 375 px with nothing overflowing outside the tables' own scroll areas.
+
 ## Checks
 
 | Area | Check | Result |
