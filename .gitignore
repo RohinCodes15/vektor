@@ -24,3 +24,6 @@ build/
 # Local tooling
 .claude/
 graphify-out/
+# Vercel CLI link (project ids) and the env file `vercel link` pulls; never commit either.
+.vercel
+.env.local
