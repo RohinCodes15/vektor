@@ -84,7 +84,8 @@ each missing setting** (`app/startup.py`) when:
 - `VEKTOR_AI_PROVIDER=anthropic` and neither `VEKTOR_AI_API_KEY` nor `ANTHROPIC_API_KEY` is set.
 - A database directory cannot be created or written.
 
-It also logs a warning if a rate limit is off, the docs are on, or no CORS origin is set. Phase 4A rules still apply:
+It also logs a warning if a rate limit is off, the docs are on, no CORS origin is set, public mode is off, or public
+mode has no owner key. Phase 4A rules still apply:
 production rejects `*` and plain-`http` origins (except localhost), turns the docs off, and keeps the limits.
 
 | Variable | Where | Notes |
