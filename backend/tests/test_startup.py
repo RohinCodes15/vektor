@@ -97,3 +97,16 @@ def test_create_app_refuses_to_start_an_incomplete_production_configuration(tmp_
 def test_create_app_starts_a_complete_production_configuration(tmp_path: Path) -> None:
     app = create_app(production(tmp_path), market_data_provider=FakeProvider())
     assert app.state.portfolio_service is not None
+
+
+def test_production_warns_when_portfolios_are_open_or_locked_for_everyone(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    check_startup(production(tmp_path, public_mode=False))
+    assert "public mode is off in production" in caplog.text
+    caplog.clear()
+    check_startup(production(tmp_path))
+    assert "public mode without an owner key" in caplog.text
+    caplog.clear()
+    check_startup(production(tmp_path, owner_key="o" * 40))
+    assert "public mode" not in caplog.text
